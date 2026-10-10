@@ -59,7 +59,7 @@ try {
   runtime.BETTER_AUTH_URL ||=
     environment === "development"
       ? "http://127.0.0.1:3100"
-      : "https://showtime-bthginfo.vercel.app";
+      : "https://showtime-ingolstadt.vercel.app";
   runtime.APP_URL = runtime.BETTER_AUTH_URL;
   if (env.BLOB_READ_WRITE_TOKEN) runtime.BLOB_READ_WRITE_TOKEN = env.BLOB_READ_WRITE_TOKEN;
   fs.writeFileSync(runtimePath, JSON.stringify(runtime, null, 2));

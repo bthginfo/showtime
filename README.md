@@ -4,7 +4,7 @@ Ein gemeinsamer Arbeitsraum für den gesamten Theaterbetrieb: SvelteKit, getrenn
 
 ## Anwendung
 
-- [Showtime öffnen](https://showtime-bthginfo.vercel.app)
+- [Showtime öffnen](https://showtime-ingolstadt.vercel.app)
 - [Architektur und Rechte](docs/ARCHITEKTUR.md)
 - [Betrieb, Migrationen und verschlüsselte Wiederherstellung](docs/BETRIEB.md)
 - [Abnahme und bekannte Grenzen](docs/ABNAHME.md)

@@ -2,7 +2,9 @@
 
 ## Ressourcen und Umgebungen
 
-Repository: [bthginfo/showtime](https://github.com/bthginfo/showtime). Produktion: [Showtime](https://showtime-bthginfo.vercel.app). Vercel-Projekt `showtime`, Node.js 24, SvelteKit, Fluid Compute und Region Frankfurt `fra1`. Der vorhandene Vercel-Pro-Tarif wird verwendet.
+Repository: [bthginfo/showtime](https://github.com/bthginfo/showtime). Produktion: [Showtime](https://showtime-ingolstadt.vercel.app). Vercel-Projekt `showtime`, Node.js 24, SvelteKit, Fluid Compute und Region Frankfurt `fra1`. Der vorhandene Vercel-Pro-Tarif wird verwendet.
+
+Der Produktionsalias ist `showtime-ingolstadt.vercel.app`. `APP_URL` und `BETTER_AUTH_URL` zeigen in Production auf diese HTTPS-Adresse. Der vorherige Alias `showtime-bthginfo.vercel.app` leitet mit Status 308 auf die neue Adresse weiter; Pfade und Queryparameter bleiben erhalten.
 
 Production, Preview und Development besitzen jeweils ein eigenes Neon-Free-Projekt, einen eigenen privaten Blob-Store sowie eigene Auth-, Cron- und VAPID-Schlüssel. Die Produktionsdatenbank ist das Neon-Projekt `royal-glade-27927910`. Die Ressourcen sind unabhängig von DigitalMask. Ein Preview-Deployment verwendet seinen eigenen Vercel-Host für Auth und Einladungslinks.
 
