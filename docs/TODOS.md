@@ -11,7 +11,7 @@ Der verbindliche Erstumfang und seine Umsetzung stehen in [APPROVED-PLAN.md](APP
 - [x] Bearbeiten und Löschen eigener Arbeits- und Anwesenheitsbuchungen.
 - [x] Bewusste Supportweiterleitung und Plattformverwaltung für Theatersperren.
 - [x] Getrennte Entwicklungs-, Vorschau- und Produktionsressourcen.
-- [ ] Finale Cloud-, Restore- und Lastprüfung sowie GitHub-/Vercel-Veröffentlichung abschließen.
+- [x] Finale Cloud-, Restore- und Paginationprüfung sowie GitHub-/Vercel-Veröffentlichung abgeschlossen.
 
 ## Spätere Erweiterungen außerhalb der Erstfreigabe
 

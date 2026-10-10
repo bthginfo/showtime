@@ -28,6 +28,8 @@ Die lokale Erstinstallation verwahrt `.local/runtime-<environment>.json`, `.loca
 
 CI führt keine Produktionsmigrationen und keinen Bootstrap aus. Additive Migrationen bevorzugen und die Verträglichkeit mit noch laufenden alten Eventversionen prüfen. Vor destruktiven Schemaänderungen ein vollständiges Backup anfertigen. Der Build ergänzt Queue-Trigger, Noto-Schriften, Portraitmodell und dynamisch geladene PDFKit-Schriftmodule in den Function-Bundles.
 
+Das Vercel-Projekt ist mit `bthginfo/showtime` verbunden; `main` ist der Produktionsbranch. Neue Commits werden durch GitHub CI geprüft und lösen die Git-Bereitstellung aus. Der initiale Release wurde zusätzlich ausdrücklich für Produktion und geschützte Preview aus demselben geprüften Git-Commit gebaut und auf beiden Adressen abgenommen.
+
 ## Zugänge und Verwaltung
 
 Neue Theater entstehen über die Plattformverwaltung und erhalten einen einmaligen, sieben Tage gültigen Einladungslink für die Theateradministration. Bestehende Konten können die Einladung ebenfalls annehmen. Gewerk- und Gastzugänge vergibt die zuständige Theaterverwaltung; Gastrollen sind an eine Produktion gebunden und können ablaufen. Mitgliedschaften, Rollen und Theatersperren werden bei jedem neuen Zugriff geprüft.

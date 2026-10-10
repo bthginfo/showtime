@@ -9,7 +9,7 @@ Freigabe am 10. Oktober 2026. Ausgangspunkt: DigitalMask `daafd42`. Ziel: `bthgi
 - [x] 2: Aktive DigitalMask-Oberfläche nach Svelte portiert; direkte Referenzscreens, Kalender, Dokumente und Maskenfunktionen übernommen.
 - [x] 3: Gemeinsame Produktionen, Besetzungen, Hausdisposition, Ressourcen, Planstände und hausweite Kommunikation.
 - [x] 4: Zwanzig aktivierbare Gewerke mit typisierten Fachansichten, Bereitschaft, Abhängigkeiten und Budgetfreigaben.
-- [ ] 5: Abschließende Cloud-/Preview-Abnahme, vollständige Restoreprobe, gemessene Pagination und Veröffentlichung des geprüften GitHub-Stands.
+- [x] 5: Abschließende Cloud-/Preview-Abnahme, vollständige Restoreprobe, gemessene Pagination und Veröffentlichung des geprüften GitHub-Stands.
 
 Zusätzlich umgesetzt: Alle eigenen gebuchten Arbeitszeiten und Anwesenheiten können bearbeitet und gelöscht werden, einschließlich Timerbuchungen und Buchungen mit inzwischen entzogenem Produktionszugang. Veraltete Änderungen werden abgewiesen. Teamkorrekturen benötigen ausdrücklich die passende Rolle.
 
@@ -18,5 +18,7 @@ Zusätzlich umgesetzt: Alle eigenen gebuchten Arbeitszeiten und Anwesenheiten k�
 Die separate Infrastruktur besteht aus Vercel-Projekt `showtime`, drei Neon-Free-Projekten und drei privaten Blob-Stores. Entwicklung, Preview und Produktion besitzen eigene Secrets und eingeschränkte Laufzeitrollen. Migrationen reichen bis `0016_showtime-support`. Migrationsrechte und Verwaltungs-PATs sind aus den Deployments entfernt.
 
 Die Abnahme ist in [ABNAHME.md](ABNAHME.md) dokumentiert. Architektur und verbindliche Rechte stehen in [ARCHITEKTUR.md](ARCHITEKTUR.md), Einrichtung und Wiederherstellung in [BETRIEB.md](BETRIEB.md). Private Testreports, Screenshots, Zugangsdaten und Sicherungen bleiben unter `.local` und werden nicht veröffentlicht.
+
+Alle Etappen des freigegebenen Erstumfangs sind abgeschlossen. Der geprüfte Anwendungscode `e5af8ee` liegt auf `main`; GitHub CI und beide getrennten Vercel-Builds sind bestanden. Das Vercel-Projekt ist mit `bthginfo/showtime` und Produktionsbranch `main` verbunden. Die Anwendung ist unter [Showtime](https://showtime-bthginfo.vercel.app) erreichbar.
 
 Der bestehende DigitalMask-Checkout, seine Laufzeitkonfiguration, Daten und Deployments werden von dieser Umsetzung nicht verändert. Offene spätere Integrationen sind ausdrücklich vom freigegebenen Erstumfang getrennt.

@@ -11,7 +11,8 @@ Stand: 10. Oktober 2026. Alle Tests verwenden synthetische Showtime-Daten und ne
 | Normale Testsuite             | 315 bestanden; 11 bewusst ausstehende Tests: 10 echte DB-Tests nur mit Opt-in und eine bestehende Exportsonderprüfung                                                |
 | Echte Entwicklungsintegration | 10 bestanden; nonowner/RLS, Poolreset, fremde IDs/FKs, Transaktionsrollback, beide Zeitarten, Rechteverlust, Ressourcen, Eventwiederholung und mehr als 5.000 Zeilen |
 | Browser-/API-Abnahme          | Alle 13 Szenarien bestanden; keine übersprungenen oder instabilen Browsertests                                                                                       |
-| Produktionsbuild              | Lokaler Build und separates Vercel-Deployment; Cloudprüfung folgt dem tatsächlichen Function-Bundle                                                                  |
+| Produktionsbuild              | Lokaler Build sowie Git-basierte Vercel-Builds für Produktion und Preview bestanden                                                                                  |
+| GitHub CI                     | [Showtime checks](https://github.com/bthginfo/showtime/actions/runs/38069481826) bestanden                                                                           |
 
 Die 13 Browser-/API-Szenarien decken eigene/fremde Arbeitszeiten und Anwesenheit, echte UI-Korrektur und Löschung, private Gruppen, Blob-Dateien, Yjs-Änderungen, DOCX-Export, Tenant-IDOR, Raumkonflikte, kanonische Vorstellungen, Plan-Snapshots, Rechteentzug und ICS, Produktionsbereitschaft, Budgetgrenzen, mobile Bedienung, ablaufende Gäste sowie bewusste Supportweiterleitung und Theatersperren ab. Hinzu kommen persistente Text- und Tabellenbearbeitung in der Oberfläche, typisierte Fachvorgänge in allen 20 Gewerken und der Theaterkern mit Werk, Spielzeit, Vorstellungsserie und Zuordnungserhalt beim Phasenwechsel.
 
@@ -29,7 +30,9 @@ Showtime ergänzt Theater-/Gewerkwechsel, Theaterbetrieb und rechtsabhängige Na
 
 Eine vollständige verschlüsselte Entwicklungs-Tenantsicherung mit Fachhistorien, Mitgliedschaften, Grants, Produktionen, Planständen, Yjs-Daten, Supportfällen und 15 privaten Dateien wurde in ein neues Theater zurückgespielt. Counts und Datei-SHA-256 sowie die identischen Zustände von 15 Dokumenten, 15 Puffern und 13 Updates wurden geprüft. Werk, Spielzeit, Vorstellungsserie und ihre neu vergebenen Referenzen wurden ebenfalls verifiziert. Bestehende Theater wurden nicht überschrieben.
 
-Cloud-Smokeprüfungen auf Produktion und geschützter Preview haben Anmeldung, Workspace, privaten Dateidownload, persistente Dokumentänderung, DOCX/PDF-Ausgabe, zwanzig durch die echte Queue erzeugte Gewerk-Arbeitsräume und eine echte Browseransicht bestanden. Preview und Produktion verwenden verschiedene Datenbanken, Dateispeicher und Secrets. Der veröffentlichte finale Commit wird vor Abschluss nochmals auf den tatsächlichen Deployment-Adressen geprüft.
+Cloud-Smokeprüfungen auf [Produktion](https://showtime-bthginfo.vercel.app) und [geschützter Preview](https://showtime-5nq0nrbuf-juliusvingelheim-2692s-projects.vercel.app) haben Anmeldung, Workspace, privaten Dateidownload, persistente Dokumentänderung, DOCX/PDF-Ausgabe, zwanzig durch die echte Queue erzeugte Gewerk-Arbeitsräume und eine echte Browseransicht bestanden. Beide Builds stammen direkt aus dem veröffentlichten Anwendungscode `e5af8ee`; die abschließende Dokumentation ändert diesen Code nicht.
+
+Entwicklung, Preview und Produktion besitzen drei unterschiedliche Datenbankhosts, Blob-Tokens und Authsecrets. Ein Versuch mit den Zugangsdaten der jeweils anderen Cloudumgebung wurde mit 401 abgewiesen. Eigene private Dateien waren erreichbar, Dateien der anderen Umgebung wurden mit 404 abgewiesen. Die für die Cloud-Abnahme erzeugten Produktionen, Facharbeitsräume und Hauskanäle wurden anschließend gezielt entfernt. Das Starttheater enthält keine übernommenen DigitalMask-Daten.
 
 ## Grenzen des Erstumfangs
 
