@@ -38,7 +38,7 @@ Die erste Cloud-Abnahme auf [Produktion](https://showtime-bthginfo.vercel.app) u
 
 Entwicklung, Preview und Produktion besitzen drei unterschiedliche Datenbankhosts, Blob-Tokens und Authsecrets. Ein Versuch mit den Zugangsdaten der jeweils anderen Cloudumgebung wurde mit 401 abgewiesen. Eigene private Dateien waren erreichbar, Dateien der anderen Umgebung wurden mit 404 abgewiesen. Die für die Cloud-Abnahme erzeugten Produktionen, Facharbeitsräume und Hauskanäle wurden anschließend gezielt entfernt. Das Starttheater enthält keine übernommenen DigitalMask-Daten.
 
-Der Produktionsalias wurde anschließend auf [Showtime Ingolstadt](https://showtime-ingolstadt.vercel.app) umgestellt. Die Produktions-URLs für Authentifizierung und erzeugte Links wurden angepasst. HTTPS, Anmeldung, Session und Workspace wurden unter dem neuen Alias erneut geprüft; die Anmeldeseite wurde zusätzlich im eingebauten Browser geöffnet. Die Weiterleitung der bisherigen Adresse ist bei Vercel mit Status 308 konfiguriert. Der direkte HTTPS-Aufruf des alten Hosts zeigte bei der Abnahme einen TLS-Handshakefehler; ein vollständiger Test dieser Weiterleitung war deshalb nicht möglich.
+Der Produktionsalias wurde anschließend auf [Showtime Ingolstadt](https://showtime-ingolstadt.vercel.app) umgestellt. Die Produktions-URLs für Authentifizierung und erzeugte Links wurden angepasst. HTTPS, Anmeldung, Session und Workspace wurden unter dem neuen Alias erneut geprüft; die Anmeldeseite wurde zusätzlich im eingebauten Browser geöffnet. Auch die HTTPS-Weiterleitung der bisherigen Adresse wurde nach der Bereitstellung bestätigt: Status 308 auf den neuen Host bei unverändertem Pfad und erhaltenen Queryparametern.
 
 ## Grenzen des Erstumfangs
 
