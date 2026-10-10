@@ -28,7 +28,7 @@ const setError = (next: typeof error | ((current: typeof error) => typeof error)
 <Modal title="Gemeinsames Dokument anlegen" onClose={() => {
     if (!busy)
         onClose();
-}} className="new-document-dialog">
+}} className="new-document-dialog" initialFocus="#new-document-name">
       <form on:submit={(event) => {
     event.preventDefault();
     if (busy || !name.trim())
@@ -55,7 +55,7 @@ const setError = (next: typeof error | ((current: typeof error) => typeof error)
           </button>
         </div>
         <label for="new-document-name">Name</label>
-        <input id="new-document-name" value={name} required maxLength={120} autofocus disabled={busy} placeholder="Zum Beispiel: Vorbereitung Abschiedsdinner" on:input={(event) => setName(event.currentTarget.value)} />
+        <input id="new-document-name" value={name} required maxLength={120} disabled={busy} placeholder="Zum Beispiel: Vorbereitung Abschiedsdinner" on:input={(event) => setName(event.currentTarget.value)} />
         <p class="small muted">
           Alle Personen mit Zugriff auf diesen Bereich arbeiten im selben Dokument.
         </p>

@@ -93,7 +93,7 @@ $: groupIds = [...new Set(rows.map((row) => value(row.data, "productionId")))].s
         </button>
       </div>
       {#if tab === "templates"}<ResourceView kind="templates" description="Wiederverwendbare Abschnitte und Textfelder. Individuelle Vorlagenfelder bleiben erhalten."></ResourceView>{:else}
-          <PageHeader eyebrow="WISSEN FÜR EUER TEAM" title="Aufschriebe" description="Allgemeine Aufschriebe und Produktionswissen, auch aus vergangenen Spielzeiten.">
+          <PageHeader eyebrow="WISSEN FÜR EUER TEAM" title="Aufschriebe" >
             <ExportButton onClick={() => setExporting(true)}></ExportButton>
             {#if workspace.user.role !== "user"}<Button onClick={() => setCategoriesOpen(true)}>Abschnitte verwalten</Button>{/if}
             <Button variant="primary" onClick={() => setEditing(true)}>

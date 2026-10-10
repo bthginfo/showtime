@@ -1,6 +1,7 @@
 <script lang="ts">import { initialState } from '@/shared/svelte-runtime';
 
 import { LinkedText } from "@/components/linked-text";
+import { descendantClicks } from "@/shared/interaction-actions";
 import { AlertTriangle, Check, Copy, MoreHorizontal, Download, Pencil, Plus, Save, Settings2, Trash2, Undo2, } from "@lucide/svelte";
 import { Button, Empty, ErrorMessage, Modal } from "@/components/ui";
 import { useWorkspace } from "@/components/workspace-context";
@@ -265,7 +266,6 @@ let timetableProps = {
     onDragStart: beginDrag,
     onDragCancel: cancelDrag,
 };
-const beginningControl = true;
 
 $: plans = workspace.records.maskPlans.filter((record) => record.data.productionId === production.id);
 $: selected = plans.find((record) => record.id === selectedId) || (!draft ? plans[0] : undefined);
@@ -348,7 +348,7 @@ $: timetableProps = {
                   </option>{/each}
               </select>
             </label>
-            {compact && beginningControl}
+            {#if compact}{@render render_beginningControl()}{/if}
             <div class={styles.planActions}>
               {#if compact}<Button variant="primary" onClick={() => setEditing(true)} disabled={pending}>
                   <Pencil size={16}></Pencil>
@@ -465,7 +465,7 @@ $: timetableProps = {
               </div>
               {@render render_beginningControl()}
             </div>{/if}
-          <div inert={pending} class={styles.workspaceContent} on:click|capture={(event) => {
+          <div inert={pending} class={styles.workspaceContent} use:descendantClicks={{selector: "a[href]", capture: true, handler: (event) => {
     const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
     if (link &&
         dirty &&
@@ -476,7 +476,7 @@ $: timetableProps = {
         event.preventDefault();
         event.stopPropagation();
     }
-}}>
+}}}>
             {#if plan.lanes.length}{#if compact}<SavedTimetable {...timetableProps}></SavedTimetable>{:else}<Timetable {...timetableProps}></Timetable>{/if}{:else}<div class={styles.empty}>
                 <Empty title="Wer arbeitet in der Maske?" description="Lege zuerst eine Personalspalte an. Eine oder mehrere Maskenpersonen können sich eine Spalte teilen. Danach kommen die Zeitblöcke für Schauspieler und Tätigkeiten dazu." action="Personalspalte hinzufügen" onAction={addLane}></Empty>
               </div>{/if}

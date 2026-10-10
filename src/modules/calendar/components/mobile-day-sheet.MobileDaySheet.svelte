@@ -61,6 +61,7 @@ $: effects.run(1, () => {
         return;
     const previousOverflow = document.body.style.overflow;
     element.showModal();
+    element.querySelector<HTMLButtonElement>('button[aria-label="Tagesdetails schließen"]')?.focus({ preventScroll: true });
     document.body.style.overflow = "hidden";
     return () => {
         element.close();
@@ -112,7 +113,7 @@ $: count = (() => calendarDayEntries(events, day).length)();
             {contextLabel} · {count} {count === 1 ? "Termin" : "Termine"}
           </p>
         </div>
-        <button type="button" class={`icon-button ${styles.close}`} aria-label="Tagesdetails schließen" on:click={onClose} autofocus>
+        <button type="button" class={`icon-button ${styles.close}`} aria-label="Tagesdetails schließen" on:click={onClose}>
           <X size={20}></X>
         </button>
       </header>

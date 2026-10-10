@@ -226,7 +226,7 @@ $: effects.run(90,()=>{void $workspaceStore.loadWindow('time',week,shiftDate(wee
                 <Plus size={16}></Plus> Nachtragen
               </Button>{/if}
           </div>
-        </header>{:else}<PageHeader eyebrow="PRODUKTIONSSTUNDEN" title="Produktionsstunden" description="Produktionsarbeit und allgemeine Tätigkeiten. Tages- und Wochensummen rechnen sich von selbst." compact><svelte:fragment slot="secondaryActions">{@render render_secondaryActions()}</svelte:fragment>
+        </header>{:else}<PageHeader eyebrow="PRODUKTIONSSTUNDEN" title="Produktionsstunden"  compact><svelte:fragment slot="secondaryActions">{@render render_secondaryActions()}</svelte:fragment>
           {#if workspace.user.role !== "superadmin"}<Button variant="primary" onClick={() => openBooking()}>
               <Plus size={16}></Plus>
               Zeit nachtragen

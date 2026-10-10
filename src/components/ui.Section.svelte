@@ -14,7 +14,7 @@ type ViewProps = {
 };
 export let title: ViewProps["title"] = undefined as any;
 export let meta: ViewProps["meta"] = undefined as any;
-export let children = undefined as any;
+
 export let action: ViewProps["action"] = undefined as any;
 
 

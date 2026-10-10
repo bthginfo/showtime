@@ -14,4 +14,4 @@ Each named plan is one `maskPlans` record linked to a production. Its lanes cont
 
 Shared records, history, cache invalidation and event-driven workspace updates need no separate infrastructure. Generic actor deletion checks nested references. Production copying remaps lane/block IDs while preserving global actor links.
 
-Focused checks: `tests/mask-plans.test.ts`, `tests/mask-plan-save.test.ts`, `tests/mask-plan-exports.test.ts`, `tests/e2e/mask-plans-ui.spec.ts`, `tests/e2e/mask-plan-save-ui.spec.ts` and `tests/e2e/numeric-mask-drag.spec.ts`. Browser fixtures intercept API traffic and create no production data. Quick production responsibility choices are covered separately by `tests/e2e/production-makeup-choice.spec.ts`.
+Focused checks: `tests/mask-plans.test.ts`, `tests/mask-plan-save.test.ts` and `tests/mask-plan-exports.test.ts`. The real development browser/API suite in `tests/e2e/showtime.spec.ts` also exercises saved-table scrolling, keyboard and mouse placement, editing and versioned saving. Browser acceptance uses synthetic Showtime development data and never creates production fixtures.

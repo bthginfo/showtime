@@ -7,9 +7,16 @@ import {
   navigateWorkspace,
   recordHref,
   restoreNavigationScroll,
+  replaceWorkspaceLocation,
   setNavigationUser,
 } from "../src/shared/client-navigation";
 import { readViewState, writeViewState } from "../src/shared/view-state";
+
+vi.mock("../src/shared/kit-history", () => ({
+  pageHistoryState: () => history.state,
+  pushState: (url: string | URL, state: Record<string, unknown>) => history.pushState(state, "", url),
+  replaceState: (url: string | URL, state: Record<string, unknown>) => history.replaceState(state, "", url),
+}));
 
 describe("navigation context", () => {
   const states: { url: URL; state: Record<string, unknown> }[] = [];
@@ -32,7 +39,7 @@ describe("navigation context", () => {
       url: new URL(
         "https://example.test/?module=productions&productionId=play&tab=casting&relatedSeason=2024%2F2025",
       ),
-      state: { existingNextState: true },
+      state: { existingPageState: true },
     });
     index = 0;
     storage.clear();
@@ -86,18 +93,30 @@ describe("navigation context", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("returns to the actual production tab and source detail without losing unrelated query or Next state", () => {
+  it("returns to the actual production tab and source detail without losing unrelated query or page state", () => {
     navigateRecord(row("target"), { from: row("source") });
     expect(states[1].url.searchParams.get("tab")).toBe("casting");
     expect(states[1].url.searchParams.get("relatedSeason")).toBe("2024/2025");
     expect(states[1].url.searchParams.get("record")).toBe("source");
-    expect(states[0].state.existingNextState).toBe(true);
+    expect(states[0].state.existingPageState).toBe(true);
     closeRecordDetail();
     expect(location.search).toContain("record=source");
     restoreNavigationScroll();
     expect(scrollTo).toHaveBeenLastCalledWith({ left: 0, top: 680, behavior: "instant" });
     closeRecordDetail();
     expect(location.search).not.toContain("record=");
+    expect(location.search).toContain("tab=casting");
+  });
+  it("replaces a selected record without adding a history entry or losing return and scroll state", () => {
+    navigateWorkspace("/?module=actors&record=first");
+    captureNavigationScroll();
+    const before = states[index].state;
+    const count = states.length;
+    replaceWorkspaceLocation("/?module=actors&record=second");
+    expect(states.length).toBe(count);
+    expect(states[index].url.searchParams.get("record")).toBe("second");
+    expect(states[index].state).toEqual(before);
+    closeRecordDetail();
     expect(location.search).toContain("tab=casting");
   });
   it("restores view filters and scrolling after a module remount without sharing another user's selection", () => {

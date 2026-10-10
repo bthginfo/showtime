@@ -1,6 +1,7 @@
 import {scopedBrowserKey} from './browser-scope';
 import type { DomainRecord } from "./contracts";
 import { value } from "./client-api";
+import { pageHistoryState, pushState, replaceState } from "./kit-history";
 
 interface NavigationContext {
   returnTo?: string;
@@ -16,11 +17,11 @@ export const locationPath = () => location.pathname + location.search + location
 const scrollKey = () =>
   `digitalmask-view:${navigationUser}:scroll:${locationPath().replace(/([?&])record=[^&]*&?/, "$1")}`;
 function context(): NavigationContext {
-  return history.state?.[contextKey] || {};
+  return (pageHistoryState()[contextKey] as NavigationContext | undefined) || {};
 }
 export function captureNavigationScroll() {
   const scroll = { x: window.scrollX, y: window.scrollY };
-  history.replaceState({ ...history.state, [contextKey]: { ...context(), scroll } }, "");
+  replaceState("", { ...pageHistoryState(), [contextKey]: { ...context(), scroll } });
   if (navigationUser) {
     try {
       sessionStorage.setItem(scopedBrowserKey(scrollKey()), JSON.stringify(scroll));
@@ -42,12 +43,17 @@ export function navigateWorkspace(
   if (from === href) return;
   const metadata: NavigationContext =
     options.retainOrigin === false ? {} : { returnTo: from, returnLabel: options.returnLabel };
-  history.pushState({ ...history.state, [contextKey]: metadata }, "", href);
+  pushState(href, { ...pageHistoryState(), [contextKey]: metadata });
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 export function returnToContext(fallback: string) {
   if (navigationReturn()) history.back();
   else navigateWorkspace(fallback, { retainOrigin: false });
+}
+/** Update a query without replacing SvelteKit's internal history bookkeeping. */
+export function replaceWorkspaceLocation(href: string, notify = true) {
+  replaceState(href, pageHistoryState());
+  if (notify) window.dispatchEvent(new PopStateEvent("popstate"));
 }
 export function closeRecordDetail() {
   if (navigationReturn()) {
@@ -56,8 +62,7 @@ export function closeRecordDetail() {
   }
   const next = new URL(location.href);
   ["record", "relatedSeason", "relatedYear"].forEach((key) => next.searchParams.delete(key));
-  history.replaceState(history.state, "", next.pathname + next.search);
-  window.dispatchEvent(new PopStateEvent("popstate"));
+  replaceWorkspaceLocation(next.pathname + next.search);
 }
 
 /** Restore the actual history entry, including Back from a linked detail dialog. */
@@ -146,11 +151,8 @@ export function navigateRecord(
   ) {
     captureNavigationScroll();
     current.searchParams.set("record", options.from.id);
-    history.pushState(
-      { ...history.state, [contextKey]: { ...context(), returnTo: locationPath() } },
-      "",
-      current.pathname + current.search,
-    );
+    pushState(current.pathname + current.search,
+      { ...pageHistoryState(), [contextKey]: { ...context(), returnTo: locationPath() } });
   }
   options.beforeNavigate?.();
   navigateWorkspace(recordHref(record));

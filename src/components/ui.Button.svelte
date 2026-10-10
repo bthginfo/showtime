@@ -14,7 +14,7 @@ type ViewProps = {
     type?: "button" | "submit";
     title?: string;
 };
-export let children = undefined as any;
+
 export let onClick: ViewProps["onClick"] = undefined as any;
 export let variant: NonNullable<ViewProps["variant"]> = "secondary";
 export let disabled: ViewProps["disabled"] = undefined as any;

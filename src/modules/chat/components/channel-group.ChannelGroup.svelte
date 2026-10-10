@@ -17,7 +17,7 @@ export let count: ViewProps["count"] = undefined as any;
 export let storageKey: ViewProps["storageKey"] = undefined as any;
 export let defaultCollapsed: NonNullable<ViewProps["defaultCollapsed"]> = false;
 export let query: NonNullable<ViewProps["query"]> = "";
-export let children = undefined as any;
+
 const id = createId();
 const preferredCollapsedStore = useCollapsedPreference<any>(storageKey, defaultCollapsed);
 let preferredCollapsed: any = $preferredCollapsedStore; $: preferredCollapsed = $preferredCollapsedStore;

@@ -12,6 +12,7 @@ Der verbindliche Erstumfang und seine Umsetzung stehen in [APPROVED-PLAN.md](APP
 - [x] Bewusste Supportweiterleitung und Plattformverwaltung für Theatersperren.
 - [x] Getrennte Entwicklungs-, Vorschau- und Produktionsressourcen.
 - [x] Finale Cloud-, Restore- und Paginationprüfung sowie GitHub-/Vercel-Veröffentlichung abgeschlossen.
+- [x] Alle 44 Svelte-Warnungen behoben; Tastatur, Dialogfokus und SvelteKit-Navigation nachgeprüft.
 
 ## Spätere Erweiterungen außerhalb der Erstfreigabe
 
@@ -19,4 +20,4 @@ Der verbindliche Erstumfang und seine Umsetzung stehen in [APPROVED-PLAN.md](APP
 - SaaS-Abrechnung und optional eigene Datenbanken für besonders abgeschottete Theater.
 - Redis-Transport bei passendem kostenfreien oder ausdrücklich genehmigtem Tarif und höherer Live-Last.
 - Große Medienarchive und Tournee-/Vertragsverwaltung.
-- Übernommene Svelte-Kompatibilitätssyntax und Accessibility-Warnungen schrittweise modernisieren, mit Referenzvergleich der betroffenen Ansichten.
+- Übernommene Svelte-Kompatibilitätssyntax bei späteren Funktionsänderungen schrittweise modernisieren, mit Referenzvergleich der betroffenen Ansichten.

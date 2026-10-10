@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "@lucide/svelte";
 import styles from "./mobile-calendar.module.css";
 import { useWorkspace } from "@/components/workspace-context";
 import { readViewState, writeViewState } from "@/shared/view-state";
+import { scrollRegion } from "@/shared/interaction-actions";
 import { createEffects, createId, externalStore, styleString, applyRef } from "@/shared/svelte-runtime";
 import type { ReactNode, CSSProperties, Dispatch, SetStateAction, FormEvent, ChangeEvent, KeyboardEvent, MouseEvent, DragEvent, ComponentProps, RefObject } from "@/shared/ui-types";
 const effects=createEffects();
@@ -10,7 +11,7 @@ type ViewProps = {
     children: ReactNode;
     month: boolean;
 };
-export let children = undefined as any;
+
 export let month: ViewProps["month"] = undefined as any;
 const workspaceStore=useWorkspace();
 let { workspace } = $workspaceStore;
@@ -58,7 +59,7 @@ $: effects.run(0, () => {
     return () => observer.disconnect();
 }, [month, scope, workspace.user.id, sync]);
 let move = (direction: number) => sync((body.current?.scrollLeft || 0) + direction * 240);
-let keyScroll = (event: KeyboardEvent<HTMLDivElement | HTMLInputElement>) => {
+let keyScroll = (event: globalThis.KeyboardEvent) => {
     if (event.target !== event.currentTarget)
         return;
     const actions: Record<string, () => void> = {
@@ -92,7 +93,7 @@ $: scope = `team-calendar-scroll:${typeof location === "undefined" ? "all" : new
         </div>
       </div>
       <input type="range" class={styles.topScrollbar} style={styleString({ "--scroll-thumb-width": `${metrics.thumb}%` } as CSSProperties)} data-team-scroll="top" hidden={!metrics.max} aria-label="Kalender oben horizontal verschieben" aria-controls={id} min={0} max={metrics.max} step={1} value={metrics.position} on:keydown={keyScroll} on:input={(event) => sync(Number(event.currentTarget.value))} />
-      <div bind:this={body.current} id={id} data-team-scroll="bottom" class={`table-scroll team-calendar ${month ? "team-month-calendar" : ""}`} role="region" aria-label={month ? "Teammonatskalender" : "Teamwochenkalender"} tabindex={0} on:keydown={keyScroll} on:scroll={(event) => sync(event.currentTarget.scrollLeft)}>
+      <div bind:this={body.current} id={id} data-team-scroll="bottom" class={`table-scroll team-calendar ${month ? "team-month-calendar" : ""}`} role="region" aria-label={month ? "Teammonatskalender" : "Teamwochenkalender"} use:scrollRegion={keyScroll} on:scroll={(event) => sync(event.currentTarget.scrollLeft)}>
         <slot />
       </div>
     </div>

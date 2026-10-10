@@ -1,4 +1,3 @@
-"use client";
 import { browserScope } from "@/shared/browser-scope";
 import { api, post } from "@/shared/client-api";
 import { appDeviceState } from "@/shared/app-device";

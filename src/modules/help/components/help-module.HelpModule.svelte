@@ -62,7 +62,7 @@ $: tutorials = helpTutorials.filter((tutorial) => `${tutorial.title} ${tutorial.
 </script>
 
 
-      <PageHeader eyebrow="SICHER DURCH DEN ARBEITSALLTAG" title="Hilfe & Orientierung" description="Anleitungen für eure gemeinsame Arbeit, Antworten und Raum für Verbesserungen.">
+      <PageHeader eyebrow="SICHER DURCH DEN ARBEITSALLTAG" title="Hilfe & Orientierung" >
         <Button onClick={onStartTour}>
           <Compass size={17}></Compass>
           Einführung neu starten

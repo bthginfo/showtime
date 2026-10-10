@@ -55,7 +55,7 @@ $: totals = (() => {
 </script>
 
 <div class={styles.workspace}>
-      <PageHeader eyebrow="ZEIT IM THEATER" title="Zeit buchen" description="Anwesenheit und Produktionsstunden getrennt erfassen. Beide Timer können gleichzeitig laufen." compact></PageHeader>
+      <PageHeader eyebrow="ZEIT IM THEATER" title="Zeit buchen"  compact></PageHeader>
       {#if selfBooking}
           <div class={`dual-timers ${styles.timers}`}>
             <TimerPanel kind="attendance" onBooked={setBooked}></TimerPanel>

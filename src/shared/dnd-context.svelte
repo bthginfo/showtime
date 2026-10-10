@@ -2,14 +2,16 @@
  import {onDestroy} from 'svelte';
  import {writable,get} from 'svelte/store';
  import {createDnd,type DndState} from './dnd';
+ import {createId} from './svelte-runtime';
  export let sensors:any=undefined;
  export let onDragStart:(event:any)=>void=()=>{};
  export let onDragMove:(event:any)=>void=()=>{};
  export let onDragEnd:(event:any)=>void=()=>{};
  export let onDragCancel:(event:any)=>void=()=>{};
- export let collisionDetection:any=undefined;
+
  export let autoScroll=true;
  export let accessibility:any=undefined;
+ const instructionsId=createId();
  const empty=():DndState=>({id:null,over:null,x:0,y:0,point:{x:0,y:0},rectangle:null});
  const state=writable(empty());const drags=new Map<string,any>(),drops=new Map<string,any>();let cleanup=()=>{};let announcement='';
  const eventShape=(active:any,event:Event)=>{const s=get(state),over=s.over?drops.get(s.over):null;return {active,over:over?{id:over.id,data:{current:over.data}}:null,delta:{x:s.x,y:s.y},activatorEvent:event};};
@@ -43,7 +45,8 @@
   const finish=()=>{clearTimeout(hold);window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);window.removeEventListener('pointercancel',cancel);window.removeEventListener('keydown',key);state.set(empty());};cleanup=finish;
   window.addEventListener('pointermove',move,{passive:false});window.addEventListener('pointerup',end,{once:true});window.addEventListener('pointercancel',cancel,{once:true});window.addEventListener('keydown',key);
  }
- createDnd({state,drags,drops,start});onDestroy(()=>cleanup());
+ createDnd({state,drags,drops,start,instructionsId});onDestroy(()=>cleanup());
 </script>
 <slot />
+<span id={instructionsId} class="visually-hidden">{accessibility?.screenReaderInstructions?.draggable || 'Zum Verschieben Enter oder Leertaste drücken, mit den Pfeiltasten das Ziel wählen und mit Enter oder Leertaste bestätigen. Escape bricht ab.'}</span>
 <span class="visually-hidden" aria-live="polite">{announcement}</span>

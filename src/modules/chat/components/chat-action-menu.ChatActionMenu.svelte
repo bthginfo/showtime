@@ -1,4 +1,5 @@
 <script lang="ts">
+import { descendantClicks } from "@/shared/interaction-actions";
 
 import { createEffects, createId, externalStore, styleString, applyRef } from "@/shared/svelte-runtime";
 import type { ReactNode, CSSProperties, Dispatch, SetStateAction, FormEvent, ChangeEvent, KeyboardEvent, MouseEvent, DragEvent, ComponentProps, RefObject } from "@/shared/ui-types";
@@ -11,8 +12,8 @@ type ViewProps = {
     disabled?: boolean;
 };
 export let label: ViewProps["label"] = undefined as any;
-export let icon = undefined as any;
-export let children = undefined as any;
+
+
 export let className: NonNullable<ViewProps["className"]> = "";
 export let disabled: NonNullable<ViewProps["disabled"]> = false;
 let open: boolean = false;
@@ -49,10 +50,10 @@ $: effects.run(0, () => {
       <button bind:this={trigger.current} type="button" class="chat-compact-button" aria-label={label} title={label} aria-expanded={open} aria-controls={id} disabled={disabled} on:click={() => setOpen(!open)}>
         <slot name="icon" />
       </button>
-      {#if open}<div id={id} class="chat-action-popover" role="group" aria-label={label} on:click={(event) => {
-    if ((event.target as HTMLElement).closest("button, a"))
-        setOpen(false);
-}}>
+      {#if open}<div id={id} class="chat-action-popover" role="group" aria-label={label} use:descendantClicks={{selector: "button, a", capture: true, handler: () => {
+    setOpen(false);
+    trigger.current?.focus({ preventScroll: true });
+}}}>
           <slot />
         </div>{/if}
     </div>

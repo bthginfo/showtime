@@ -83,7 +83,7 @@ $: greet = hour < 11 ? "Guten Morgen" : hour < 18 ? "Guten Tag" : "Guten Abend";
     year: "numeric",
 })
     .format(new Date())
-    .toUpperCase()} title={`${greet}, ${workspace.user.name.split(" ")[0]}.`} description="Dein Tag hinter der Bühne. Alles Wichtige an einem Ort.">
+    .toUpperCase()} title={`${greet}, ${workspace.user.name.split(" ")[0]}.`} >
         <Button variant="primary" onClick={() => navigate("time")}>
           <Clock3 size={16}></Clock3>
           Zeit buchen

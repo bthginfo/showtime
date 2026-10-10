@@ -26,6 +26,7 @@
     "@fullcalendar/luxon3": "^6.1.21",
     "@fullcalendar/timegrid": "^6.1.21",
     "@lucide/svelte": "^1.55.0",
+    "@opentelemetry/api": "^1.9.0",
     "@react-pdf/renderer": "^4.9.0",
     "@sveltejs/kit": "2.70.3",
     "@tensorflow-models/face-detection": "^1.0.3",
@@ -63,6 +64,7 @@
     "sharp": "^0.35.5",
     "svelte": "^5.57.2",
     "web-push": "^3.6.7",
+    "ws": "^8.22.0",
     "y-indexeddb": "^9.0.12",
     "yjs": "^13.6.33",
     "zod": "^4.6.5"

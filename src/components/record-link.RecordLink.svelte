@@ -17,7 +17,7 @@ type ViewProps = {
 export let record: ViewProps["record"] = undefined as any;
 export let from: ViewProps["from"] = undefined as any;
 export let onNavigate: ViewProps["onNavigate"] = undefined as any;
-export let children = undefined as any;
+
 export let className: NonNullable<ViewProps["className"]> = "";
 export let decoration: NonNullable<ViewProps["decoration"]> = true;
 let props = $$restProps;

@@ -13,6 +13,30 @@ export default defineConfig(({ mode }) => {
         adapter: adapter({ runtime: "nodejs24.x", regions: ["fra1"], maxDuration: 120 }),
         alias: { "@": resolve("src") },
       }),
+      {
+        name: "showtime-workspace-chunks",
+        apply: "build",
+        enforce: "post",
+        config(config) {
+          if (config.build?.ssr) return;
+          return {
+            build: {
+              rolldownOptions: {
+                output: {
+                  // Preserve browser module initialization when splitting the workspace.
+                  strictExecutionOrder: true,
+                  codeSplitting: {
+                    groups: [
+                      { name: "vendor", test: /[\\/]node_modules[\\/]/, minSize: 20000, maxSize: 400000, priority: 10 },
+                      { name: "workspace", test: /[\\/]src[\\/]/, minSize: 20000, maxSize: 400000, priority: 5 },
+                    ],
+                  },
+                },
+              },
+            },
+          };
+        },
+      },
     ],
     server: {
       watch: {

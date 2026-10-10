@@ -10,7 +10,7 @@ type ViewProps = {
     children: ReactNode;
     tone?: string;
 };
-export let children = undefined as any;
+
 export let tone: NonNullable<ViewProps["tone"]> = "neutral";
 
 

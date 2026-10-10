@@ -8,7 +8,7 @@
 {#each fields as field (field.key)}
  {#if field.type==='members'}<fieldset class="form-multi full"><legend>{field.label}</legend>{#each workspace.members.filter(m=>m.status==='active') as member (member.id)}<label class="check-label"><input type="checkbox" checked={choices(field.key).includes(member.id)} on:change={e=>update(field.key,e.currentTarget.checked?[...choices(field.key),member.id]:choices(field.key).filter(id=>id!==member.id))}/>{member.name}</label>{/each}</fieldset>
  {:else}<label class:full={field.type==='textarea'}>{field.label}
-  {#if field.type==='textarea'}<textarea value={text(field.key)} maxlength="10000" on:input={e=>update(field.key,e.currentTarget.value)} required={field.required}/>
+  {#if field.type==='textarea'}<textarea value={text(field.key)} maxlength="10000" on:input={e=>update(field.key,e.currentTarget.value)} required={field.required}></textarea>
   {:else if field.type==='select'}<select value={text(field.key)} on:change={e=>update(field.key,e.currentTarget.value)} required={field.required}><option value="">Bitte wählen</option>{#each field.options||[] as option (option)}<option>{option}</option>{/each}</select>
   {:else if field.type==='checkbox'}<input type="checkbox" checked={Boolean(data[field.key])} on:change={e=>update(field.key,e.currentTarget.checked)}/>
   {:else if ['member','resource','record','department','budget'].includes(field.type)}<select value={text(field.key)} on:change={e=>update(field.key,e.currentTarget.value)} required={field.required}><option value="">{field.type==='department'?'Gesamtes Theater':'Bitte wählen'}</option>

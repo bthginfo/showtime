@@ -97,7 +97,13 @@ $: duplicates = workspace.records.people.filter((person) => isDirectoryPerson(pe
         {#each fields as field (field.key)}<label for={`${id}-${field.key}`} class={field.key === "name" ? "full" : undefined}>
             {field.label}
             {"required" in field && field.required ? " *" : ""}
-            <input id={`${id}-${field.key}`} type={"type" in field ? field.type : "text"} required={"required" in field && field.required} maxLength={field.maxLength} autocomplete={field.autoComplete} value={textValue(draft[field.key])} on:input={(event) => setDraft((current) => ({ ...current, [field.key]: event.currentTarget.value }))} disabled={disabled} />
+            <input id={`${id}-${field.key}`} type={"type" in field ? field.type : "text"} required={"required" in field && field.required} maxLength={field.maxLength} autocomplete={field.autoComplete} value={textValue(draft[field.key])} on:input={(event) => setDraft((current) => ({ ...current, [field.key]: event.currentTarget.value }))} on:keydown={(event) => {
+    if (embedded && event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
+        void submit();
+    }
+}} disabled={disabled} />
           </label>{/each}
         <label class="full" for={`${id}-notes`}>
           Notizen
@@ -129,13 +135,7 @@ $: duplicates = workspace.records.people.filter((person) => isDirectoryPerson(pe
         </Button>
       </div>
     </div>{/snippet}
-{#if embedded}<section class={styles.inline} on:keydown={(event) => {
-    if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
-        event.preventDefault();
-        event.stopPropagation();
-        void submit();
-    }
-}}>
+{#if embedded}<section class={styles.inline}>
       {@render render_content()}
     </section>{:else}<Modal title={record ? "Kontakt bearbeiten" : "Person anlegen"} onClose={close}>
       <form on:submit={(event) => void submit(event)}>{@render render_content()}</form>

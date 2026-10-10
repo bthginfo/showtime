@@ -1,4 +1,5 @@
 import {get} from "svelte/store";
+import {replaceWorkspaceLocation} from "@/shared/client-navigation";
 import { useViewState } from "@/shared/view-state";
 import { Badge } from "./ui";
 import { PeriodPicker } from "./period-picker";
@@ -33,7 +34,7 @@ export function useRelationshipPeriod(record: DomainRecord) {
             url.searchParams.set("relatedYear", String(next.year));
         else
             url.searchParams.delete("relatedYear");
-        history.replaceState(history.state, "", url.pathname + url.search);
+        replaceWorkspaceLocation(url.pathname + url.search, false);
     };
     return [period, update] as const;
 }

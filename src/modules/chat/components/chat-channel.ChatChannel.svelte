@@ -14,6 +14,7 @@ import { DocumentAttachment } from "@/modules/documents/components/document-atta
 import { NewDocumentDialog } from "@/modules/documents/components/new-document-dialog";
 import { documentAccept } from "@/modules/documents/components/record-documents";
 import { ChatActionMenu } from "./chat-action-menu";
+import { navigateWorkspace } from "@/shared/client-navigation";
 import { createEffects, createId, externalStore, styleString, applyRef } from "@/shared/svelte-runtime";
 import type { ReactNode, CSSProperties, Dispatch, SetStateAction, FormEvent, ChangeEvent, KeyboardEvent, MouseEvent, DragEvent, ComponentProps, RefObject } from "@/shared/ui-types";
 import { DocumentEditor } from "./chat-channel";
@@ -39,8 +40,8 @@ export let productionId: NonNullable<ViewProps["productionId"]> = "";
 export let conversation: ViewProps["conversation"] = undefined as any;
 export let title: ViewProps["title"] = undefined as any;
 export let onManage: ViewProps["onManage"] = undefined as any;
-export let sidebarToggle = undefined as any;
-export let mobileChannelToggle = undefined as any;
+
+
 export let onCreatePrivate: ViewProps["onCreatePrivate"] = undefined as any;
 export let onCreateTeam: ViewProps["onCreateTeam"] = undefined as any;
 const workspaceStore=useWorkspace();
@@ -219,8 +220,7 @@ $: messages = (() => workspace.records.messages
           </button>
           <a href="/?module=help&guide=app-install" on:click={(event) => {
     event.preventDefault();
-    history.pushState({}, "", "/?module=help&guide=app-install");
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    navigateWorkspace("/?module=help&guide=app-install");
     window.scrollTo({ top: 0, behavior: "instant" });
 }}>
             Hilfe & App installieren

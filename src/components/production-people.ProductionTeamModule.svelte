@@ -81,7 +81,7 @@ $: team = workspace.members.filter((member) => ids(production.data, "memberIds")
 </script>
 
 
-      <PageHeader eyebrow="MENSCHEN HINTER DER PRODUKTION" title="Team & Kontakte" description="Zuständigkeiten und wichtige Personen für dieses Stück.">
+      <PageHeader eyebrow="MENSCHEN HINTER DER PRODUKTION" title="Team & Kontakte" >
         <Button onClick={edit} disabled={busy || !!pendingMemberId}>
           Team & Kontakte bearbeiten
         </Button>

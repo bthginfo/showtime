@@ -260,7 +260,7 @@ $: active = nav.find((x) => x.id === activeModule)!;
       <a class="skip-link" href="#main">
         Zum Inhalt
       </a>
-      {#if mobileMenu}<div class="sidebar-backdrop" on:click={() => setMobileMenu(false)}></div>{/if}
+      {#if mobileMenu}<button type="button" class="sidebar-backdrop" aria-label="Navigation schließen" tabindex="-1" on:click={() => setMobileMenu(false)}></button>{/if}
       <aside bind:this={sidebar.current} inert={isMobile && !mobileMenu} aria-hidden={isMobile && !mobileMenu ? true : undefined} role={isMobile && mobileMenu ? "dialog" : undefined} aria-modal={isMobile && mobileMenu ? true : undefined} aria-label="Navigation" class={`sidebar ${mobileMenu ? "mobile-open" : ""}`}>
         <a class="brand" href="/" on:click={(event) => {
     if (event.button !== 0 ||
@@ -358,7 +358,7 @@ $: active = nav.find((x) => x.id === activeModule)!;
             <WifiOff size={17}></WifiOff>
             Du bist offline. Zeitentwürfe kannst du lokal speichern und später synchronisieren.
           </div>{/if}
-        <main bind:this={main.current} id="main" class="main-content" tabindex={-1}>
+        <main bind:this={main.current} id="main" class="main-content" tabindex="-1">
           {@render render_screen()}
           <MoreRecords module={activeModule}/>
         </main>
@@ -394,13 +394,13 @@ $: active = nav.find((x) => x.id === activeModule)!;
             <X size={15}></X>
           </button>
         </div>{/if}
-      {#if searchOpen}<Modal title="Im Arbeitsraum suchen" onClose={() => {
+      {#if searchOpen}<Modal title="Im Arbeitsraum suchen" initialFocus='input[aria-label="Suchbegriff"]' onClose={() => {
     setSearchOpen(false);
     setSearch("");
 }} wide>
           <div class="global-search-field">
             <Search size={20}></Search>
-            <input autofocus placeholder="Produktion, Figur, Schauspieler, Material …" aria-label="Suchbegriff" value={search} on:input={(e) => setSearch(e.currentTarget.value)} />
+            <input placeholder="Produktion, Figur, Schauspieler, Material …" aria-label="Suchbegriff" value={search} on:input={(e) => setSearch(e.currentTarget.value)} />
           </div>
           {#if search.length < 2}<p class="empty-inline">
               Mindestens 2 Zeichen eingeben. Die Suche verwendet die bereits geladenen, für dich

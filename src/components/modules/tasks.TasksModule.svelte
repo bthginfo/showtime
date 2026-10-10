@@ -131,9 +131,7 @@ $: selectedSprint = workspace.records.sprints.find((x) => x.id === sprint);
 </script>
 
 <section class={styles.taskWorkspace}>
-      <PageHeader compact eyebrow="GEMEINSAM VORAN" title={project ? "Aufgaben & Sprints" : "Teamboard"} description={project
-    ? "Das Kanban und die Sprints dieser Produktion."
-    : "Gemeinsame Aufgaben der Maske, unabhängig von einer Produktion."}><svelte:fragment slot="secondaryActions">
+      <PageHeader compact eyebrow="GEMEINSAM VORAN" title={project ? "Aufgaben & Sprints" : "Teamboard"} ><svelte:fragment slot="secondaryActions">
             <ExportButton onClick={() => setExporting(true)}></ExportButton>
             {#if project}<Button onClick={() => setEditor({ kind: "sprints" })}>Sprint planen</Button>{/if}
           </svelte:fragment>

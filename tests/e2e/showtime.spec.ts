@@ -1,4 +1,4 @@
-import { test, expect, request, type APIRequestContext } from "@playwright/test";
+import { test, expect, request, type APIRequestContext, type Page } from "@playwright/test";
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import * as Y from "yjs";
@@ -32,6 +32,11 @@ async function login(username: string, password: string) {
 }
 async function switchTo(api: APIRequestContext, target: typeof scope) {
   await json(api, "/api/platform/switch", target);
+}
+async function openWorkspace(page: Page, path: string) {
+  await page.goto(path);
+  await expect(page.locator(".workspace")).toBeVisible({ timeout: 30000 });
+  await expect(page.locator("h1").first()).toBeVisible();
 }
 async function member(label: string) {
   const invite = await json(admin, "/api/platform/configuration", {
@@ -570,6 +575,160 @@ test("booked work and attendance can be edited and deleted through the interface
     expect(workspace.records[kind].some((r: { id: string }) => r.id === record.id)).toBe(false);
   }
 });
+test("keyboard navigation restores focus across search, mobile menus, calendars and document dialogs", async ({ page }) => {
+  await json(admin, "/api/actions", { action: "profile-update", data: { onboardingCompleted: true } });
+  await page.context().addCookies((await admin.storageState()).cookies);
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.name));
+  page.on("console", (message) => { if (message.type() === "warning" && message.text().includes("SvelteKit's router")) warnings.push("Router warning"); });
+  await openWorkspace(page, "/");
+  const searchTrigger = page.locator(".global-search-button");
+  await searchTrigger.focus();
+  await page.keyboard.press("Control+k");
+  await expect(page.getByRole("textbox", { name: "Suchbegriff" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(searchTrigger).toBeFocused();
+  await page.locator('.sidebar button[aria-label="Produktionen"]').click();
+  await expect(page.locator("h1").first()).toHaveText("Produktionen");
+  await page.goBack();
+  await expect(page.locator(".nav-item.active")).toHaveAttribute("aria-label", "Heute");
+  await page.goForward();
+  await expect(page.locator("h1").first()).toHaveText("Produktionen");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const menuTrigger = page.getByRole("button", { name: "Menü öffnen", exact: true });
+  await menuTrigger.focus();
+  await menuTrigger.press("Enter");
+  await expect(page.locator(".sidebar.mobile-open")).toBeVisible();
+  await page.screenshot({ path: ".local/screens/warnings-mobile-menu.png" });
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".sidebar.mobile-open")).toHaveCount(0);
+  await expect(menuTrigger).toBeFocused();
+
+  await openWorkspace(page, "/?module=productions");
+  const more = page.getByLabel("Weitere Aktionen", { exact: true });
+  await more.focus();
+  await more.press("Enter");
+  await expect(more.locator("..")).toHaveAttribute("open", "");
+  await more.press("Escape");
+  await expect(more.locator("..")).not.toHaveAttribute("open");
+  await expect(more).toBeFocused();
+  await more.press("Space");
+  await page.getByRole("button", { name: "Exportieren", exact: true }).press("Enter");
+  await expect(page.getByRole("dialog").last()).toBeVisible();
+  await expect(more.locator("..")).not.toHaveAttribute("open");
+  await page.keyboard.press("Escape");
+  await expect(more).toBeFocused();
+
+  await openWorkspace(page, "/?module=calendar");
+  const calendarActions = page.locator(".calendar-mobile-actions summary");
+  await calendarActions.press("Enter");
+  await expect(calendarActions.locator("..")).toHaveAttribute("open", "");
+  await calendarActions.press("Escape");
+  await expect(calendarActions.locator("..")).not.toHaveAttribute("open");
+  await expect(calendarActions).toBeFocused();
+  await page.getByRole("button", { name: "Team", exact: true }).click();
+  await page.getByRole("button", { name: "Teammonat", exact: true }).click();
+  const region = page.getByRole("region", { name: "Teammonatskalender", exact: true });
+  await expect(region).toHaveAttribute("tabindex", "0");
+  await region.focus();
+  await region.press("Home");
+  await region.press("ArrowRight");
+  await expect.poll(() => region.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  await region.press("Home");
+  const day = page.locator(".team-day-heading").first();
+  await day.press("Enter");
+  await expect(page.getByRole("button", { name: "Tagesdetails schließen" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(day).toBeFocused();
+
+  await openWorkspace(page, "/?module=chat");
+  const attachments = page.getByRole("button", { name: "Anhänge und Dokumente", exact: true });
+  await attachments.press("Enter");
+  await page.getByRole("button", { name: "Gemeinsames Dokument anlegen", exact: true }).press("Enter");
+  await expect(page.getByRole("textbox", { name: "Name", exact: true })).toBeFocused();
+  await page.screenshot({ path: ".local/screens/warnings-document-focus.png" });
+  await expect(attachments).toHaveAttribute("aria-expanded", "false");
+  await page.keyboard.press("Escape");
+  await expect(attachments).toBeFocused();
+  await attachments.press("Enter");
+  await page.keyboard.press("Escape");
+  await expect(attachments).toBeFocused();
+  await expect(attachments).toHaveAttribute("aria-expanded", "false");
+
+  await openWorkspace(page, "/?module=help");
+  await page.getByRole("button", { name: "Einführung neu starten" }).press("Enter");
+  await expect(page.locator(".onboarding-body h3")).toBeFocused();
+  await page.keyboard.press("Escape");
+  expect(errors).toEqual([]);
+  expect(warnings).toEqual([]);
+});
+
+test("mask plan placement works with keyboard and pointer; embedded contacts submit with Enter", async ({ page }) => {
+  await json(admin, "/api/actions", { action: "profile-update", data: { onboardingCompleted: true } });
+  await page.context().addCookies((await admin.storageState()).cookies);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.name));
+  const lanes = Array.from({ length: 5 }, (_, index) => ({
+    id: randomUUID(), label: "QA Spalte " + (index + 1), memberIds: [], staffNames: [],
+  }));
+  const plan = await json(admin, "/api/records/maskPlans", {
+    data: { productionId: production, title: marker + " Tastatur", windowMinutes: 90, stepMinutes: 5, lanes, blocks: [] },
+  });
+  await page.setViewportSize({ width: 900, height: 1000 });
+  await openWorkspace(page, `/?module=productions&productionId=${production}&tab=mask-plan&record=${plan.id}`);
+  const region = page.getByRole("region", { name: "Maskenplan-Zeittabelle, horizontal und vertikal scrollbar" });
+  await expect(region).toHaveAttribute("tabindex", "0");
+  await page.getByRole("button", { name: "Plan bearbeiten", exact: true }).press("Enter");
+  const place = page.getByRole("button", { name: "Zeitblock platzieren", exact: true });
+  const descriptionId = await place.getAttribute("aria-describedby");
+  expect(descriptionId).toBeTruthy();
+  await expect(page.locator(`[id="${descriptionId}"]`)).toContainText("Zum Bearbeiten");
+  await place.press("Enter");
+  const target = page.getByRole("button", { name: "Neuen Zeitblock platzieren bei QA Spalte 1", exact: true });
+  await target.focus();
+  await target.press("Space");
+  let editor = page.getByRole("dialog").last();
+  await expect(editor.getByRole("combobox", { name: "Personalspalte", exact: true })).toHaveValue(lanes[0].id);
+  await editor.getByLabel("Tätigkeit / Zusatz (optional)").fill(marker + " Tastaturblock");
+  await editor.getByRole("button", { name: "Übernehmen", exact: true }).press("Enter");
+  await expect(page.locator("[data-mask-block]")).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Zeitblock platzieren", exact: true }).click();
+  const pointerTarget = page.getByRole("button", { name: "Neuen Zeitblock platzieren bei QA Spalte 2", exact: true });
+  await pointerTarget.scrollIntoViewIfNeeded();
+  await pointerTarget.click({ position: { x: 40, y: 320 } });
+  editor = page.getByRole("dialog").last();
+  await expect(editor.getByRole("combobox", { name: "Personalspalte", exact: true })).toHaveValue(lanes[1].id);
+  expect(Number(await editor.getByLabel("Minuten vor Beginn").inputValue())).toBeGreaterThan(30);
+  await editor.getByLabel("Tätigkeit / Zusatz (optional)").fill(marker + " Mausblock");
+  await editor.getByRole("button", { name: "Übernehmen", exact: true }).click();
+  await expect(page.locator("[data-mask-block]")).toHaveCount(2);
+  await page.screenshot({ path: ".local/screens/warnings-mask-plan.png", fullPage: true });
+  const saving = page.waitForResponse((response) => response.url().endsWith(`/api/records/maskPlans/${plan.id}`) && response.request().method() === "PATCH");
+  await page.getByRole("button", { name: "Speichern", exact: true }).filter({ visible: true }).click();
+  const saved = await saving;
+  expect(saved.ok()).toBeTruthy();
+  expect((await saved.json()).data.blocks).toHaveLength(2);
+
+  await openWorkspace(page, `/?module=productions&productionId=${production}&tab=team`);
+  await page.getByRole("button", { name: "Team & Kontakte bearbeiten", exact: true }).click();
+  editor = page.getByRole("dialog").last();
+  await editor.getByRole("button", { name: "Kontakt hinzufügen", exact: true }).click();
+  const contact = editor.locator(".production-contact-form").last();
+  await contact.getByRole("button", { name: "Person anlegen", exact: true }).click();
+  const personName = contact.getByLabel("Name *", { exact: true });
+  await personName.fill(marker + " Kontakt");
+  const creating = page.waitForResponse((response) => response.url().endsWith("/api/records/people") && response.request().method() === "POST");
+  await personName.press("Enter");
+  expect((await creating).ok()).toBeTruthy();
+  await expect(contact.locator("strong").filter({ hasText: marker + " Kontakt" })).toBeVisible();
+  await expect(editor).toBeVisible();
+  await page.keyboard.press("Escape");
+  expect(errors).toEqual([]);
+});
+
 test("a guest only sees the assigned production and loses tickets and exports after expiry", async () => {
   const document = await json(admin, "/api/documents", {
     recordKind: "productions",

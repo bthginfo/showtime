@@ -11,6 +11,7 @@ import styles from "./mask-plans.module.css";
 import { createEffects, createId, externalStore, styleString, applyRef } from "@/shared/svelte-runtime";
 import type { ReactNode, CSSProperties, Dispatch, SetStateAction, FormEvent, ChangeEvent, KeyboardEvent, MouseEvent, DragEvent, ComponentProps, RefObject } from "@/shared/ui-types";
 import { laneTitle, colorStyle, type Props, type DragSource, type DropTarget, type Point, NEW_BLOCK, eventPoint, PlaceControl, DraggableBlock, PlanAgenda } from "./timetable";
+import { scrollRegion } from "@/shared/interaction-actions";
 const effects=createEffects();
 type ViewProps = Props;
 export let plan: ViewProps["plan"] = undefined as any;
@@ -224,7 +225,7 @@ $: targetLane = displayPlan.lanes.findIndex((lane) => lane.id === target?.laneId
         ? "Zum Abbrechen außerhalb der Tabelle loslassen."
         : ""}
       </span>
-      <div bind:this={board.current} class={`${styles.timelineScroll} ${compact ? styles.compactTable : ""} ${placing ? styles.placing : ""} ${drag ? styles.dragActive : ""}`} data-compact={compact} tabindex={0} role="region" aria-label="Maskenplan-Zeittabelle, horizontal und vertikal scrollbar">
+      <div bind:this={board.current} class={`${styles.timelineScroll} ${compact ? styles.compactTable : ""} ${placing ? styles.placing : ""} ${drag ? styles.dragActive : ""}`} data-compact={compact} use:scrollRegion role="region" aria-label="Maskenplan-Zeittabelle, horizontal und vertikal scrollbar">
         <div class={styles.sheet} style={styleString({
     gridTemplateColumns: `var(--time-rail) repeat(${displayPlan.lanes.length}, minmax(var(--lane-width), 1fr))`,
 })}>
@@ -252,20 +253,22 @@ $: targetLane = displayPlan.lanes.findIndex((lane) => lane.id === target?.laneId
                     </span>{/if}
                 </div>{/each}
           </div>
-          {#each displayPlan.lanes as lane (lane.id)}<div class={styles.laneBody} data-mask-lane={lane.id} on:click={(event) => {
-    if (!placing ||
-        event.button !== 0 ||
-        (event.target instanceof Element && event.target.closest("button")))
+          {#each displayPlan.lanes as lane, index (lane.id)}<div class={styles.laneBody} data-mask-lane={lane.id} style={styleString({
+    height,
+    "--tick-height": `${displayPlan.stepMinutes * minuteHeight}px`,
+} as CSSProperties)}>
+              {#if placing}<button type="button" class={styles.placementTarget} aria-label={`Neuen Zeitblock platzieren bei ${laneTitle(lane, members, index)}`} on:click={(event) => {
+    if (event.detail === 0) {
+        setPlacing(false);
+        onAddBlock(lane.id);
         return;
+    }
     const drop = locateTarget(null, { x: event.clientX, y: event.clientY });
     if (drop) {
         setPlacing(false);
         onAddBlock(drop.laneId, drop.startMinutes);
     }
-}} style={styleString({
-    height,
-    "--tick-height": `${displayPlan.stepMinutes * minuteHeight}px`,
-} as CSSProperties)}>
+}}></button>{/if}
               {#if !compact && !displayPlan.blocks.some((block) => block.laneId === lane.id)}<button type="button" class={styles.emptyLane} on:click={() => onAddBlock(lane.id)}>
                   <Plus size={18}></Plus>
                   <span>Ersten Zeitblock hinzufügen</span>
@@ -300,7 +303,7 @@ $: targetLane = displayPlan.lanes.findIndex((lane) => lane.id === target?.laneId
             </div>{/each}
         </div>
       </div>
-      <DragOverlay dropAnimation={null} style={{ pointerEvents: "none" }}>
+      <DragOverlay style={{ pointerEvents: "none" }}>
         {#if drag}<div class={styles.dragGhost}>
             <GripVertical size={16}></GripVertical>
             <strong>

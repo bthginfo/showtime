@@ -172,7 +172,7 @@ $: effects.run(90,()=>{void $workspaceStore.loadWindow('attendance',week,shiftDa
                 <Plus size={16}></Plus> Nachtragen
               </Button>{/if}
           </div>
-        </header>{:else}<PageHeader eyebrow="DEIN NACHWEIS IM THEATER" title="Anwesenheit im Theater" description="Beginn, Ende und Pausen. Dieser Nachweis bleibt getrennt von deinen Produktionsstunden." compact><svelte:fragment slot="secondaryActions">{@render render_secondaryActions()}</svelte:fragment>
+        </header>{:else}<PageHeader eyebrow="DEIN NACHWEIS IM THEATER" title="Anwesenheit im Theater"  compact><svelte:fragment slot="secondaryActions">{@render render_secondaryActions()}</svelte:fragment>
           {#if selfBooking}
               <Button variant="primary" onClick={() => openBooking()}>
                 <Plus size={16}></Plus>

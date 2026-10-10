@@ -260,7 +260,7 @@ $: projectHours = (workspace as Workspace & {
     : "Checklisten, Absprachen und offene Punkte zu den Vorstellungen."}></ResourceView>{/key}{/if}{/if}{/if}{/if}{/if}{/if}{/if}{/if}{/if}
         {#if details}<RecordDetail record={production} onClose={() => setDetails(false)}></RecordDetail>{/if}
       </section>{:else}<section class={styles.productionBrowse}>
-      <PageHeader compact eyebrow="JEDES STÜCK HAT SEINE GESCHICHTE" title="Produktionen" description="Euer gemeinsamer Überblick von der Vorbereitung bis zur Wiederaufnahme."><svelte:fragment slot="secondaryActions">
+      <PageHeader compact eyebrow="JEDES STÜCK HAT SEINE GESCHICHTE" title="Produktionen" ><svelte:fragment slot="secondaryActions">
             <ExportButton onClick={() => setExporting(true)}></ExportButton>
             {#if memberCan(workspace.user, 'production.manage')}<Button onClick={() => setImporting(true)}>Importieren</Button>{/if}
           </svelte:fragment>

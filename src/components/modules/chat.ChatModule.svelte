@@ -315,9 +315,7 @@ $: title = conversation
     </button>{/if}{/snippet}
 
       <div class={styles.pageHeading}>
-        <PageHeader eyebrow="KURZE WEGE. GUTE ABSPRACHEN." title={locked ? "Projektchat" : "Kommunikation"} description={locked
-    ? "Alles zum Stück an einem gemeinsamen Ort."
-    : "Allgemeine Informationen, Projektkanäle und private Gespräche."}>
+        <PageHeader eyebrow="KURZE WEGE. GUTE ABSPRACHEN." title={locked ? "Projektchat" : "Kommunikation"} >
           {#if !locked && memberCan(workspace.user, 'chat.channels.manage')}<Button onClick={() => setEditor("new-team")}>
               <Plus size={16}></Plus>
               Teamkanal

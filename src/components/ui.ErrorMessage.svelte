@@ -21,6 +21,6 @@ $: effects.run(0, () => {
 
 </script>
 
-{#if message}<p bind:this={ref.current} role="alert" tabindex={-1} class="error-message">
+{#if message}<p bind:this={ref.current} role="alert" tabindex="-1" class="error-message">
       {message}
     </p>{:else}{/if}

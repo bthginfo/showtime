@@ -52,7 +52,7 @@ export let title: ViewProps["title"] = undefined as any;
 export let description: ViewProps["description"] = undefined as any;
 export let defaults: NonNullable<ViewProps["defaults"]> = {};
 export let filter: ViewProps["filter"] = undefined as any;
-export let children = undefined as any;
+
 export let headerActions = undefined as any;
 export let canCreate: ViewProps["canCreate"] = undefined as any;
 export let lockedProductionId: ViewProps["lockedProductionId"] = undefined as any;
@@ -113,7 +113,7 @@ $: exportable = [
 </script>
 
 <section class={browseStyles.resourceBrowse}>
-      <PageHeader compact eyebrow="DEIN GEMEINSAMER ARBEITSRAUM" title={title || labels[kind][0]} description={description}><svelte:fragment slot="secondaryActions">{#if (headerActions ||
+      <PageHeader compact eyebrow="DEIN GEMEINSAMER ARBEITSRAUM" title={title || labels[kind][0]} ><svelte:fragment slot="secondaryActions">{#if (headerActions ||
     exportable ||
     (admin &&
         (lockedProductionId === undefined ||

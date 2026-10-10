@@ -106,7 +106,7 @@ $: Icon = current.icon;
         <div class="onboarding-symbol" aria-hidden="true">
           {#if last}<BrandMark></BrandMark>{:else}<svelte:component this={Icon} size={28} strokeWidth={1.6}></svelte:component>{/if}
         </div>
-        <h3 bind:this={heading.current} tabindex={-1}>
+        <h3 bind:this={heading.current} tabindex="-1">
           {last ? "Mach es zu deinem Arbeitsraum." : current.title}
         </h3>
         {#if last}

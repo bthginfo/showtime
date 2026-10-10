@@ -12,7 +12,7 @@ import { Timetable } from "./timetable";
 import { SavedTimetable } from "./saved-timetable";
 import styles from "./mask-plans.module.css";
 import { useViewState } from "@/shared/view-state";
-import { navigateWorkspace } from "@/shared/client-navigation";
+import { navigateWorkspace, replaceWorkspaceLocation } from "@/shared/client-navigation";
 export type Draft = {
     data: MaskPlanData;
     base?: DomainRecord;
@@ -42,8 +42,7 @@ export function updateLocation(id: string, push = false) {
     if (push)
         navigateWorkspace(next.pathname + next.search);
     else {
-        history.replaceState(history.state, "", next.pathname + next.search);
-        window.dispatchEvent(new PopStateEvent("popstate"));
+        replaceWorkspaceLocation(next.pathname + next.search);
     }
 }
 export { default as MaskPlansModule } from "./mask-plans-module.MaskPlansModule.svelte";

@@ -1,4 +1,5 @@
 <script lang="ts">
+import { keyboardEvents } from "@/shared/interaction-actions";
 import {memberCan} from "@/shared/access-policy";import { initialState } from '@/shared/svelte-runtime';
 
 import { PeriodPicker, periodExportFilters } from "@/components/period-picker";
@@ -354,7 +355,7 @@ $: if(view === "team" && teamStart && teamEnd && requestedWindow !== teamStart+"
                       <span>{hours}</span>
                     </button>{/snippet}
 <div bind:this={calendarRoot.current} class={`calendar-module ${calendarStyles.calendar}${presentation.collapsed ? ` ${presentationStyles.collapsed}` : ""}${presentation.fullscreen ? ` ${presentationStyles.focus} calendar-focus-view` : ""}`} data-calendar-fullscreen={presentation.fullscreen || undefined}>
-      <PageHeader eyebrow="DEIN DIENSTPLAN. GEMEINSAM GEPLANT." title="Kalender" description="Eigene Dienste, Teamkalender und freie Tage im Überblick.">
+      <PageHeader eyebrow="DEIN DIENSTPLAN. GEMEINSAM GEPLANT." title="Kalender" >
         <div class="calendar-desktop-actions">
           <CalendarPresentationControls collapsed={presentation.collapsed} fullscreen={presentation.fullscreen} filtersId={filtersId} onToggleFilters={presentation.toggleFilters} onToggleFullscreen={presentation.toggleFullscreen}></CalendarPresentationControls>
           <ExportButton onClick={() => setExporting(true)}></ExportButton>
@@ -365,7 +366,7 @@ $: if(view === "team" && teamStart && teamEnd && requestedWindow !== teamStart+"
           <Plus size={16}></Plus>
           Termin
         </Button>
-        <details bind:this={actionsMenu.current} class="calendar-mobile-actions" on:keydown={(event) => {
+        <details bind:this={actionsMenu.current} class="calendar-mobile-actions" use:keyboardEvents={(event) => {
     if (event.key === "Escape") {
         actionsMenu.current?.removeAttribute("open");
         actionsMenu.current?.querySelector("summary")?.focus();

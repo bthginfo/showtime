@@ -14,7 +14,8 @@ type ViewProps = {
     className?: string;
 };
 export let title: ViewProps["title"] = undefined as any;
-export let children = undefined as any;
+export let initialFocus: string | undefined = undefined;
+
 export let onClose: ViewProps["onClose"] = undefined as any;
 export let wide: NonNullable<ViewProps["wide"]> = false;
 export let className: NonNullable<ViewProps["className"]> = "";
@@ -24,6 +25,7 @@ $: effects.run(0, () => {
     const el = ref.current;
     const previousFocus = document.activeElement;
     el?.showModal();
+    if (initialFocus) el?.querySelector<HTMLElement>(initialFocus)?.focus({ preventScroll: true });
     const previous = document.body.style.overflow;
     document.body.style.setProperty("overflow", "hidden");
     return () => {

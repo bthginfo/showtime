@@ -16,9 +16,9 @@ type ViewProps = {
 };
 export let eyebrow: ViewProps["eyebrow"] = undefined as any;
 export let title: ViewProps["title"] = undefined as any;
-export let description: ViewProps["description"] = undefined;
-export let children = undefined as any;
-export let secondaryActions = undefined as any;
+
+
+
 export let compact: NonNullable<ViewProps["compact"]> = false;
 
 
