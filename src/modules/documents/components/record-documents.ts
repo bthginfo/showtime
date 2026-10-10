@@ -1,0 +1,13 @@
+import { FileText, Plus, Trash2, Upload } from "@lucide/svelte";
+import { Button, Empty, ErrorMessage } from "@/components/ui";
+import { useWorkspace } from "@/components/workspace-context";
+import { canManageRecord } from "@/shared/record-permissions";
+import type { DomainRecord } from "@/shared/contracts";
+import { api, dateLabel, post, value } from "@/shared/client-api";
+import { imageAccept, prepareUpload } from "@/shared/client-files";
+import { DocumentAttachment } from "./document-attachment";
+import { NewDocumentDialog } from "./new-document-dialog";
+import "../documents.css";
+export {DocumentEditor} from "@/modules/documents/components/document-editor";
+export const documentAccept = `.docx,.xlsx,.csv,.pdf,${imageAccept}`;
+export { default as RecordDocuments } from "./record-documents.RecordDocuments.svelte";

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
-import { db } from "@/platform/db";
+import { authDb as db } from "@/platform/db/connections";
 import { HttpError } from "@/platform/http";
 export async function throttle(request: Request, action: string, limit = 10) {
   const ip =

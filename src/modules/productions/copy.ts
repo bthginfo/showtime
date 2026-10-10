@@ -1,13 +1,14 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/platform/db";
 import { records } from "@/platform/db/schema";
-import { type Context } from "@/platform/context";
+import { requirePermission,type Context } from "@/platform/context";
 import { findRecord, serialize } from "@/modules/records/repository";
 import { invalidateWorkspace } from "@/modules/records/workspace";
 import { auditChange } from "@/platform/events";
 import { assertRead } from "@/modules/records/service";
 import { cloneMaskPlan, maskPlanValue } from "@/modules/mask-plans/model";
 export async function copyProduction(context: Context, id: string, title: string) {
+  requirePermission(context,"production.manage",id);
   const result = await db.transaction(async (tx) => {
     const source = await findRecord(context, id, "productions", tx);
     await assertRead(context, source, tx);

@@ -1,5 +1,5 @@
 /* Never cache authenticated HTML, API responses, uploads, or personal records. */
-const CACHE = "digitalmask-shell-v6";
+const CACHE = "showtime-shell-v6";
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(["/icon.svg", "/offline.html"])));
   self.skipWaiting();
@@ -33,7 +33,7 @@ self.addEventListener("fetch", (event) => {
 // Device consent metadata only; no authenticated pages, message bodies or personal records.
 function deviceState(write) {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open("digitalmask-device", 1);
+    const request = indexedDB.open("showtime-device", 1);
     request.onupgradeneeded = () => request.result.createObjectStore("state");
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {
@@ -75,14 +75,14 @@ function safeTarget(value) {
   }
 }
 self.addEventListener("message", (event) => {
-  if (event.data?.type !== "DIGITALMASK_BADGE") return;
+  if (event.data?.type !== "SHOWTIME_BADGE") return;
   event.waitUntil(
     (async () => {
-      const userId = typeof event.data.userId === "string" ? event.data.userId : null;
+      const ownerId = typeof event.data.ownerId === "string" ? event.data.ownerId : null;
       const count = Math.max(0, Math.floor(Number(event.data.count) || 0));
-      await deviceState({ userId, count, timestamp: Number(event.data.timestamp) || Date.now() });
+      await deviceState({ ownerId, count, timestamp: Number(event.data.timestamp) || Date.now() });
       await setBadge(count);
-      if (!userId) {
+      if (!ownerId) {
         const notifications = await self.registration.getNotifications();
         notifications.forEach((notification) => notification.close());
       }
@@ -99,23 +99,23 @@ self.addEventListener("push", (event) => {
       } catch {
         return;
       }
-      if (!payload || typeof payload.userId !== "string") return;
+      if (!payload || typeof payload.ownerId !== "string") return;
       const state = await deviceState();
       // A queued notification must not leak to a logged-out or different account on a shared phone.
-      if (state.userId !== payload.userId) return;
+      if (state.ownerId !== payload.ownerId) return;
       const count = Math.max(0, Math.floor(Number(payload.unreadCount) || 0));
       if ((Number(payload.timestamp) || 0) >= (state.timestamp || 0)) {
-        await deviceState({ userId: state.userId, count, timestamp: payload.timestamp });
+        await deviceState({ ownerId: state.ownerId, count, timestamp: payload.timestamp });
         await setBadge(count);
       }
       await self.registration.showNotification(
-        String(payload.title || "DigitalMask").slice(0, 120),
+        String(payload.title || "Showtime").slice(0, 120),
         {
           body: String(payload.body || "Du hast eine neue Mitteilung.").slice(0, 240),
           icon: "/icon-192.png",
           badge: "/icon-192.png",
-          tag: String(payload.tag || "digitalmask"),
-          data: { url: safeTarget(payload.url), userId: payload.userId },
+          tag: String(payload.tag || "showtime"),
+          data: { url: safeTarget(payload.url), ownerId: payload.ownerId },
         },
       );
     })(),
@@ -127,7 +127,7 @@ self.addEventListener("notificationclick", (event) => {
     (async () => {
       const state = await deviceState();
       const url = safeTarget(
-        state.userId === event.notification.data?.userId ? event.notification.data?.url : "/",
+        state.ownerId === event.notification.data?.ownerId ? event.notification.data?.url : "/",
       );
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       for (const client of windows) {

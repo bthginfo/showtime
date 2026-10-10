@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import {fileQuota} from "@/platform/quotas";
 import { put, get, del } from "@vercel/blob";
 import { eq } from "drizzle-orm";
 import { db } from "@/platform/db";
@@ -59,6 +60,7 @@ export async function uploadFile(
   const id = crypto.randomUUID();
   if (image && recordKind === "actors") portrait = await analyzePortrait(bytes);
   const path = `${context.organizationId}/${context.departmentId}/${recordKind}/${recordId}/${id}.${extension}`;
+  await fileQuota(context,bytes.length);
   await put(path, bytes, { access: "private", contentType: mime, addRandomSuffix: false });
   let deletionQueued = false;
   try {

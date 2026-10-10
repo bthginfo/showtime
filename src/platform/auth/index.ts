@@ -1,14 +1,15 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { username } from "better-auth/plugins";
-import { db } from "@/platform/db";
+import { authDb } from "@/platform/db/connections";
 import * as schema from "@/platform/db/schema";
 import { usernamePattern } from "@/shared/auth-feedback";
+import { applicationURL } from "@/platform/application-url";
 export const auth = betterAuth({
-  appName: "DigitalMask",
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+  appName: "Showtime",
+  baseURL: applicationURL(),
   secret: process.env.BETTER_AUTH_SECRET,
-  database: drizzleAdapter(db, { provider: "pg", schema }),
+  database: drizzleAdapter(authDb, { provider: "pg", schema }),
   emailAndPassword: { enabled: true, minPasswordLength: 10, maxPasswordLength: 128 },
   plugins: [
     username({
@@ -30,7 +31,7 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
-    cookieCache: { enabled: true, maxAge: 60 },
+    cookieCache: { enabled: false },
   },
   advanced: {
     defaultCookieAttributes: {

@@ -3,8 +3,8 @@ import type { RecordData } from "@/shared/contracts";
 export function safeNotificationLink(link: unknown) {
   if (typeof link !== "string" || !link.startsWith("/?")) return "/";
   try {
-    const url = new URL(link, "https://digitalmask.invalid");
-    return url.origin === "https://digitalmask.invalid" && url.pathname === "/"
+    const url = new URL(link, "https://showtime.invalid");
+    return url.origin === "https://showtime.invalid" && url.pathname === "/"
       ? url.pathname + url.search
       : "/";
   } catch {
@@ -17,6 +17,7 @@ export function pushPayload(
   userId: string,
   count: number,
   data: RecordData,
+  organizationId: string,
 ) {
   const labels: Record<string, string> = {
     ChatMessageCreatedV1: "Neue Nachricht",
@@ -27,12 +28,14 @@ export function pushPayload(
     LookPublishedV1: "Neuer Aufschrieb",
   };
   return {
-    title: `DigitalMask · ${labels[type] || "Neue Mitteilung"}`,
+    title: `Showtime · ${labels[type] || "Neue Mitteilung"}`,
     // Message contents and personal planning details stay inside the authenticated app.
-    body: "Öffne DigitalMask, um die Mitteilung zu lesen.",
+    body: "Öffne Showtime, um die Mitteilung zu lesen.",
     url: safeNotificationLink(data.link),
     tag: noticeId,
     userId,
+    organizationId,
+    ownerId: `${organizationId}:${userId}`,
     unreadCount: Math.max(0, Math.floor(count)),
     timestamp: Date.now(),
   };

@@ -3,6 +3,7 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import type { DomainRecord } from "@/shared/contracts";
 import { THEATER_ZONE } from "@/modules/time-tracking/rules";
 export function occurrences(event: DomainRecord, from: Date, to: Date) {
+  if(event.data.cancelled===true)return [];
   const start = new Date(String(event.data.start)),
     end = new Date(String(event.data.end));
   const period = event.data.recurrence === "daily" ? 1 : event.data.recurrence === "weekly" ? 7 : 0;

@@ -1,3 +1,4 @@
+import {contextFixture} from "./access-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
@@ -16,7 +17,7 @@ vi.mock("@/modules/records/workspace", () => ({ invalidateWorkspace: mock.invali
 import { saveRecord } from "@/modules/records/service";
 
 const context = (role: "admin" | "user" = "user") =>
-  ({ user: { id: "owner", role }, organizationId: "theatre", departmentId: "makeup" }) as Context;
+  contextFixture("owner",role==="admin"?["employee","personnel"]:["employee"]);
 const payload = (): RecordData => ({
   title: "Anwesenheit",
   date: "2026-09-14",
@@ -41,11 +42,11 @@ function fixture() {
     select: () => ({
       from: () => ({
         where: (condition: SQL) => {
-          const { params } = dialect.sqlToQuery(condition);
+          const { params, sql: query } = dialect.sqlToQuery(condition);
           if (params.includes("categories"))
             return result([{ data: { key: "other" } }]);
-          if (params[0] && rows.some((row) => row.id === params[0]))
-            return result(rows.filter((row) => row.id === params[0]));
+          if (query.includes('"records"."id" =') && rows.some((row) => params.includes(row.id)))
+            return result(rows.filter((row) => params.includes(row.id)));
           if (params.includes("time") && params.includes("manual:receipt"))
             return result(
               rows.filter(

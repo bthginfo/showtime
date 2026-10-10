@@ -1,15 +1,21 @@
-import { Redis } from "@upstash/redis";
-import { HttpError } from "@/platform/http";
-
-let connection: Redis | undefined;
+import { eq } from "drizzle-orm";
+import { db } from "@/platform/db";
+import { tenantSettings, documentBuffers } from "@/platform/db/schema";
+/** Compatibility seam for document capabilities; PostgreSQL is the sole live store. */
+export const permissionEpochKey = (departmentId: string) => departmentId;
 export function liveRedis() {
-  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "";
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || "";
-  if (!url.startsWith("https://") || !token)
-    throw new HttpError(
-      503,
-      "Gemeinsames Bearbeiten ist gerade nicht erreichbar. Bitte versuche es später erneut.",
-    );
-  return (connection ??= new Redis({ url, token }));
+  return {
+    async get<T>(_key: string): Promise<T | null> {
+      const [row] = await db.select().from(tenantSettings).limit(1);
+      return String(row?.permissionVersion || 1) as T;
+    },
+    async smembers<T>(_key: string): Promise<T> {
+      const rows = await db
+        .select({ id: documentBuffers.fileId })
+        .from(documentBuffers)
+        .where(eq(documentBuffers.dirty, true))
+        .limit(40);
+      return rows.map((r) => r.id) as T;
+    },
+  };
 }
-export const permissionEpochKey = (departmentId: string) => `dm:permissions:${departmentId}`;

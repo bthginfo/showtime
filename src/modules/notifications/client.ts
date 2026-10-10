@@ -1,4 +1,5 @@
 "use client";
+import { browserScope } from "@/shared/browser-scope";
 import { api, post } from "@/shared/client-api";
 import { appDeviceState } from "@/shared/app-device";
 
@@ -9,7 +10,7 @@ export type PushDeviceState = {
   needsHomeScreen: boolean;
   configured: boolean;
 };
-const ownerKey = "digitalmask-push-owner";
+const ownerKey = "showtime-push-owner";
 function capabilities() {
   const { ios, standalone } = appDeviceState();
   return {
@@ -26,7 +27,7 @@ export async function registerPushWorker() {
   await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
   return navigator.serviceWorker.ready;
 }
-async function workerState(userId: string | null, count: number) {
+async function workerState(ownerId: string | null, count: number) {
   const registration = await registerPushWorker();
   if (!registration?.active) return;
   await new Promise<void>((resolve) => {
@@ -41,14 +42,14 @@ async function workerState(userId: string | null, count: number) {
       resolve();
     };
     registration.active!.postMessage(
-      { type: "DIGITALMASK_BADGE", userId, count, timestamp: Date.now() },
+      { type: "SHOWTIME_BADGE", ownerId, count, timestamp: Date.now() },
       [channel.port2],
     );
   });
 }
 export async function syncAppBadge(userId: string, count: number) {
   const owner = localStorage.getItem(ownerKey);
-  if (owner && owner !== userId) {
+  if (owner && owner !== browserScope()) {
     localStorage.removeItem(ownerKey);
     await workerState(null, 0);
     const registration = await registerPushWorker();
@@ -65,7 +66,7 @@ export async function syncAppBadge(userId: string, count: number) {
     /* Optional OS capability; never interrupt the app. */
   }
   // Only an explicitly enabled account may accept notifications on this device.
-  if (localStorage.getItem(ownerKey) === userId) await workerState(userId, count);
+  if (localStorage.getItem(ownerKey) === browserScope()) await workerState(browserScope(), count);
 }
 export async function getPushDeviceState(userId: string): Promise<PushDeviceState> {
   const support = capabilities();
@@ -82,7 +83,7 @@ export async function getPushDeviceState(userId: string): Promise<PushDeviceStat
   const subscription = await registration?.pushManager.getSubscription();
   if (
     subscription &&
-    localStorage.getItem(ownerKey) === userId &&
+    localStorage.getItem(ownerKey) === browserScope() &&
     Notification.permission === "granted"
   ) {
     initial.active = (
@@ -97,7 +98,7 @@ export async function getPushDeviceState(userId: string): Promise<PushDeviceStat
 export async function enablePush(userId: string) {
   const support = capabilities();
   if (support.needsHomeScreen)
-    throw new Error("Füge DigitalMask zuerst zum Home-Bildschirm hinzu und öffne die App dort.");
+    throw new Error("Füge Showtime zuerst zum Home-Bildschirm hinzu und öffne die App dort.");
   if (!support.supported) throw new Error("Dieser Browser unterstützt keine Gerätemitteilungen.");
   // Permission must be requested directly from the user's click, before any network await (iOS).
   const permission = await Notification.requestPermission();
@@ -116,7 +117,7 @@ export async function enablePush(userId: string) {
   if (!registration) throw new Error("Die App konnte nicht für Mitteilungen vorbereitet werden.");
   let subscription = await registration.pushManager.getSubscription();
   // An explicit enable on a shared device transfers only this browser's subscription.
-  if (subscription && localStorage.getItem(ownerKey) !== userId) {
+  if (subscription && localStorage.getItem(ownerKey) !== browserScope()) {
     await subscription.unsubscribe();
     subscription = null;
   }
@@ -125,8 +126,8 @@ export async function enablePush(userId: string) {
     applicationServerKey: bytes,
   });
   try {
-    localStorage.setItem(ownerKey, userId);
-    await workerState(userId, 0);
+    localStorage.setItem(ownerKey, browserScope());
+    await workerState(browserScope(), 0);
     await post("/api/push", { action: "subscribe", subscription: subscription.toJSON() });
   } catch (error) {
     localStorage.removeItem(ownerKey);
@@ -138,7 +139,7 @@ export async function enablePush(userId: string) {
 export async function disablePush(userId: string) {
   const registration = await registerPushWorker();
   const subscription = await registration?.pushManager.getSubscription();
-  if (localStorage.getItem(ownerKey) !== userId) return;
+  if (localStorage.getItem(ownerKey) !== browserScope()) return;
   try {
     if (subscription)
       await post("/api/push", { action: "unsubscribe", endpoint: subscription.endpoint });
@@ -156,7 +157,7 @@ export async function testPush() {
   await post("/api/push", { action: "test", endpoint: subscription.endpoint });
 }
 export async function stopPushOnLogout(userId: string) {
-  if ("serviceWorker" in navigator && localStorage.getItem(ownerKey) === userId)
+  if ("serviceWorker" in navigator && localStorage.getItem(ownerKey) === browserScope())
     await disablePush(userId).catch(() => undefined);
   await syncAppBadge(userId, 0);
 }

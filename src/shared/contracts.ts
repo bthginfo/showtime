@@ -71,14 +71,21 @@ export interface DomainRecord {
   data: RecordData;
 }
 export interface Member {
+  departmentId?: string;
   id: string;
   name: string;
   username: string;
   role: Role;
   status: "pending" | "active" | "disabled";
   preferences?: ProfilePreferences;
+  permissions?: import('@/platform/access').Permission[];
+  grants?: import('@/platform/access').Grant[];
 }
 export interface Workspace {
+  pages?: Partial<Record<RecordKind,string|null>>;
+  scopes?: {organizationId:string;organizationName:string;departmentId:string;departmentName:string;status:string}[];
+  platformAdmin?: boolean;
+  modules?: string[];
   live?: { channel: string; ticket: string; expiresAt: number; cursor: string } | null;
   user: Member;
   organization: { id: string; name: string };

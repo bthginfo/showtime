@@ -1,0 +1,16 @@
+import { LinkedText } from "@/components/linked-text";
+import { FilePlus2, Download, Hash, MessageCircle, MoreHorizontal, Paperclip, Pencil, Plus, Send, Trash2, Users, X, } from "@lucide/svelte";
+import type { DomainRecord } from "@/shared/contracts";
+import { api, dateLabel, initials, post, value } from "@/shared/client-api";
+import { prepareUpload } from "@/shared/client-files";
+import { useWorkspace } from "@/components/workspace-context";
+import { LiveStatus } from "@/components/live-status";
+import { Badge, Button, Empty, ErrorMessage, ExportButton, Modal } from "@/components/ui";
+import { ExportDialog } from "@/components/export-dialog";
+import { useChatRead } from "@/modules/notifications/use-chat-read";
+import { DocumentAttachment } from "@/modules/documents/components/document-attachment";
+import { NewDocumentDialog } from "@/modules/documents/components/new-document-dialog";
+import { documentAccept } from "@/modules/documents/components/record-documents";
+import { ChatActionMenu } from "./chat-action-menu";
+export {DocumentEditor} from "@/modules/documents/components/document-editor";
+export { default as ChatChannel } from "./chat-channel.ChatChannel.svelte";

@@ -10,3 +10,6 @@ artifacts/
 *.tsbuildinfo
 .local/
 .frontend-lint.json
+
+.svelte-kit/
+build/

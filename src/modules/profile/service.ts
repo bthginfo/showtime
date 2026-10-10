@@ -1,8 +1,8 @@
-import { revalidateTag } from "next/cache";
+import { revalidateTag } from "@/platform/cache";
 import { db } from "@/platform/db";
 import { and, eq, sql } from "drizzle-orm";
-import { memberships, profilePreferences } from "@/platform/db/schema";
-import { requireAdmin, type Context } from "@/platform/context";
+import { memberships, profilePreferences,tenantProfiles } from "@/platform/db/schema";
+import { requirePermission, type Context } from "@/platform/context";
 import { HttpError } from "@/platform/http";
 import { scheduleLiveChange } from "@/platform/realtime";
 import { invalidateTeam } from "@/modules/records/workspace";
@@ -16,7 +16,7 @@ export async function updateProfile(context: Context, input: RecordData) {
   const data = profileUpdateSchema.parse(input);
   if (data.workingTime || data.workingTimeDelete) {
     const targetId = data.memberId || context.user.id;
-    if (data.workingTimeDelete || targetId !== context.user.id) requireAdmin(context);
+    requirePermission(context,"personnel.manage");
     const change = data.workingTime || data.workingTimeDelete!;
     const profile = await db.transaction(async (tx) => {
       const [membership] = await tx
@@ -37,9 +37,9 @@ export async function updateProfile(context: Context, input: RecordData) {
         );
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`working-time:${targetId}`}))`);
       const [existing] = await tx
-        .select({ settings: profilePreferences.workingTime })
-        .from(profilePreferences)
-        .where(eq(profilePreferences.userId, targetId))
+        .select({ settings: tenantProfiles.workingTime })
+        .from(tenantProfiles)
+        .where(and(eq(tenantProfiles.userId,targetId),eq(tenantProfiles.organizationId,context.organizationId)))
         .limit(1);
       const previous = existing?.settings;
       if ((previous?.version || 0) !== change.expectedVersion)
@@ -88,16 +88,16 @@ export async function updateProfile(context: Context, input: RecordData) {
         };
       }
       const [saved] = await tx
-        .insert(profilePreferences)
-        .values({ userId: targetId, workingTime: settings })
+        .insert(tenantProfiles)
+        .values({userId:targetId,organizationId:context.organizationId,workingTime:settings})
         .onConflictDoUpdate({
-          target: profilePreferences.userId,
+          target:[tenantProfiles.organizationId,tenantProfiles.userId],
           set: { workingTime: settings, updatedAt: new Date() },
         })
         .returning({
-          accentPalette: profilePreferences.accentPalette,
-          onboardingVersion: profilePreferences.onboardingVersion,
-          workingTime: profilePreferences.workingTime,
+
+
+          workingTime: tenantProfiles.workingTime,
         });
       await auditChange(
         tx,

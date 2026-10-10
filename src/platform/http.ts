@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { applicationURL } from "@/platform/application-url";
+const NextResponse = Response;
 import { ZodError } from "zod";
 export class HttpError extends Error {
   constructor(
@@ -18,16 +19,23 @@ export function route<T>(handler: () => Promise<T>) {
         { error: "Bitte prüfe deine Eingaben.", details: error.flatten() },
         { status: 400 },
       );
-    console.error("DigitalMask request failed", {
+    console.error("Showtime request failed", {
       name: error instanceof Error ? error.name : "unknown",
-      code: (error as { cause?: { code?: string } })?.cause?.code || "unknown",
+      code:
+        (error as { cause?: { code?: string }; code?: string })?.cause?.code ||
+        (error as { code?: string })?.code ||
+        "unknown",
+      dependency:
+        error instanceof Error && /^Cannot find (?:module|package) '/.test(error.message)
+          ? error.message.match(/^Cannot find (?:module|package) '([@\w./-]+)'/)?.[1]
+          : undefined,
       // Log locations only; error messages can contain SQL values or private input.
       frames:
         error instanceof Error
           ? error.stack
               ?.split("\n")
               .filter((line) => /^\s+at .+:\d+:\d+\)?$/.test(line))
-              .slice(0, 5)
+              .slice(0, 10)
           : undefined,
     });
     return NextResponse.json(
@@ -38,7 +46,7 @@ export function route<T>(handler: () => Promise<T>) {
 }
 export function assertOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin && origin !== process.env.APP_URL)
+  if (origin && origin !== new URL(request.url).origin && origin !== applicationURL())
     throw new HttpError(403, "Diese Anfrage ist nicht zulässig.");
 }
 export async function readJson(request: Request) {

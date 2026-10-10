@@ -1,3 +1,4 @@
+import {contextFixture} from "./access-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
@@ -22,11 +23,7 @@ import { saveRecord } from "@/modules/records/service";
 
 const laneId = "11111111-1111-4111-8111-111111111111";
 const blockId = "22222222-2222-4222-8222-222222222222";
-const context = {
-  departmentId: "fictional-makeup",
-  organizationId: "fictional-theatre",
-  user: { id: "editor", role: "user" },
-} as Context;
+const context=contextFixture("editor",["employee"],"fictional-makeup","fictional-theatre");
 const historicalPlan = () =>
   maskPlanSchema.parse({
     ...newMaskPlan("production"),

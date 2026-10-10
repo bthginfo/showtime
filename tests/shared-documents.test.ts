@@ -266,6 +266,7 @@ describe("document privacy and untrusted uploads", () => {
     try {
       const ticket = createDocumentTicket(
         {
+          organizationId: "theater",
           fileId: "file",
           departmentId: "dept",
           userId: "user",

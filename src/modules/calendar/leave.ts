@@ -2,7 +2,7 @@ import { and, eq, sql, inArray } from "drizzle-orm";
 import { addDays, parseISO, format } from "date-fns";
 import { db } from "@/platform/db";
 import { records } from "@/platform/db/schema";
-import { requireAdmin, type Context } from "@/platform/context";
+import { requirePermission, type Context } from "@/platform/context";
 import { findRecord, serialize } from "@/modules/records/repository";
 import { invalidateWorkspace } from "@/modules/records/workspace";
 import { emit, auditChange, scheduleEvents } from "@/platform/events";
@@ -16,7 +16,7 @@ export async function decideLeave(
   status: unknown,
   categoryKey?: unknown,
 ) {
-  requireAdmin(context);
+  requirePermission(context,"leave.approve");
   if (status !== "approved" && status !== "rejected")
     throw new HttpError(400, "Ungültige Entscheidung.");
   const result = await db.transaction(async (tx) => {
@@ -24,6 +24,7 @@ export async function decideLeave(
       sql`select pg_advisory_xact_lock(hashtext(${context.departmentId + ":calendar"}))`,
     );
     const row = await findRecord(context, id, "leave", tx);
+    if(row.data.userId===context.user.id)throw new HttpError(403,"Eigene Anträge dürfen nicht selbst genehmigt werden.");
     if (row.data.status === "withdrawn")
       throw new HttpError(409, "Dieser Antrag wurde zurückgezogen.");
     let eventId = String(row.data.eventId || "");

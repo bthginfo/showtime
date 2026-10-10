@@ -1,3 +1,4 @@
+import {memberFixture} from "./access-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { maskPlanSchema } from "@/modules/mask-plans/schema";
 import {
@@ -140,10 +141,10 @@ describe("production mask plans", () => {
       [-60, 0, 2],
     ]);
   });
-  it("lets normal team members create and edit production plans", () => {
-    expect(canManageRecord({ id: "member", role: "user" }, "maskPlans")).toBe(true);
+  it("lets employees create plans and a team lead edit a colleague's plan", () => {
+    expect(canManageRecord(memberFixture("member"), "maskPlans")).toBe(true);
     expect(
-      canManageRecord({ id: "member", role: "user" }, "maskPlans", {
+      canManageRecord(memberFixture("member",["team_lead"]), "maskPlans", {
         createdBy: "colleague",
         data: plan(),
       }),

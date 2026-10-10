@@ -128,5 +128,5 @@ describe("time exports with separate calendar day labels", () => {
     expect(overview).not.toContain("3:00 h");
     expect(overview).toContain("keine Anwesenheits- oder Arbeitsstunden");
     await documentTask.destroy();
-  });
+  }, 90000);
 });

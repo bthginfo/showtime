@@ -1,3 +1,4 @@
+import {memberFixture} from "./access-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Context } from "../src/platform/context";
 import type { Transaction } from "../src/platform/db";
@@ -11,13 +12,13 @@ vi.mock("../src/modules/records/repository", () => ({ findRecord }));
 import { assertConversation } from "../src/modules/chat/permissions";
 import { prepareConversation } from "../src/modules/chat/conversations";
 
-const member = { id: "member", role: "user" as const };
-const admin = { id: "admin", role: "admin" as const };
+const member=memberFixture("member",["employee"],"maske");
+const admin=memberFixture("admin",["team_lead"],"maske");
 const context = (user: typeof member | typeof admin): Context =>
-  ({ user, departmentId: "maske" }) as Context;
+  ({ user,grants:user.grants!, departmentId: "maske",organizationId:"theatre" }) as Context;
 const tx = {} as Transaction;
 const existing = (mode: string) =>
-  ({ createdBy: "other-admin", data: { mode } }) as unknown as NonNullable<
+  ({ createdBy: "other-admin", departmentId:"maske", data: { mode,scope:"department" } }) as unknown as NonNullable<
     Parameters<typeof prepareConversation>[3]
   >;
 
@@ -64,7 +65,7 @@ describe("public team channels and private conversation boundaries", () => {
   });
 
   it("a newly registered active team member accesses a team channel without a participant entry", async () => {
-    const channel = { data: { mode: "team", participantIds: [] } };
+    const channel = {departmentId:"maske",kind:"conversations",createdBy:"other", data: { mode: "team", participantIds: [] } };
     findRecord.mockResolvedValue(channel);
     await expect(assertConversation(context(member), "team-channel", tx)).resolves.toBe(channel);
   });

@@ -1,59 +1,14 @@
-"use client";
-import { useEffect, useRef, type RefObject } from "react";
-import { useWorkspace } from "@/components/workspace-context";
-import { value } from "@/shared/client-api";
-import { isChatNotice } from "./unread";
-export function useChatRead(
-  conversationId: string,
-  productionId: string,
-  endRef?: RefObject<HTMLElement | null>,
-) {
-  const { workspace, action } = useWorkspace();
-  const actionRef = useRef(action);
-  useEffect(() => {
-    actionRef.current = action;
-  }, [action]);
-  const unreadIds = workspace.records.notifications
-    .filter(
-      (notice) =>
-        notice.data.userId === workspace.user.id &&
-        !notice.data.read &&
-        isChatNotice(notice) &&
-        value(notice.data, "conversationId") === conversationId &&
-        (conversationId || value(notice.data, "productionId") === productionId),
-    )
-    .map((notice) => notice.id)
-    .sort()
-    .join(",");
-  const attempted = useRef("");
-  useEffect(() => {
-    if (!unreadIds) return;
-    let endVisible = !endRef;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const read = () => {
-      clearTimeout(timer);
-      if (document.hidden || !endVisible || attempted.current === unreadIds) return;
-      timer = setTimeout(() => {
-        if (document.hidden || !endVisible) return;
-        attempted.current = unreadIds;
-        void actionRef
-          .current("chat-notifications-read", undefined, { conversationId, productionId })
-          .catch(() => undefined);
-      }, 600);
-    };
-    read();
-    const observer = endRef?.current
-      ? new IntersectionObserver((entries) => {
-          endVisible = entries.some((entry) => entry.isIntersecting);
-          read();
-        })
-      : null;
-    if (endRef?.current) observer?.observe(endRef.current);
-    document.addEventListener("visibilitychange", read);
-    return () => {
-      clearTimeout(timer);
-      observer?.disconnect();
-      document.removeEventListener("visibilitychange", read);
-    };
-  }, [conversationId, productionId, unreadIds, endRef]);
+import {onMount} from 'svelte';
+import {get} from 'svelte/store';
+import {useWorkspace} from '@/components/workspace-context';
+import {value} from '@/shared/client-api';
+import {isChatNotice} from './unread';
+export function useChatRead(input:()=>{conversationId:string;productionId:string;endRef?:{current:HTMLElement|null}}){
+ const workspaceStore=useWorkspace();
+ onMount(()=>{let attempted='';const timer=setInterval(()=>{
+  if(document.hidden||!document.hasFocus())return;const {conversationId,productionId,endRef}=input();
+  if(endRef?.current){const rect=endRef.current.getBoundingClientRect();if(rect.bottom<0||rect.top>innerHeight)return;}
+  const {workspace,action}=get(workspaceStore);const ids=workspace.records.notifications.filter(n=>!n.data.read&&n.data.userId===workspace.user.id&&isChatNotice(n)&&value(n.data,'conversationId')===conversationId&&(conversationId||value(n.data,'productionId')===productionId)).map(n=>n.id).sort().join(',');
+  if(!ids||ids===attempted)return;attempted=ids;void action('chat-notifications-read',undefined,{conversationId,productionId}).catch(()=>{attempted='';});
+ },600);return()=>clearInterval(timer);});
 }

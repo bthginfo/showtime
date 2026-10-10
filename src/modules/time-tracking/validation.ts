@@ -14,7 +14,7 @@ export async function validateBooking(
 ) {
   const owner = String(data.userId);
   await tx.execute(
-    sql`select pg_advisory_xact_lock(hashtext(${context.departmentId + ":" + kind + ":" + owner}))`,
+    sql`select pg_advisory_xact_lock(hashtext(${context.organizationId + ":" + kind + ":" + owner}))`,
   );
   if (Boolean(data.start) !== Boolean(data.end))
     throw new HttpError(400, "Beginn und Ende müssen gemeinsam angegeben werden.");
@@ -39,7 +39,7 @@ export async function validateBooking(
       .from(records)
       .where(
         and(
-          eq(records.departmentId, context.departmentId),
+          eq(records.organizationId, context.organizationId),
           eq(records.kind, kind),
           eq(records.ownerId, owner),
           recordId ? ne(records.id, recordId) : undefined,

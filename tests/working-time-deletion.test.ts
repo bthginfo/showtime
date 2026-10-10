@@ -3,21 +3,21 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import type { Context } from "@/platform/context";
 import type { WorkingTimeSettings } from "@/shared/working-time";
 import { HttpError } from "@/platform/http";
-import { memberships, profilePreferences } from "@/platform/db/schema";
+import { memberships, tenantProfiles } from "@/platform/db/schema";
 import { calculateAttendanceBalance } from "@/modules/time-tracking/balance";
 import { profileUpdateSchema } from "@/modules/profile/schema";
 
 const mock = vi.hoisted(() => ({
   transaction: vi.fn(),
-  requireAdmin: vi.fn(),
+  requirePermission: vi.fn(),
   revalidate: vi.fn(),
   invalidateTeam: vi.fn(),
   live: vi.fn(),
   audit: vi.fn(),
 }));
 vi.mock("@/platform/db", () => ({ db: { transaction: mock.transaction } }));
-vi.mock("@/platform/context", () => ({ requireAdmin: mock.requireAdmin }));
-vi.mock("next/cache", () => ({ revalidateTag: mock.revalidate }));
+vi.mock("@/platform/context", () => ({ requirePermission: mock.requirePermission }));
+vi.mock("@/platform/cache", () => ({ revalidateTag: mock.revalidate }));
 vi.mock("@/platform/realtime", () => ({ scheduleLiveChange: mock.live }));
 vi.mock("@/modules/records/workspace", () => ({ invalidateTeam: mock.invalidateTeam }));
 vi.mock("@/platform/events", () => ({ auditChange: mock.audit }));
@@ -54,7 +54,7 @@ function database(settings: WorkingTimeSettings | null = fixture(), role: string
               conditions.push(condition);
               return role ? [{ role }] : [];
             }
-            if (table === profilePreferences) return [{ settings }];
+            if (table === tenantProfiles) return [{ settings }];
             throw new Error("Unexpected table in mock");
           },
         }),
@@ -84,7 +84,7 @@ function settingsOf(result: unknown) {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mock.requireAdmin.mockImplementation((context: Context) => {
+  mock.requirePermission.mockImplementation((context: Context) => {
     if (context.user.role === "user") throw new HttpError(403, "Admins vorbehalten");
   });
 });
@@ -94,7 +94,7 @@ describe("admin deletion of dated working-time schedules", () => {
     const previous = fixture();
     const state = database(previous, "admin");
     const result = await updateProfile(admin, deletion());
-    expect(mock.requireAdmin).toHaveBeenCalledWith(admin);
+    expect(mock.requirePermission).toHaveBeenCalledWith(admin,"personnel.manage");
     expect(settingsOf(result)).toEqual({
       ...previous,
       version: 7,

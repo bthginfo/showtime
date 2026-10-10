@@ -1,3 +1,4 @@
+import {scopedBrowserKey,setBrowserScope} from "@/shared/browser-scope";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiFailure } from "@/shared/client-api";
 import {
@@ -78,20 +79,20 @@ describe("local time receipts", () => {
     };
     expect(retainTimeDraft(attendanceKey, "manual:receipt", data)).toBe(true);
     expect(retainTimeDraft(attendanceKey, "manual:receipt", data)).toBe(true);
-    expect(JSON.parse(storage.get(attendanceKey)!)).toMatchObject([
+    expect(JSON.parse(storage.get(scopedBrowserKey(attendanceKey))!)).toMatchObject([
       { id: "manual:receipt", data: { ...data, idempotencyKey: "manual:receipt" } },
     ]);
     retainTimeDraft(attendanceKey, "manual:other", { ...data, date: "2026-09-15" });
     clearTimeDraft(attendanceKey, "manual:receipt");
-    expect(JSON.parse(storage.get(attendanceKey)!)).toHaveLength(1);
-    expect(JSON.parse(storage.get(workKey)!)).toHaveLength(1);
+    expect(JSON.parse(storage.get(scopedBrowserKey(attendanceKey))!)).toHaveLength(1);
+    expect(JSON.parse(storage.get(scopedBrowserKey(workKey))!)).toHaveLength(1);
   });
 
   it("does not throw or wipe other entries when storage is full, restricted or malformed", () => {
     const key = timeDraftQueueKey("attendance", "person");
-    storage.set(key, "broken-json");
+    storage.set(scopedBrowserKey(key), "broken-json");
     expect(retainTimeDraft(key, "receipt", {})).toBe(false);
-    expect(storage.get(key)).toBe("broken-json");
+    expect(storage.get(scopedBrowserKey(key))).toBe("broken-json");
     vi.stubGlobal("localStorage", {
       getItem: () => "[]",
       setItem: () => {

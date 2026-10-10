@@ -1,3 +1,4 @@
+import {scopedBrowserKey} from "@/shared/browser-scope";
 import * as Y from "yjs";
 import { IndexeddbPersistence } from "y-indexeddb";
 import type { DocumentSession, DocumentState } from "../contracts";
@@ -150,7 +151,7 @@ export class SharedDocument {
       try {
         if (!this.snapshot.session?.canEdit) throw new Error("read-only");
         this.persistence = new IndexeddbPersistence(
-          `digitalmask-document:${this.userId}:${this.fileId}`,
+          scopedBrowserKey(`digitalmask-document:${this.userId}:${this.fileId}`),
           this.doc,
         );
         await Promise.race([

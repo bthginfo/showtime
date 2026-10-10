@@ -38,6 +38,11 @@ export const profilePreferences = pgTable("profile_preferences", {
 export const pushSubscriptions = pgTable(
   "push_subscriptions",
   {
+    organizationId: text("organization_id")
+      .notNull()
+      .default(sql.raw("current_setting('app.tenant_id', true)"))
+      .references(() => organizations.id),
+
     id: text("id").primaryKey(),
     userId: text("user_id")
       .notNull()
@@ -197,30 +202,42 @@ export const records = pgTable(
       .on(t.departmentId, sql`(${t.data}->>'scope')`, sql`(${t.data}->>'key')`)
       .where(sql`${t.kind}='categories'`),
     uniqueIndex("direct_chat_key_idx")
-      .on(t.departmentId, sql`(${t.data}->>'directKey')`)
+      .on(t.organizationId, sql`(${t.data}->>'directKey')`)
       .where(sql`${t.kind}='conversations' and coalesce(${t.data}->>'directKey','')<>''`),
     index("private_chat_messages_idx")
       .on(t.departmentId, sql`(${t.data}->>'conversationId')`, t.updatedAt)
       .where(sql`${t.kind}='messages' and coalesce(${t.data}->>'conversationId','')<>''`),
   ],
 );
-export const timers = pgTable("timers", {
-  id: text("id").primaryKey(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id)
-    .unique(),
-  departmentId: text("department_id")
-    .notNull()
-    .references(() => departments.id),
-  data: jsonb("data").$type<RecordData>().notNull(),
-});
+export const timers = pgTable(
+  "timers",
+  {
+    organizationId: text("organization_id")
+      .notNull()
+      .default(sql.raw("current_setting('app.tenant_id', true)"))
+      .references(() => organizations.id),
+
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
+    departmentId: text("department_id")
+      .notNull()
+      .references(() => departments.id),
+    data: jsonb("data").$type<RecordData>().notNull(),
+  },
+  (t) => [uniqueIndex("timers_tenant_user").on(t.organizationId, t.userId)],
+);
 export const attendanceTimers = pgTable("attendance_timers", {
+  organizationId: text("organization_id")
+    .notNull()
+    .default(sql.raw("current_setting('app.tenant_id', true)"))
+    .references(() => organizations.id),
+
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
-    .references(() => user.id, { onDelete: "cascade" })
-    .unique(),
+    .references(() => user.id, { onDelete: "cascade" }),
   departmentId: text("department_id")
     .notNull()
     .references(() => departments.id),
@@ -229,6 +246,11 @@ export const attendanceTimers = pgTable("attendance_timers", {
 export const outbox = pgTable(
   "outbox",
   {
+    organizationId: text("organization_id")
+      .notNull()
+      .default(sql.raw("current_setting('app.tenant_id', true)"))
+      .references(() => organizations.id),
+
     id: text("id").primaryKey(),
     departmentId: text("department_id")
       .notNull()
@@ -243,6 +265,11 @@ export const outbox = pgTable(
   (t) => [index("outbox_pending_idx").on(t.status, t.availableAt)],
 );
 export const audit = pgTable("audit", {
+  organizationId: text("organization_id")
+    .notNull()
+    .default(sql.raw("current_setting('app.tenant_id', true)"))
+    .references(() => organizations.id),
+
   id: text("id").primaryKey(),
   departmentId: text("department_id")
     .notNull()
@@ -287,6 +314,11 @@ export const recordOperations = pgTable(
   ],
 );
 export const calendarTokens = pgTable("calendar_tokens", {
+  organizationId: text("organization_id")
+    .notNull()
+    .default(sql.raw("current_setting('app.tenant_id', true)"))
+    .references(() => organizations.id),
+
   id: text("id").primaryKey(),
   tokenHash: text("token_hash").notNull().unique(),
   userId: text("user_id")
@@ -300,6 +332,11 @@ export const calendarTokens = pgTable("calendar_tokens", {
 export const recordHistory = pgTable(
   "record_history",
   {
+    organizationId: text("organization_id")
+      .notNull()
+      .default(sql.raw("current_setting('app.tenant_id', true)"))
+      .references(() => organizations.id),
+
     id: text("id").primaryKey(),
     recordId: text("record_id")
       .notNull()
@@ -315,6 +352,11 @@ export const recordHistory = pgTable(
 );
 /** Document bodies are excluded from workspace lists and their shared cache. */
 export const collaborativeDocuments = pgTable("collaborative_documents", {
+  organizationId: text("organization_id")
+    .notNull()
+    .default(sql.raw("current_setting('app.tenant_id', true)"))
+    .references(() => organizations.id),
+
   fileId: text("file_id")
     .primaryKey()
     .references(() => records.id, { onDelete: "cascade" }),
@@ -327,3 +369,5 @@ export const collaborativeDocuments = pgTable("collaborative_documents", {
     .references(() => user.id),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export * from "./theater-schema";

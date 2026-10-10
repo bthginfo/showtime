@@ -23,12 +23,12 @@ export const helpArticles: HelpArticle[] = [
     title: "App auf dem Smartphone installieren",
     module: "settings",
     intro:
-      "Lege DigitalMask auf deinen Startbildschirm. Danach öffnest du sie über das App-Symbol und kannst Mitteilungen einschalten. Eine Installation aus dem App Store oder Play Store ist nicht nötig.",
+      "Lege Showtime auf deinen Startbildschirm. Danach öffnest du sie über das App-Symbol und kannst Mitteilungen einschalten. Eine Installation aus dem App Store oder Play Store ist nicht nötig.",
     steps: [
       "iPhone oder iPad: Öffne digitalmask.vercel.app in Safari. Tippe auf Teilen. Je nach Safari-Ansicht findest du Teilen im Seitenmenü oder unter Mehr (…).",
       "iPhone oder iPad: Wähle Zum Home-Bildschirm beziehungsweise Zu Home-Bildschirm hinzufügen. Fehlt der Eintrag, scrolle in der Liste zu Aktionen bearbeiten und ergänze ihn dort.",
-      "iPhone oder iPad: Lass Als Web-App öffnen eingeschaltet, falls diese Auswahl erscheint, und tippe auf Hinzufügen. Öffne DigitalMask danach über das neue Symbol. Für Mitteilungen brauchst du iOS oder iPadOS 16.4 oder neuer.",
-      "Android: Öffne digitalmask.vercel.app in Chrome. Tippe auf App installieren, falls DigitalMask den Button anbietet, und bestätige die Installation.",
+      "iPhone oder iPad: Lass Als Web-App öffnen eingeschaltet, falls diese Auswahl erscheint, und tippe auf Hinzufügen. Öffne Showtime danach über das neue Symbol. Für Mitteilungen brauchst du iOS oder iPadOS 16.4 oder neuer.",
+      "Android: Öffne digitalmask.vercel.app in Chrome. Tippe auf App installieren, falls Showtime den Button anbietet, und bestätige die Installation.",
       "Android: Alternativ öffnest du das Dreipunkt-Menü von Chrome. Wähle Zum Startbildschirm hinzufügen beziehungsweise Zum Home-Bildschirm hinzufügen und dann Installieren. Die Bezeichnung kann je nach Chrome-Version abweichen. Öffne die App danach über ihr Symbol.",
       "Melde dich in der App an. Unter Mehr → Einstellungen → Mitteilungen auf diesem Gerät tippst du auf Mitteilungen aktivieren. Erlaube die Nachfrage deines Handys. Bei Nicht erlauben oder Blockieren bleibt der Empfang ausgeschaltet.",
       "Tippe auf Testmitteilung, um den Empfang zu prüfen. Wenn nichts ankommt, prüfe die Mitteilungen in den Handy-Einstellungen und den Fokus- beziehungsweise Nicht-stören-Modus. Die ausführliche Anleitung Mitteilungen auf dem Handy hilft dir weiter.",
@@ -44,7 +44,7 @@ export const helpArticles: HelpArticle[] = [
     steps: [
       "Die Übersicht startet mit der aktuellen Spielzeit von August bis Juli. Über Spielzeit kannst du ältere Stücke oder Alle Spielzeiten anzeigen. Neue Produktionen übernehmen die gewählte Spielzeit als Vorschlag; du kannst sie beim Anlegen ändern.",
       "Am Smartphone öffnest du Jahr und Spielzeit über Zeitraum auswählen. Die aktuelle Auswahl bleibt als kurze Zusammenfassung sichtbar. Zusätzliche Aktionen wie Import und Export findest du unter Mehr.",
-      "Öffne Produktionen und wähle ein Stück. Alle freigegebenen Teammitglieder können Produktionen anlegen und zugängliche Produktionen bearbeiten, archivieren oder löschen. Wenn du ein Produktionsteam auswählst, bleibst du als Ersteller automatisch dabei.",
+      "Öffne Produktionen und wähle ein zugängliches Stück. Anlegen, Bearbeiten, Archivieren und Löschen benötigen eine passende Produktionsrolle. Wenn du ein Produktionsteam auswählst, bleibst du als Ersteller automatisch dabei.",
       "Im Stück wechselst du am Smartphone über Produktionsbereich zwischen Überblick, Besetzung, Maskenplan, Aufgaben und den übrigen Bereichen. Am Desktop bleiben die Reiter verfügbar.",
       "Unter Team & Kontakte lassen sich Rollen frei benennen, etwa Regie, Kostüm oder Maskenbetreuung. Wähle externe Kontakte aus Ansprechpersonen, damit ihre Kontaktdaten wiederverwendet werden.",
       "Fehlt eine Person, kannst du sie direkt im Kontaktformular anlegen oder ihren Namen frei eintragen. Beim Speichern der Produktion wird ein neuer freier Kontakt im Verzeichnis hinterlegt. Es entsteht kein Benutzerkonto.",
@@ -245,12 +245,12 @@ export const helpArticles: HelpArticle[] = [
     title: "Mitteilungen auf dem Handy",
     module: "settings",
     intro:
-      "DigitalMask kann dich auch bei geschlossener App über neue Nachrichten, Aufgaben und Änderungen informieren.",
+      "Showtime kann dich auch bei geschlossener App über neue Nachrichten, Aufgaben und Änderungen informieren.",
     steps: [
-      "Öffne DigitalMask über ihr App-Symbol. Am Smartphone findest du die Einstellungen unter Mehr. Öffne Mitteilungen auf diesem Gerät, wähle Mitteilungen aktivieren und erlaube die Nachfrage deines Geräts. Für jedes Handy oder jeden Computer entscheidest du getrennt.",
-      "Auf iPhone oder iPad zeigt App installieren unten auf der Seite eine kurze Anleitung. Öffne DigitalMask in Safari und füge sie über Teilen zum Home-Bildschirm hinzu. Lass Als Web-App öffnen eingeschaltet, falls die Auswahl erscheint. Die Installation allein aktiviert noch keine Mitteilungen: Öffne die App über ihr Symbol, gehe in DigitalMask zu Einstellungen → Mitteilungen auf diesem Gerät und tippe auf Mitteilungen aktivieren. Erlaube die iOS-Nachfrage und wähle anschließend Testmitteilung. Dafür brauchst du iOS oder iPadOS 16.4 oder neuer.",
-      "Wenn du die Nachfrage zuvor abgelehnt hast, öffne auf dem iPhone Einstellungen → Mitteilungen → DigitalMask → Mitteilungen erlauben. Gehe danach zurück in die App und prüfe den Status erneut.",
-      "Unter Android findest du die Freigabe in den Handy-Einstellungen unter Apps → DigitalMask → Benachrichtigungen. Wenn der Empfang über Chrome läuft, prüfe auch Chrome → Einstellungen → Website-Einstellungen → Benachrichtigungen. Die Namen der Menüs können je nach Handy abweichen.",
+      "Öffne Showtime über ihr App-Symbol. Am Smartphone findest du die Einstellungen unter Mehr. Öffne Mitteilungen auf diesem Gerät, wähle Mitteilungen aktivieren und erlaube die Nachfrage deines Geräts. Für jedes Handy oder jeden Computer entscheidest du getrennt.",
+      "Auf iPhone oder iPad zeigt App installieren unten auf der Seite eine kurze Anleitung. Öffne Showtime in Safari und füge sie über Teilen zum Home-Bildschirm hinzu. Lass Als Web-App öffnen eingeschaltet, falls die Auswahl erscheint. Die Installation allein aktiviert noch keine Mitteilungen: Öffne die App über ihr Symbol, gehe in Showtime zu Einstellungen → Mitteilungen auf diesem Gerät und tippe auf Mitteilungen aktivieren. Erlaube die iOS-Nachfrage und wähle anschließend Testmitteilung. Dafür brauchst du iOS oder iPadOS 16.4 oder neuer.",
+      "Wenn du die Nachfrage zuvor abgelehnt hast, öffne auf dem iPhone Einstellungen → Mitteilungen → Showtime → Mitteilungen erlauben. Gehe danach zurück in die App und prüfe den Status erneut.",
+      "Unter Android findest du die Freigabe in den Handy-Einstellungen unter Apps → Showtime → Benachrichtigungen. Wenn der Empfang über Chrome läuft, prüfe auch Chrome → Einstellungen → Website-Einstellungen → Benachrichtigungen. Die Namen der Menüs können je nach Handy abweichen.",
       "Mit Testmitteilung prüfst du den Empfang. Deaktivieren schaltet Mitteilungen auf diesem Gerät aus. Beim Abmelden wird die Verbindung dieses Geräts ebenfalls beendet.",
       "Der Punkt oder Zähler am App-Symbol zeigt ungelesene Mitteilungen. Er wird beim Empfang und Öffnen der App aktualisiert; beim Lesen sinkt er. Auf anderen gerade geschlossenen Geräten kann der Zähler bis zur nächsten Mitteilung oder zum Öffnen der App abweichen.",
       "Die Glocke und Neu für dich zeigen nur deine ungelesenen Mitteilungen, die neueste ganz oben. Öffnest du eine Mitteilung oder liest den zugehörigen Chat, verschwindet sie nach dem Lesen aus diesen Listen.",
@@ -344,19 +344,34 @@ export const helpArticles: HelpArticle[] = [
     module: "settings",
     intro: "Accounts und Mitarbeiterzuordnungen erfüllen unterschiedliche Aufgaben.",
     steps: [
-      "Neue Teammitglieder registrieren sich mit Benutzername und Passwort. Ein Admin gibt ihren Zugang frei.",
-      "Das Team arbeitet gemeinsam an Produktionen, Kontakten, Besetzung, Aufgaben, Sprints, Aufschrieben und Vorlagen. Du planst deinen eigenen Kalender, buchst deine eigenen Zeiten und stellst Freiwünsche. Kalenderplanung für andere Personen, Kategorien, Zugangsverwaltung sowie die Freigabe von Freiwünschen bleiben bei Admins.",
-      "Der Superadmin vergibt Adminrollen und bearbeitet den zentralen Feedbackverlauf. Ein Superadmin ist ein Systemkonto und erscheint nicht als neue Mitarbeiterauswahl.",
+      "Neue Teammitglieder nehmen eine Einladung ihrer Theaterverwaltung an. Auch mit einem vorhandenen Konto kannst du weitere Theater- oder Gewerk-Einladungen annehmen.",
+      "Deine Rolle gilt für ein Theater, Gewerk oder eine Produktion. Mitarbeitende bearbeiten ihre eigenen Zeiten und erlaubte Arbeitsinhalte. Teamleitung, Disposition und andere Fachrollen erhalten zusätzliche Aktionen in ihrem zugewiesenen Bereich.",
+      "Die Theaterverwaltung vergibt Theaterrollen. Der Plattform-Superadmin richtet Theater ein und bearbeitet bewusst eingereichte Supportfälle. Seine Plattformrolle öffnet keine privaten Chats oder Fachunterlagen.",
       "Passwörter werden im Profil geändert. Bei einem vergessenen Passwort erstellt ein Admin einen Wiederherstellungscode, der auf der Anmeldeseite verwendet werden kann.",
       "Wähle in deinen Einstellungen eine persönliche Akzentfarbe. Die fachlichen Farben von Terminen, Status und Produktionen behalten ihre Bedeutung.",
-      "Deine Wochenstunden und dein Zeitkonto sind für dich und die Admins sichtbar. Admins können die Wochenstunden von Teammitgliedern ihrer Abteilung in den Einstellungen bearbeiten und einzelne bisherige Sollzeit-Einträge löschen.",
+      "Deine Zeiten sind für dich und ausdrücklich berechtigte Team- oder Personalrollen sichtbar. Du kannst alle eigenen gebuchten Arbeitszeiten und Anwesenheiten bearbeiten oder löschen, auch nach einer Timerbuchung. Korrekturen fremder Zeiten benötigen eine Teamzeit-Berechtigung.",
     ],
   },
 ];
+helpArticles.push({
+  id: "theater",
+  title: "Theaterbetrieb & Gewerkwechsel",
+  module: "theater",
+  intro:
+    "Ein gemeinsamer Arbeitsraum für dein Theater, mit den passenden Aufgaben und Unterlagen je Gewerk.",
+  steps: [
+    "Wähle im Theater- und Gewerkwechsel deinen Arbeitsbereich. Ein anderes Theater hat seinen eigenen Datenbestand. Deine Rolle und die sichtbaren Inhalte richten sich nach dem ausgewählten Bereich.",
+    "Unter Theaterbetrieb findest du die Fachansicht deines Gewerks, zentrale Produktionen, Planung und Ressourcen. Wähle eine Produktion, um ihre Unterlagen, Abhängigkeiten und Bereitschaft zu sehen.",
+    "Die zuständige Disposition erstellt Planentwürfe, prüft Konflikte und veröffentlicht freigegebene Planstände. Änderungen an einer bereits geprüften Planung benötigen einen neuen Entwurf.",
+    "Teamleitungen melden die Bereitschaft ihres Gewerks. Offene Abhängigkeiten und erforderliche Rückmeldungen bleiben vor der Produktionsfreigabe sichtbar.",
+    "Eigene Arbeitszeiten und Anwesenheiten kannst du nach dem Buchen über das Stiftsymbol korrigieren und über Löschen entfernen. Das gilt auch für Timerbuchungen; neuere Korrekturen werden nicht stillschweigend überschrieben.",
+    "Hausweite Kommunikation bleibt in deinem Theater. Für private Absprachen legst du einen Direkt- oder Gruppenchat mit ausdrücklich ausgewählten Teilnehmenden an.",
+  ],
+});
 export const helpFaq = [
   [
-    "Wie installiere ich DigitalMask auf meinem iPhone oder Android-Handy?",
-    "Die Anleitung App auf dem Smartphone installieren zeigt beide Wege mit Kurzvideos: Auf dem iPhone öffnest du DigitalMask in Safari und fügst sie über Teilen zum Home-Bildschirm hinzu. Unter Android nutzt du App installieren oder das Chrome-Menü. Starte die App danach über ihr Symbol und melde dich an.",
+    "Wie installiere ich Showtime auf meinem iPhone oder Android-Handy?",
+    "Die Anleitung App auf dem Smartphone installieren zeigt beide Wege mit Kurzvideos: Auf dem iPhone öffnest du Showtime in Safari und fügst sie über Teilen zum Home-Bildschirm hinzu. Unter Android nutzt du App installieren oder das Chrome-Menü. Starte die App danach über ihr Symbol und melde dich an.",
   ],
   [
     "Warum bekomme ich nach der Installation noch keine Handy-Mitteilungen?",
@@ -364,7 +379,7 @@ export const helpFaq = [
   ],
   [
     "Laden die Kurzvideos automatisch und verbrauchen sie Speicher?",
-    "Ein Video wird erst geladen, wenn du es öffnest und die Wiedergabe startest. Die kurzen Clips sind ohne Ton, mit eingeblendeten Erklärungen. Du kannst dieselben Schritte auch als Text lesen. DigitalMask lädt keine komplette Videobibliothek auf dein Handy.",
+    "Ein Video wird erst geladen, wenn du es öffnest und die Wiedergabe startest. Die kurzen Clips sind ohne Ton, mit eingeblendeten Erklärungen. Du kannst dieselben Schritte auch als Text lesen. Showtime lädt keine komplette Videobibliothek auf dein Handy.",
   ],
   [
     "Kann ich mit anderen an derselben Word- oder Excel-Datei arbeiten?",
@@ -384,11 +399,11 @@ export const helpFaq = [
   ],
   [
     "Wer kann neue Teamkanäle anlegen?",
-    "Admins legen Teamkanäle an und verwalten sie. Das ganze Maskenteam kann sie lesen und darin schreiben, auch später freigegebene Kolleginnen. Private Direkt- und Gruppenchats sind nur für ihre Teilnehmenden sichtbar.",
+    "Personen mit Kanalverwaltung legen Haus-, Gewerk- und Produktionskanäle in ihrem erlaubten Bereich an. Hauskanäle gehören ausschließlich zu deinem Theater. Private Direkt- und Gruppenchats sind nur für ihre Teilnehmenden sichtbar, auch gegenüber Leitung und Administration.",
   ],
   [
     "Was darf ich als normales Teammitglied?",
-    "Du kannst gemeinsame Arbeitsinhalte in deinen zugänglichen Bereichen anlegen, bearbeiten und löschen: Produktionen, Kontakte, Schauspieler, Figuren, Besetzungen, Aufgaben, Sprints, Aufschriebe und Vorlagen. Du kannst außerdem deinen eigenen Kalender planen. Kalenderplanung für andere Personen, Kategorien, Benutzerverwaltung und die Freigabe von Freiwünschen sind Adminaufgaben. Persönliche Zeitbuchungen und private Chats bleiben geschützt.",
+    "Du bearbeitest eigene Zeiten, Freiwünsche und zugängliche Aufgaben oder Arbeitsunterlagen. Die verfügbaren Aktionen richten sich nach deinen aktuellen Theater-, Gewerk- und Produktionsrollen. Produktion, Besetzung, Planung, Personal- und Budgetfreigaben benötigen zusätzliche Fachrechte. Private Chats bleiben auf ihre Teilnehmenden begrenzt.",
   ],
   [
     "Warum sehe ich eine Produktion nicht?",
@@ -460,6 +475,6 @@ export const helpFaq = [
   ],
   [
     "Wo melde ich einen Fehler oder eine Idee?",
-    "Unter Hilfe → Ideen & Fehler. Beschreibe den Ablauf und das erwartete Ergebnis. Deine Rückmeldung geht in die Bearbeitungsübersicht des Superadmins.",
+    "Unter Hilfe → Ideen & Fehler. Beschreibe den Ablauf und das erwartete Ergebnis. Für Plattformhilfe leitest du deine eigene Rückmeldung ausdrücklich über An Plattform-Support senden weiter. Dabei werden Titel, Beschreibung und Typ übertragen, ohne Anhänge oder andere Theaterdaten.",
   ],
 ] as const;

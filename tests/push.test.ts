@@ -1,3 +1,4 @@
+import {contextFixture} from "./access-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isPushEndpoint, subscriptionSchema } from "../src/modules/notifications/schema";
 import { pushPayload, safeNotificationLink } from "../src/modules/notifications/payload";
@@ -9,8 +10,10 @@ const mocks = vi.hoisted(() => ({
   remove: vi.fn(),
   invalidate: vi.fn(),
   send: vi.fn(),
+  subjects:vi.fn(),
+  readable:vi.fn(),
 }));
-vi.mock("next/cache", () => ({
+vi.mock("@/platform/cache", () => ({
   unstable_cache: (fn: () => unknown) => fn,
   revalidateTag: mocks.invalidate,
 }));
@@ -18,6 +21,8 @@ vi.mock("web-push", () => ({ default: { sendNotification: mocks.send } }));
 vi.mock("../src/platform/db", () => ({
   db: { select: mocks.select, delete: () => ({ where: mocks.remove }) },
 }));
+vi.mock("@/platform/worker-subjects",()=>({activeSubjects:mocks.subjects}));
+vi.mock("@/modules/notifications/access",()=>({noticeReadable:mocks.readable}));
 import { deliverNotifications, subscriptionId } from "../src/modules/notifications/service";
 const endpoint = "https://fcm.googleapis.com/fcm/send/fixture";
 const notice = (id: string, userId: string, data = {}) => ({
@@ -91,14 +96,14 @@ describe("push consent, boundaries and private payloads", () => {
     expect(() =>
       subscriptionSchema.parse({ endpoint, keys: { ...keys, auth: "short" } }),
     ).toThrow();
-    expect(subscriptionId(endpoint)).toHaveLength(64);
+    expect(subscriptionId(endpoint,"theatre","person")).toHaveLength(64);
   });
   it("never includes private message content or external navigation in a lock-screen payload", () => {
     const payload = pushPayload("ChatMessageCreatedV1", "notice-1", "person", 3, {
       body: "Private message",
       title: "Private production",
       link: "https://evil.invalid",
-    });
+    },"theatre");
     expect(JSON.stringify(payload)).not.toContain("Private");
     expect(payload).toMatchObject({ url: "/", unreadCount: 3, tag: "notice-1" });
     expect(safeNotificationLink("/?module=chat&conversationId=private")).toBe(
@@ -106,91 +111,39 @@ describe("push consent, boundaries and private payloads", () => {
     );
     expect(safeNotificationLink("//evil.invalid")).toBe("/");
   });
-  it("uses no database reads when push is not configured, and no notice reads without devices", async () => {
-    vi.stubEnv("VAPID_PRIVATE_KEY", "");
-    await deliverNotifications("maske", "ChatMessageCreatedV1", ["new"]);
+
+  it('scopes the same physical endpoint separately per tenant and person',()=>{
+    expect(subscriptionId(endpoint,'one','person')).not.toBe(subscriptionId(endpoint,'two','person'));
+    expect(subscriptionId(endpoint,'one','person')).not.toBe(subscriptionId(endpoint,'one','other'));
+  });
+  it('does no database work when push is not configured',async()=>{
+    vi.stubEnv('VAPID_PRIVATE_KEY','');
+    await deliverNotifications('theatre','makeup','ChatMessageCreatedV1',['new']);
     expect(mocks.select).not.toHaveBeenCalled();
-    vi.stubEnv("VAPID_PRIVATE_KEY", "fixture");
-    selects([]);
-    await deliverNotifications("maske", "ChatMessageCreatedV1", ["new"]);
-    expect(mocks.select).toHaveBeenCalledTimes(1);
+  });
+  it('uses current subjects and rechecks parents for both badges and dispatch',async()=>{
+    const subject=contextFixture('person');mocks.subjects.mockResolvedValue([subject]);
+    const device={id:'device',userId:'person',organizationId:'theatre',endpoint,keys:{},updatedAt:new Date()};
+    const fresh=notice('new','person',{link:'/?module=chat'}),revoked=notice('revoked','person'),previous=notice('previous','person');
+    selects([device],[fresh,revoked],[fresh,revoked,previous]);
+    mocks.readable.mockImplementation(async(_context,row)=>row.id!=='revoked');
+    await deliverNotifications('theatre','makeup','ChatMessageCreatedV1',['new','revoked']);
+    expect(mocks.subjects).toHaveBeenCalledWith('theatre','makeup');
+    expect(mocks.readable).toHaveBeenCalledWith(subject,revoked);
+    expect(mocks.send).toHaveBeenCalledOnce();
+    expect(JSON.parse(mocks.send.mock.calls[0][1])).toMatchObject({ownerId:'theatre:person',organizationId:'theatre',unreadCount:2,tag:'new'});
+  });
+  it('drops notifications immediately when the tenant membership or guest role has expired',async()=>{
+    mocks.subjects.mockResolvedValue([]);selects([{userId:'person'}],[notice('new','person')]);
+    await deliverNotifications('theatre','makeup','ChatMessageCreatedV1',['new']);
     expect(mocks.send).not.toHaveBeenCalled();
   });
-  it("checks current private-chat and production membership before delivery and badge counting", async () => {
-    const device = {
-      id: "device",
-      userId: "person",
-      departmentId: "maske",
-      endpoint,
-      keys: {},
-      updatedAt: new Date(),
-      createdAt: new Date(),
-    };
-    selects(
-      [device],
-      [
-        {
-          notice: notice("new", "person", {
-            conversationId: "mine",
-            link: "/?module=chat&conversationId=mine",
-          }),
-          role: "user",
-          status: "active",
-        },
-        {
-          notice: notice("removed", "person", { conversationId: "other" }),
-          role: "admin",
-          status: "active",
-        },
-        {
-          notice: notice("restricted", "person", { productionId: "restricted" }),
-          role: "user",
-          status: "active",
-        },
-        { notice: notice("previous", "person"), role: "user", status: "active" },
-      ],
-      [
-        {
-          id: "mine",
-          kind: "conversations",
-          data: { mode: "direct", participantIds: ["person", "sender"] },
-        },
-        {
-          id: "other",
-          kind: "conversations",
-          data: { mode: "direct", participantIds: ["someone"] },
-        },
-        { id: "restricted", kind: "productions", data: { memberIds: ["someone"] } },
-      ],
-    );
-    await deliverNotifications("maske", "ChatMessageCreatedV1", ["new", "removed", "restricted"]);
-    expect(mocks.send).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(mocks.send.mock.calls[0][1])).toMatchObject({
-      userId: "person",
-      unreadCount: 2,
-      tag: "new",
-    });
-  });
-  it("removes expired devices, but transient provider failures keep the event retryable", async () => {
-    const device = {
-      id: "device",
-      userId: "person",
-      departmentId: "maske",
-      endpoint,
-      keys: {},
-      updatedAt: new Date(),
-      createdAt: new Date(),
-    };
-    const rows = [{ notice: notice("new", "person"), role: "user", status: "active" }];
-    selects([device], rows);
-    mocks.send.mockRejectedValueOnce({ statusCode: 410 });
-    await deliverNotifications("maske", "TaskAssignedV1", ["new"]);
-    expect(mocks.remove).toHaveBeenCalledTimes(1);
-    expect(mocks.invalidate).toHaveBeenCalled();
-    selects([device], rows);
-    mocks.send.mockRejectedValueOnce({ statusCode: 503 });
-    await expect(deliverNotifications("maske", "TaskAssignedV1", ["new"])).rejects.toThrow(
-      "retried",
-    );
+  it('removes expired devices while transient failures leave the outbox retryable',async()=>{
+    const device={id:'device',userId:'person',organizationId:'theatre',endpoint,keys:{},updatedAt:new Date()};
+    const row=notice('new','person');mocks.subjects.mockResolvedValue([contextFixture('person')]);mocks.readable.mockResolvedValue(true);
+    selects([device],[row],[row]);mocks.send.mockRejectedValueOnce({statusCode:410});
+    await deliverNotifications('theatre','makeup','TaskAssignedV1',['new']);expect(mocks.remove).toHaveBeenCalledOnce();
+    selects([device],[row],[row]);mocks.send.mockRejectedValueOnce({statusCode:503});
+    await expect(deliverNotifications('theatre','makeup','TaskAssignedV1',['new'])).rejects.toThrow('retried');
   });
 });

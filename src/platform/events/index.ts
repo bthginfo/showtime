@@ -1,7 +1,13 @@
-import { after } from "next/server";
+import { activeSubjects } from "../worker-subjects";
+import { privateRowReadable, anyPermission } from "@/shared/access-policy";
+import { projectVisible } from "@/modules/records/repository";
+import { assertRead } from "@/modules/records/service";
+import { publishEvents } from "./transport";
+import { handleTheaterEvent } from "@/modules/theater/events";
+import { after } from "@/platform/request";
 import { and, eq, lte, sql, or, ne, inArray } from "drizzle-orm";
 import { db, type Transaction } from "@/platform/db";
-import { outbox, records, audit, memberships } from "@/platform/db/schema";
+import { outbox, records, audit, memberships, eventReceipts } from "@/platform/db/schema";
 import type { Context } from "@/platform/context";
 import { invalidateWorkspace } from "@/modules/records/workspace";
 import type { RecordData } from "@/shared/contracts";
@@ -18,7 +24,17 @@ export async function emit(
     id: crypto.randomUUID(),
     departmentId: context.departmentId,
     type,
-    payload: { ...payload, actorId: context.user.id, organizationId: context.organizationId },
+    organizationId: context.organizationId,
+    payload: {
+      ...payload,
+      aggregateId: String(payload.recordId || ""),
+      aggregateVersion: Number(payload.version || 1),
+      schemaVersion: 1,
+      occurredAt: new Date().toISOString(),
+      correlationId: crypto.randomUUID(),
+      actorId: context.user.id,
+      organizationId: context.organizationId,
+    },
     ...(options.availableAt ? { availableAt: options.availableAt } : {}),
   });
 }
@@ -38,7 +54,7 @@ export async function auditChange(
 }
 export function scheduleEvents() {
   after(async () => {
-    await processEvents().catch((error) =>
+    await publishEvents().catch((error) =>
       console.error("Event processing failed", {
         name: error instanceof Error ? error.name : "unknown",
         code: (error as { cause?: { code?: string } })?.cause?.code || "unknown",
@@ -46,7 +62,7 @@ export function scheduleEvents() {
     );
   });
 }
-export async function processEvents() {
+export async function processEvents(eventId?: string) {
   const changedDepartments = new Set<string>();
   const due = await db.transaction(async (tx) => {
     const list = await tx
@@ -54,8 +70,12 @@ export async function processEvents() {
       .from(outbox)
       .where(
         and(
-          or(eq(outbox.status, "pending"), eq(outbox.status, "processing")),
-          lte(outbox.availableAt, new Date()),
+          or(
+            eq(outbox.status, "pending"),
+            eq(outbox.status, "queued"),
+            eq(outbox.status, "processing"),
+          ),
+          eventId ? eq(outbox.id, eventId) : lte(outbox.availableAt, new Date()),
         ),
       )
       .limit(20)
@@ -99,91 +119,79 @@ export async function processEvents() {
         }
       }
       await db.transaction(async (tx) => {
+        const [receipt] = await tx
+          .select()
+          .from(eventReceipts)
+          .where(and(eq(eventReceipts.eventId, event.id), eq(eventReceipts.handler, "business-v1")))
+          .limit(1);
+        if (receipt) {
+          const previous = await tx
+            .select({ id: records.id })
+            .from(records)
+            .where(
+              and(
+                eq(records.kind, "notifications"),
+                sql`${records.id} like ${"notice:" + event.id + ":%"}`,
+              ),
+            );
+          noticeIds.push(...previous.map((n) => n.id));
+          return;
+        }
+        await handleTheaterEvent(tx, event);
         if (
           event.type === "TaskAssignedV1" ||
           event.type === "LeaveRequestDecidedV1" ||
           event.type === "ServiceChangedV1" ||
           event.type === "ShiftSwapChangedV1" ||
           event.type === "LookPublishedV1" ||
-          event.type === "ChatMessageCreatedV1"
+          event.type === "ChatMessageCreatedV1" ||
+          event.type === "SchedulePublishedV1" ||
+          event.type === "PurchaseDecidedV1"
         ) {
-          let targets = Array.isArray(event.payload.userIds)
-            ? event.payload.userIds.filter((x): x is string => typeof x === "string")
+          const subjects = await activeSubjects(event.organizationId, event.departmentId, tx);
+          const [source] = event.payload.recordId
+            ? await tx
+                .select()
+                .from(records)
+                .where(eq(records.id, String(event.payload.recordId)))
+                .limit(1)
             : [];
-          let targetsChecked = false;
-          if (event.type === "ChatMessageCreatedV1") {
-            const [conversation] = event.payload.conversationId
-              ? await tx
-                  .select({ data: records.data })
-                  .from(records)
-                  .where(
-                    and(
-                      eq(records.departmentId, event.departmentId),
-                      eq(records.id, String(event.payload.conversationId)),
-                      eq(records.kind, "conversations"),
-                    ),
-                  )
-                  .limit(1)
-              : [];
-            const participants = Array.isArray(conversation?.data.participantIds)
-              ? conversation.data.participantIds
-              : [];
-            if (
-              conversation?.data.mode === "team" ||
-              (!event.payload.conversationId && event.payload.audience === "team")
-            ) {
-              const activeTeam = await tx
-                .select({ id: memberships.userId, role: memberships.role })
-                .from(memberships)
-                .where(
-                  and(
-                    eq(memberships.departmentId, event.departmentId),
-                    eq(memberships.status, "active"),
-                    ne(memberships.role, "superadmin"),
-                  ),
-                );
-              targets = activeTeam.map((member) => member.id);
-              targetsChecked = true;
-              if (event.payload.productionId) {
-                const [production] = await tx
-                  .select({ data: records.data })
-                  .from(records)
-                  .where(
-                    and(
-                      eq(records.departmentId, event.departmentId),
-                      eq(records.id, String(event.payload.productionId)),
-                      eq(records.kind, "productions"),
-                    ),
-                  )
-                  .limit(1);
-                const permitted = listValue(production?.data.memberIds);
-                targets = production
-                  ? activeTeam
-                      .filter(
-                        (member) =>
-                          member.role !== "user" ||
-                          !permitted.length ||
-                          permitted.includes(member.id),
-                      )
-                      .map((member) => member.id)
-                  : [];
-              }
-            } else {
-              targets = targets.filter((id) => participants.includes(id));
+          let permitted = subjects.filter(
+            (subject) =>
+              Array.isArray(event.payload.userIds) &&
+              event.payload.userIds.includes(subject.user.id),
+          );
+          if (event.type === "ChatMessageCreatedV1" || event.type === "SchedulePublishedV1")
+            permitted = subjects;
+          const targets: string[] = [];
+          for (const subject of permitted) {
+            if (!source) {
+              if (
+                (event.type === "SchedulePublishedV1" &&
+                  anyPermission(subject.user, "schedule.read")) ||
+                event.type === "PurchaseDecidedV1"
+              )
+                targets.push(subject.user.id);
+              continue;
             }
-          }
-          if (targets.length && !targetsChecked) {
-            const active = await tx
-              .select({ id: memberships.userId })
-              .from(memberships)
-              .where(
-                and(
-                  eq(memberships.departmentId, event.departmentId),
-                  eq(memberships.status, "active"),
-                  inArray(memberships.userId, targets),
-                ),
-              );
-            targets = [...new Set(active.map((member) => member.id))];
+            if (
+              event.type === "ChatMessageCreatedV1" &&
+              !source.data.conversationId &&
+              !source.data.productionId &&
+              subject.departmentId !== source.departmentId
+            )
+              continue;
+            try {
+              await assertRead(subject, source, tx);
+              targets.push(subject.user.id);
+            } catch (error) {
+              if (!(
+                error instanceof Error &&
+                "status" in error &&
+                [403, 404].includes(Number(error.status))
+              ))
+                throw error;
+            }
           }
           for (const uid of targets) {
             if (uid === event.payload.actorId) continue;
@@ -222,9 +230,17 @@ export async function processEvents() {
               .onConflictDoNothing();
           }
         }
+        await tx
+          .insert(eventReceipts)
+          .values({
+            organizationId: event.organizationId,
+            eventId: event.id,
+            handler: "business-v1",
+          })
+          .onConflictDoNothing();
       });
       changedDepartments.add(event.departmentId);
-      await deliverNotifications(event.departmentId, event.type, noticeIds);
+      await deliverNotifications(event.organizationId, event.departmentId, event.type, noticeIds);
       await db.update(outbox).set({ status: "done" }).where(eq(outbox.id, event.id));
     } catch (error) {
       await db

@@ -1,0 +1,1 @@
+{"extends":"./tsconfig.json","compilerOptions":{"paths":{"@/*":["./src/*"]}},"include":["scripts/migrate-showtime.ts","scripts/bootstrap-showtime.ts","scripts/tenant-backup.ts","src/platform/**/*.ts","src/**/*.d.ts"]}

@@ -46,7 +46,7 @@ describe("installed-app push worker", () => {
   it("receives a background notification, updates badge and opens its app channel", async () => {
     const app = worker();
     await app.dispatch("message", {
-      data: { type: "DIGITALMASK_BADGE", userId: "person", count: 0, timestamp: 1 },
+      data: { type: "SHOWTIME_BADGE", ownerId: "theatre:person", count: 0, timestamp: 1 },
       ports: [],
     });
     await app.dispatch("push", {
@@ -54,7 +54,7 @@ describe("installed-app push worker", () => {
         json: () => ({
           title: "DigitalMask",
           body: "Neue Nachricht",
-          userId: "person",
+          ownerId: "theatre:person",
           unreadCount: 2,
           timestamp: 2,
           tag: "one",
@@ -76,20 +76,20 @@ describe("installed-app push worker", () => {
   it("clears the badge after reading and rejects queued push for a logged-out or different account", async () => {
     const app = worker();
     await app.dispatch("message", {
-      data: { type: "DIGITALMASK_BADGE", userId: "person", count: 0, timestamp: 20 },
+      data: { type: "SHOWTIME_BADGE", ownerId: "theatre:person", count: 0, timestamp: 20 },
       ports: [],
     });
     await app.dispatch("push", {
-      data: { json: () => ({ userId: "person", unreadCount: 5, timestamp: 10 }) },
+      data: { json: () => ({ ownerId: "theatre:person", unreadCount: 5, timestamp: 10 }) },
     });
     expect(app.badge).not.toHaveBeenCalled(); // Delayed push must not restore a read counter.
     await app.dispatch("message", {
-      data: { type: "DIGITALMASK_BADGE", userId: null, count: 0 },
+      data: { type: "SHOWTIME_BADGE", ownerId: null, count: 0 },
       ports: [],
     });
     app.show.mockClear();
     await app.dispatch("push", {
-      data: { json: () => ({ userId: "person", unreadCount: 5, timestamp: Date.now() }) },
+      data: { json: () => ({ ownerId: "theatre:person", unreadCount: 5, timestamp: Date.now() }) },
     });
     expect(app.show).not.toHaveBeenCalled();
     expect(app.clear).toHaveBeenCalled();
@@ -97,11 +97,11 @@ describe("installed-app push worker", () => {
   it("keeps notification clicks inside the app even for a malformed external link", async () => {
     const app = worker();
     await app.dispatch("message", {
-      data: { type: "DIGITALMASK_BADGE", userId: "person", count: 1 },
+      data: { type: "SHOWTIME_BADGE", ownerId: "theatre:person", count: 1 },
       ports: [],
     });
     await app.dispatch("notificationclick", {
-      notification: { data: { userId: "person", url: "https://evil.invalid" }, close: vi.fn() },
+      notification: { data: { ownerId: "theatre:person", url: "https://evil.invalid" }, close: vi.fn() },
     });
     expect(app.navigate).toHaveBeenCalledWith("https://digitalmask.vercel.app/");
   });

@@ -1,3 +1,4 @@
+import {memberFixture} from "./access-fixture";
 import { describe, expect, it } from "vitest";
 import type { DomainRecord } from "@/shared/contracts";
 import { canManageRecord } from "@/shared/record-permissions";
@@ -85,10 +86,10 @@ describe("article reservations", () => {
   });
   it("protects other people's reservations and never grants generic swap status editing", () => {
     const record = { createdBy: "a", data: { userId: "a" } };
-    expect(canManageRecord({ id: "a", role: "user" }, "reservations", record)).toBe(true);
-    expect(canManageRecord({ id: "b", role: "user" }, "reservations", record)).toBe(false);
-    expect(canManageRecord({ id: "b", role: "admin" }, "reservations", record)).toBe(true);
-    expect(canManageRecord({ id: "admin", role: "admin" }, "shiftSwaps", record)).toBe(false);
+    expect(canManageRecord(memberFixture("a",["employee"],"fictional-makeup"), "reservations", record)).toBe(true);
+    expect(canManageRecord(memberFixture("b",["employee"],"fictional-makeup"), "reservations", record)).toBe(false);
+    expect(canManageRecord(memberFixture("b",["team_lead"],"fictional-makeup"), "reservations", record)).toBe(true);
+    expect(canManageRecord(memberFixture("admin",["team_lead"],"fictional-makeup"), "shiftSwaps", record)).toBe(false);
   });
 });
 

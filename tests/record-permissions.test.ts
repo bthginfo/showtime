@@ -1,67 +1,45 @@
-import { describe, expect, it } from "vitest";
-import { canManageRecord } from "../src/shared/record-permissions";
-import type { RecordKind } from "../src/shared/contracts";
-
-const member = { id: "member", role: "user" as const };
-const admin = { id: "admin", role: "admin" as const };
-const other = { createdBy: "other", data: { userId: "other" } };
-describe("shared working permissions", () => {
-  it.each<RecordKind>([
-    "productions",
-    "people",
-    "actors",
-    "characters",
-    "casting",
-    "sprints",
-    "tasks",
-    "templates",
-    "materials",
-    "handovers",
-  ])("members create and manage shared %s", (kind) => {
-    expect(canManageRecord(member, kind)).toBe(true);
-    expect(canManageRecord(member, kind, other)).toBe(true);
-  });
-  it("category administration stays with admins", () => {
-    for (const kind of ["categories", "calendarCategories"] as const) {
-      expect(canManageRecord(member, kind)).toBe(false);
-      expect(canManageRecord(admin, kind)).toBe(true);
-    }
-  });
-  it("members plan only their own calendar; admins plan for others", () => {
-    const own = { ...other, data: { participantIds: [member.id] } };
-    const foreign = { ...other, data: { participantIds: ["other"] } };
-    const group = { ...other, data: { participantIds: [member.id, "other"] } };
-    expect(canManageRecord(member, "events")).toBe(true);
-    expect(canManageRecord(member, "events", own)).toBe(true);
-    for (const record of [foreign, group, other]) {
-      expect(canManageRecord(member, "events", record)).toBe(false);
-      expect(canManageRecord(admin, "events", record)).toBe(true);
-    }
-  });
-  it("personal bookings and requests retain ownership", () => {
-    for (const kind of ["time", "attendance", "leave"] as const) {
-      expect(canManageRecord(member, kind, other)).toBe(false);
-      expect(canManageRecord(admin, kind, other)).toBe(true);
-      expect(canManageRecord(member, kind, { ...other, data: { userId: member.id } })).toBe(true);
-    }
-  });
-  it("private messages, feedback and chats remain protected", () => {
-    const privateMessage = { ...other, data: { userId: "other", conversationId: "private" } };
-    expect(canManageRecord(admin, "messages", privateMessage)).toBe(false);
-    expect(canManageRecord(member, "conversations", other)).toBe(false);
-    expect(canManageRecord(admin, "feedback", other)).toBe(false);
-  });
-  it("shared looks are editable; private drafts remain private", () => {
-    expect(canManageRecord(member, "looks", { ...other, data: { status: "published" } })).toBe(
-      true,
-    );
-    expect(canManageRecord(member, "looks", { ...other, data: { status: "draft" } })).toBe(false);
-  });
-  it("approved absences and workflow records cannot be changed through generic CRUD", () => {
-    expect(canManageRecord(member, "events", { ...other, data: { leaveId: "request" } })).toBe(
-      false,
-    );
-    for (const kind of ["timesheets", "notifications", "files"] as const)
-      expect(canManageRecord(admin, kind)).toBe(false);
-  });
+import {describe,expect,it} from 'vitest';
+import {canManageRecord} from '@/shared/record-permissions';
+import {memberFixture} from './access-fixture';
+const employee=memberFixture('member'),leader=memberFixture('leader',['team_lead']);
+const own={createdBy:'member',departmentId:'makeup',data:{userId:'member'}};
+const other={createdBy:'other',departmentId:'makeup',data:{userId:'other'}};
+describe('scoped theater working permissions',()=>{
+ it('employees create their own shared work; managing other work needs a team role',()=>{
+  for(const kind of ['tasks','looks','templates','maskPlans'] as const){
+   expect(canManageRecord(employee,kind,own)).toBe(true);
+   expect(canManageRecord(employee,kind,other)).toBe(false);
+   expect(canManageRecord(leader,kind,other)).toBe(true);
+  }
+  for(const kind of ['productions','casting','characters','people','actors','materials','sprints','categories','calendarCategories'] as const)expect(canManageRecord(employee,kind)).toBe(false);
+ });
+ it('own calendar changes remain available; team planning needs scope',()=>{
+  expect(canManageRecord(employee,'events')).toBe(true);
+  expect(canManageRecord(employee,'events',{...own,data:{participantIds:['member']}})).toBe(true);
+  for(const data of [{participantIds:['other']},{participantIds:['member','other']},{}]){
+   expect(canManageRecord(employee,'events',{...other,data})).toBe(false);
+   expect(canManageRecord(leader,'events',{...other,data})).toBe(true);
+   expect(canManageRecord(leader,'events',{...other,departmentId:'sound',data})).toBe(false);
+  }
+ });
+ it('every own time booking is correctable; team editing is scoped and explicit',()=>{
+  for(const kind of ['time','attendance'] as const){
+   expect(canManageRecord(employee,kind,own)).toBe(true);
+   expect(canManageRecord(employee,kind,other)).toBe(false);
+   expect(canManageRecord(leader,kind,other)).toBe(true);
+   expect(canManageRecord(leader,kind,{...other,departmentId:'sound'})).toBe(false);
+  }
+  expect(canManageRecord(leader,'leave',other)).toBe(false);
+ });
+ it('administration never grants private conversation or personal-message access',()=>{
+  const admin=memberFixture('admin',['theater_admin']);
+  expect(canManageRecord(admin,'time',other)).toBe(false);
+  expect(canManageRecord(admin,'messages',{...other,data:{userId:'other',conversationId:'private'}})).toBe(false);
+  expect(canManageRecord(admin,'conversations',{...other,data:{mode:'group'}})).toBe(false);
+  expect(canManageRecord(admin,'feedback',other)).toBe(false);
+ });
+ it('protected workflows have no generic write permission',()=>{
+  expect(canManageRecord(leader,'events',{...own,data:{leaveId:'request'}})).toBe(false);
+  for(const kind of ['timesheets','notifications','files','shiftSwaps'] as const)expect(canManageRecord(leader,kind)).toBe(false);
+ });
 });

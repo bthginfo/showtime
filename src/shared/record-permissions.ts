@@ -1,32 +1,20 @@
-import { listValue, type Member, type RecordData, type RecordKind } from "./contracts";
-
-export function canSetCalendarParticipants(member: Pick<Member, "id" | "role">, data: RecordData) {
-  const people = listValue(data.participantIds);
-  return member.role !== "user" || (people.length === 1 && people[0] === member.id);
-}
-
-/** Project visibility and private document access are checked separately on the server. */
-export function canManageRecord(
-  member: Pick<Member, "id" | "role">,
-  kind: RecordKind,
-  record?: { createdBy: string; data: RecordData },
-) {
-  if (["notifications", "timesheets", "files", "shiftSwaps"].includes(kind)) return false;
-  if (kind === "reservations" && record)
-    return member.role !== "user" || record.data.userId === member.id;
-  if (["categories", "calendarCategories"].includes(kind)) return member.role !== "user";
-  if (kind === "events" && record?.data.leaveId) return false;
-  if (kind === "events" && record) return canSetCalendarParticipants(member, record.data);
-  if (kind === "conversations" && record)
-    return record.data.mode === "team" ? member.role !== "user" : record.createdBy === member.id;
-  if (kind === "messages" && record?.data.conversationId) return record.data.userId === member.id;
-  if (kind === "feedback" && record)
-    return member.role === "superadmin" || record.data.userId === member.id;
-  if (member.role === "user" && record) {
-    if (["time", "attendance", "leave", "messages"].includes(kind))
-      return record.data.userId === member.id;
-    if (kind === "looks" && record.data.status !== "published")
-      return record.createdBy === member.id;
-  }
-  return true;
+import {listValue,type Member,type RecordData,type RecordKind} from './contracts';
+import {memberCan,writePermission,anyPermission} from './access-policy';
+type Actor=Pick<Member,'id'|'role'|'permissions'|'grants'|'departmentId'>;
+export function canSetCalendarParticipants(member:Actor,data:RecordData,departmentId=member.departmentId){const selected=listValue(data.participantIds);const row={kind:'events' as const,createdBy:member.id,departmentId,data};return memberCan(member as Member,'schedule.manage',row)||memberCan(member as Member,'availability.own',row)&&selected.length===1&&selected[0]===member.id;}
+export function canManageRecord(member:Actor,kind:RecordKind,record?:{id?:string;createdBy:string;departmentId?:string;data:RecordData}){
+ if(['notifications','timesheets','files','shiftSwaps'].includes(kind))return false;
+ const row={...record,kind,createdBy:record?.createdBy||member.id,data:record?.data||{}};
+ if(['leave','messages','feedback'].includes(kind)&&record?.data.userId&&record.data.userId!==member.id)return false;
+ if(['time','attendance'].includes(kind))return record?.data.userId && record.data.userId!==member.id ? memberCan(member as Member,'time.team.manage',row) : anyPermission(member as Member,'time.own');
+ if(kind==='events'&&record?.data.leaveId)return false;
+ if(kind==='events'&&!record)return memberCan(member as Member,'schedule.manage',row)||memberCan(member as Member,'availability.own',row);
+ if(kind==='events'&&record)return canSetCalendarParticipants(member,record.data,record.departmentId);
+ if(kind==='conversations'&&record?.data.mode!=='team'&&record)return record.createdBy===member.id&&anyPermission(member as Member,'chat.write');
+ if(kind==='conversations'&&record?.data.mode==='team')return memberCan(member as Member,'chat.channels.manage',record.data.scope==='theater'?{...row,departmentId:''}:row);
+ if(kind==='messages'&&(record?.data.conversationId||record?.data.productionId))return anyPermission(member as Member,'chat.write');
+ if(kind==='reservations'&&record&&record.createdBy!==member.id)return memberCan(member as Member,'inventory.manage',row);
+ if(kind==='tasks'&&record&&record.createdBy!==member.id)return memberCan(member as Member,'task.manage',row);
+ if(['looks','templates','maskPlans'].includes(kind)&&record&&record.createdBy!==member.id)return memberCan(member as Member,'document.manage',row);
+ const permission=writePermission[kind];return permission?memberCan(member as Member,permission,row):false;
 }

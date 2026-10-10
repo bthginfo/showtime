@@ -34,7 +34,7 @@ export async function sourceBytes(path: string) {
     throw new HttpError(404, "Die Originaldatei wurde nicht gefunden.");
   return Buffer.from(await new Response(blob.stream).arrayBuffer());
 }
-async function documentAccess(context: Context, id: string) {
+export async function documentAccess(context: Context, id: string) {
   const file = await findRecord(context, id, "files");
   if (file.data.pendingDeletionOperation) throw new HttpError(404, "Die Datei wurde entfernt.");
   const parent = await findRecord(context, String(file.data.recordId));
@@ -145,6 +145,7 @@ export async function ensureSharedDocument(context: Context, id: string) {
             const update = Buffer.from(Y.encodeStateAsUpdate(document, vector)).toString("base64");
             const appended = await appendDocumentUpdate(
               {
+                organizationId:context.organizationId,
                 fileId: id,
                 departmentId: context.departmentId,
                 userId: context.user.id,
@@ -202,6 +203,7 @@ export async function openDocument(context: Context, id: string, cookie: string)
       { code: "document_session_expired" },
     );
   const claims = {
+    organizationId:context.organizationId,
     fileId: id,
     departmentId: context.departmentId,
     userId: context.user.id,

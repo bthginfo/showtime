@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/platform/db";
 import { timers, attendanceTimers } from "@/platform/db/schema";
-import type { Context } from "@/platform/context";
+import {can,requirePermission,type Context} from "@/platform/context";
 import { HttpError } from "@/platform/http";
 import { assertProject } from "@/modules/records/repository";
 import { saveRecord } from "@/modules/records/service";
@@ -16,10 +16,11 @@ export async function timerAction(
   data: RecordData,
   kind: "time" | "attendance" = "time",
 ) {
+  requirePermission(context,'time.own');
   const timerTable = kind === "attendance" ? attendanceTimers : timers;
   const result = await db.transaction(async (tx) => {
     await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${kind + ":timer:" + context.user.id}))`,
+      sql`select pg_advisory_xact_lock(hashtext(${context.organizationId+':'+kind + ":timer:" + context.user.id}))`,
     );
     const [timer] = await tx
       .select()
@@ -66,7 +67,7 @@ export async function timerAction(
         .returning();
       return created;
     }
-    if (!timer || timer.departmentId !== context.departmentId)
+    if (!timer)
       throw new HttpError(404, "Es läuft kein Timer.");
     if (action === "timer-discard") {
       if (timer.data.stopping)
@@ -129,12 +130,12 @@ export async function timerAction(
         .update(timerTable)
         .set({ data: { ...timer.data, stopping: true, stoppedAt: end } })
         .where(eq(timerTable.id, timer.id));
-      return { timerId: timer.id, payload };
+      return { timerId: timer.id, departmentId:timer.departmentId, payload };
     }
     throw new HttpError(400, "Unbekannte Timeraktion.");
   });
   if ("payload" in result && result.payload && result.timerId) {
-    const booking = await saveRecord(context, kind, result.payload);
+    const booking = await saveRecord({...context,departmentId:result.departmentId,user:{...context.user,departmentId:result.departmentId}}, kind, result.payload);
     await db
       .delete(timerTable)
       .where(and(eq(timerTable.id, result.timerId), eq(timerTable.userId, context.user.id)));

@@ -3,6 +3,7 @@ import type { DocumentFormat } from "./contracts";
 import { HttpError } from "@/platform/http";
 
 export interface DocumentClaims {
+  organizationId: string;
   fileId: string;
   departmentId: string;
   userId: string;
@@ -65,6 +66,7 @@ export function verifyDocumentTicket(
       claims.expiresAt <= now ||
       claims.expiresAt > now + 31 * 60_000 ||
       typeof claims.fileId !== "string" ||
+      typeof claims.organizationId !== "string" ||
       typeof claims.departmentId !== "string" ||
       typeof claims.userId !== "string" ||
       typeof claims.epoch !== "string" ||

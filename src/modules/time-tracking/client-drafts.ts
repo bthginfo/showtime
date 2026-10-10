@@ -1,3 +1,4 @@
+import {scopedBrowserKey} from '@/shared/browser-scope';
 import type { RecordData } from "@/shared/contracts";
 
 export interface TimeDraft {
@@ -12,11 +13,11 @@ export function timeDraftQueueKey(kind: "attendance" | "time", userId: string) {
 
 function updateQueue(key: string, change: (drafts: TimeDraft[]) => TimeDraft[]) {
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(key) || "[]");
+    const parsed: unknown = JSON.parse(localStorage.getItem(scopedBrowserKey(key)) || "[]");
     if (!Array.isArray(parsed)) return false;
     const next = change(parsed);
     if (next === parsed) return true;
-    localStorage.setItem(key, JSON.stringify(next));
+    localStorage.setItem(scopedBrowserKey(key), JSON.stringify(next));
     window.dispatchEvent(new Event("digitalmask-storage"));
     return true;
   } catch {

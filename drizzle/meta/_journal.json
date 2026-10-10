@@ -99,6 +99,27 @@
       "when": 1791397458854,
       "tag": "0013_working_time_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791632620733,
+      "tag": "0014_showtime_platform",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1791638759248,
+      "tag": "0015_showtime_hardening",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791645848678,
+      "tag": "0016_showtime-support",
+      "breakpoints": true
     }
   ]
 }

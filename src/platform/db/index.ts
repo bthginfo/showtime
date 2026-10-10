@@ -1,16 +1,14 @@
-import postgres from "postgres";
-import { drizzle } from "drizzle-orm/postgres-js";
-import * as schema from "./schema";
-const globalDb = globalThis as unknown as { digitalMaskSql?: ReturnType<typeof postgres> };
-export const sqlClient =
-  globalDb.digitalMaskSql ??
-  postgres(process.env.DATABASE_URL || "postgresql://localhost/digitalmask", {
-    max: 3,
-    idle_timeout: 20,
-    connect_timeout: 15,
-    prepare: false,
-  });
-if (process.env.NODE_ENV !== "production") globalDb.digitalMaskSql = sqlClient;
-export const db = drizzle(sqlClient, { schema });
+import { appDatabase, appSql } from "./connections";
+import { requestScope } from "../request";
+/** Every business query uses the transaction whose tenant was verified for this request. */
+export const db: typeof appDatabase = new Proxy(appDatabase, {
+  get(_target, key) {
+    const tx = requestScope.getStore()?.transaction;
+    if (!tx) throw new Error("Tenant transaction required");
+    const value = Reflect.get(tx, key);
+    return typeof value === "function" ? value.bind(tx) : value;
+  },
+});
+export const sqlClient = appSql;
 export type Database = typeof db;
 export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];

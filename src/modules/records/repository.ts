@@ -1,11 +1,13 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq,or,inArray } from "drizzle-orm";
 import { db, type Transaction } from "@/platform/db";
 import { records } from "@/platform/db/schema";
-import type { Context } from "@/platform/context";
-import type { DomainRecord, RecordKind } from "@/shared/contracts";
+import { can,type Context } from "@/platform/context";
+import {listValue,type DomainRecord,type RecordKind} from "@/shared/contracts";
+import { centralKinds,guestOnly } from "@/shared/access-policy";
 import { HttpError } from "@/platform/http";
 export function serialize(row: typeof records.$inferSelect): DomainRecord {
-  return { ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+  const {positionAt: _positionAt,...record}=row as typeof row & {positionAt?:string};
+  return { ...record, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
 }
 export async function findRecord(
   context: Context,
@@ -20,7 +22,7 @@ export async function findRecord(
     .where(
       and(
         eq(records.id, id),
-        eq(records.departmentId, context.departmentId),
+        eq(records.organizationId,context.organizationId),
         kind ? eq(records.kind, kind) : undefined,
       ),
     )
@@ -32,11 +34,11 @@ export async function findRecord(
 export const projectVisible = (
   context: Context,
   production: DomainRecord | typeof records.$inferSelect,
-) =>
-  context.user.role !== "user" ||
-  !Array.isArray(production.data.memberIds) ||
-  production.data.memberIds.length === 0 ||
-  production.data.memberIds.includes(context.user.id);
+) => can(context,'production.read',production.id)&&(
+  context.grants.some(g=>g.scope==='production'&&g.scopeId===production.id)||
+  !guestOnly(context.user)&&(can(context,'production.read',production.id,'')||can(context,'production.manage',production.id)||!listValue(production.data.memberIds).length)||
+  listValue(production.data.memberIds).includes(context.user.id)
+ );
 export async function assertProject(
   context: Context,
   productionId: unknown,

@@ -1,52 +1,65 @@
-# Betrieb von DigitalMask
+# Betrieb von Showtime
 
-## Einrichtung
+## Ressourcen und Umgebungen
 
-Das Vercel-Projekt heißt `digitalmask`, Organisation `juliusvingelheim-2692s-projects`, Node 24. Funktionen laufen in Frankfurt (`fra1`). Eine dedizierte Neon-Datenbank und ein privater Vercel Blob Store sind über Vercel provisioniert und mit Production und Development verbunden. Ein vorhandenes Vercel-Pro-Konto wird verwendet; kein Tarifupgrade wurde vorgenommen.
+Repository: [bthginfo/showtime](https://github.com/bthginfo/showtime). Produktion: [Showtime](https://showtime-bthginfo.vercel.app). Vercel-Projekt `showtime`, Node.js 24, SvelteKit, Fluid Compute und Region Frankfurt `fra1`. Der vorhandene Vercel-Pro-Tarif wird verwendet.
 
-Das Repository ist `bthginfo/DigitalMask`, Implementierungsbranch `codex/digitalmask`. Nach der initialen Veröffentlichung dient dieser Branch auch als Vercel-Produktionsbranch. Der GitHub-PAT wird nur für den initialen Push verwendet. Deployments können danach über die vorhandene Vercel-GitHub-Verbindung erfolgen.
+Production, Preview und Development besitzen jeweils ein eigenes Neon-Free-Projekt, einen eigenen privaten Blob-Store sowie eigene Auth-, Cron- und VAPID-Schlüssel. Die Produktionsdatenbank ist das Neon-Projekt `royal-glade-27927910`. Die Ressourcen sind unabhängig von DigitalMask. Ein Preview-Deployment verwendet seinen eigenen Vercel-Host für Auth und Einladungslinks.
 
-Production benötigt `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `APP_URL` und `CRON_SECRET`. Blob-Zugriff nutzt die verknüpfte Store-ID und Vercel OIDC; lokale Entwicklung kann den zugewiesenen Blob-Token verwenden. Verwaltungs-PATs gehören nicht zu den Runtime-Variablen. `.env.local`, `.local` und `.vercel` sind vollständig von Git ausgeschlossen.
+| Umgebung    | Verwendung                                                        |
+| ----------- | ----------------------------------------------------------------- |
+| Development | Synthetische Integrationstests, Browserabnahme und Restoreproben  |
+| Preview     | Geschützte Vorschau mit ausschließlich eigenen Vorschauressourcen |
+| Production  | Separates Starttheater; keine Altdatenmigration                   |
 
-Lokale Einrichtung verwendet derzeit dieselbe dedizierte Datenbank wie die Erstinstallation. Für weitere Entwicklung mit realen Theaterdaten ist eine separate Development-Datenbank erforderlich. Preview wird absichtlich nicht mit der Produktionsdatenbank verbunden. Der Vercel-Ignore-Befehl überspringt Preview-Builds bis zur isolierten Einrichtung. Vor aktiven Vorschauen müssen ein isolierter Neon-Branch, eigene Auth-Secrets und eine getrennte Blob-Zuordnung eingerichtet und der Ignore-Befehl angepasst werden.
+Laufzeitvariablen stehen in `.env.example`. Die vier Rollen-URLs, Authsecret, Cronsecret, private Blob-Zugangsdaten und VAPID-Schlüssel gehören in die jeweilige Vercel-Umgebung. Migrationseigentümer und Verwaltungs-PATs gehören nicht in Functions oder Git. `.env*`, `.local` und `.vercel` sind ignoriert.
 
-## Releases
+Die lokale Erstinstallation verwahrt `.local/runtime-<environment>.json`, `.local/.env.owner-<environment>` und `.local/access-<environment>.json`. Die Zugriffdatei enthält den Bootstrap-Zugang und muss privat bleiben. Passwort beim ersten Einsatz ändern. Diese Dateien und der Backupschlüssel sind nicht aus Git rekonstruierbar; separat und verschlüsselt sichern.
 
-1. `npm ci`, Typprüfung, Lint, Tests und Build durchführen.
-2. Neue Migrationen überprüfen und kontrolliert mit `npm run db:migrate` gegen das gewünschte Ziel anwenden. Additive Änderungen bevorzugen, damit ältere Deployments während eines Rollbacks weiterlaufen.
-3. Commit pushen und Produktionsdeployment prüfen. Bei manueller Veröffentlichung die Vercel-CLI mit `--prod` verwenden. Tokens werden nicht als Git-Remote gespeichert.
-4. Login, Workspace, private Bilder und mindestens einen PDF-Export auf der Liveadresse prüfen.
+## Einrichtung und Release
 
-CI führt keine Produktionsmigrationen durch. Der einmalige Bootstrap wird ebenfalls nicht bei jedem Deployment ausgeführt.
+1. Node.js 24 installieren und `npm ci` ausführen.
+2. Ausschließlich neue Showtime-Ressourcen provisionieren. Eigentümervariablen der gewünschten Neon-Umgebung privat unter `.local/.env.owner-<environment>` ablegen; den passenden privaten Blob-Token hinzufügen.
+3. `npm run db:migrate -- development` ausführen. Für andere Ziele den Namen ausdrücklich ersetzen. Das Skript wendet Drizzle-Migrationen, RLS-Policies und getrennte Laufzeitrollen an und schreibt nur ignorierte Runtime-Dateien.
+4. `npm run bootstrap -- development` einmalig ausführen. Ein neutraler Theaterdatensatz mit zwanzig Gewerken und einem privaten Bootstrap-Zugang entsteht. Keine Schauspieler- oder DigitalMask-Daten werden importiert.
+5. `npm run typecheck`, `npm run lint`, `npx tsc --noEmit -p tsconfig.scripts.json`, `npm test` und `npm run build` ausführen. Sicherheits- oder Planungsänderungen zusätzlich gegen die separate Entwicklungsdatenbank und im Browser prüfen.
+6. Geprüften Commit veröffentlichen und das separate Vercel-Projekt deployen. Produktion mit `vercel deploy --prod`; Vorschau mit `vercel deploy`. Eigentümervariablen niemals ins Deployment übernehmen.
+7. Auf der tatsächlichen Deployment-Adresse Anmeldung, Kontextwechsel, private Datei, Dokumentänderung, PDF-Export und Queue-Folgeaktion prüfen. Ein erfolgreicher Build allein genügt nicht.
 
-## Rechte und Wiederherstellung
+CI führt keine Produktionsmigrationen und keinen Bootstrap aus. Additive Migrationen bevorzugen und die Verträglichkeit mit noch laufenden alten Eventversionen prüfen. Vor destruktiven Schemaänderungen ein vollständiges Backup anfertigen. Der Build ergänzt Queue-Trigger, Noto-Schriften, Portraitmodell und dynamisch geladene PDFKit-Schriftmodule in den Function-Bundles.
 
-Registrierungen warten auf Freigabe. Im Bereich Einstellungen können Admins Teammitglieder freischalten/deaktivieren; Rollenänderungen bleiben Superadmins vorbehalten. Schreibzugriffe prüfen aktuelle Rechte. Der initiale Superadmin-Zugang liegt nur in der lokalen Datei `.local/ADMIN-ZUGANG.txt`; das Passwort nach der ersten Anmeldung ändern.
+## Zugänge und Verwaltung
 
-Ohne E-Mail-Anmeldung erfolgt Wiederherstellung über einen einmaligen 15-Minuten-Code. Admin gibt den Code persönlich weiter; der Nutzer setzt das Passwort auf der Anmeldeseite. Bestehende Sitzungen werden widerrufen. ICS-Abonnements enthalten einen geheimen Kalenderzugang; im Profil lässt er sich widerrufen und ersetzen.
+Neue Theater entstehen über die Plattformverwaltung und erhalten einen einmaligen, sieben Tage gültigen Einladungslink für die Theateradministration. Bestehende Konten können die Einladung ebenfalls annehmen. Gewerk- und Gastzugänge vergibt die zuständige Theaterverwaltung; Gastrollen sind an eine Produktion gebunden und können ablaufen. Mitgliedschaften, Rollen und Theatersperren werden bei jedem neuen Zugriff geprüft.
 
-## Ereignisse und Logs
+Die Theaterverwaltung konfiguriert Gewerke, Module, Arbeitsregeln, Bereitschaftsanforderungen, Mitglieder, Rollen und Kontingente. Der Anfangsbestand ist neutral. Vor Nutzung der automatischen Planprüfung die tatsächlich geltenden Hausregeln bestätigen. Die übernommene Kalenderdarstellung verwendet Europe/Berlin.
 
-Aufgabenzuweisung, Dienständerung, veröffentlichter Aufschrieb und Freiwunschentscheidung erzeugen In-App-Benachrichtigungen. Datei-Löschungen werden ebenfalls über die transaktionale Outbox abgewickelt. Aufschriebmeldungen sind auf berechtigte Projektmitglieder und Admins begrenzt.
+Die Plattformverwaltung bearbeitet ausschließlich bewusst eingereichte Supportanfragen. Sie kann Theater sperren und wieder freigeben. Private Chats, Dateien, Personalangaben und sonstige Fachinhalte werden dadurch nicht global freigegeben.
 
-Nach relevanten Writes läuft der Worker in `after`; der tägliche Cron um 03:17 UTC übernimmt ausgefallene bzw. fällige Jobs. Der Cron-Endpunkt benötigt `Authorization: Bearer CRON_SECRET`. Jeder Lauf übernimmt höchstens 20 Ereignisse mit Lease und `SKIP LOCKED`; weitere Batches werden bei folgenden Writes oder Recoveryläufen verarbeitet. Sechs fehlgeschlagene Versuche führen zu `failed`. Diese Aufträge sind in der Outbox sichtbar; Wiederanstoßen erfolgt derzeit kontrolliert im Datenbankwerkzeug, nach Behebung der Ursache. Eine technische Admin-Konsole ist ein Erweiterungspunkt.
+## Ereignisse und Fehler
 
-Vercel-Logs enthalten bei API-Fehlern Fehlerklasse und Datenbankfehlercode. Passwörter, Sessioncookies, SQL-Parameter und Blob-Tokens werden nicht geloggt. Die fachlichen Auditzeilen speichern Aktion, betroffene ID, Person und Zeitpunkt. Die Oberfläche bietet Versionsverläufe für Aufschriebe und Vorlagen; Audit dient zunächst der serverseitigen Nachvollziehbarkeit.
+Normale Writes schicken die dauerhafte Outbox über Vercel Queues an den separaten Consumer. Queuezustellung kann sich wiederholen; der Datenbankbeleg verhindert doppelte Fachwirkungen. Wenn Versand oder Consumer ausfallen, bleibt der Auftrag in PostgreSQL erhalten.
 
-## Backups und Kosten
+`/api/cron` benötigt `Authorization: Bearer CRON_SECRET` und läuft alle 15 Minuten. Dieses Recoveryintervall begrenzt regelmäßige Datenbank-Wakeups; es ersetzt die sofortige normale Queuezustellung nicht. Fehlerstatus, Versuche und tenantgebundenes Audit sind in der Theaterverwaltung sichtbar. Fehlgeschlagene Events dort erst nach Ursachenbehebung erneut starten. Logs enthalten Fehlerklasse, technische Codes und Stackpositionen, keine SQL-Werte, Passwörter, Sitzungen oder privaten Nachrichtentexte.
 
-Die Live-Verbindung verwendet die zusätzliche Ressource `digitalmask-live` (Upstash Redis, Frankfurt/fra1, Free-Plan). Vercel injiziert `KV_REST_API_URL` und `KV_REST_API_TOKEN`; alternativ sind `UPSTASH_REDIS_REST_URL` und `UPSTASH_REDIS_REST_TOKEN` möglich. Tokens bleiben ausschließlich serverseitig. SSE-Reconnects lesen keine PostgreSQL-Daten. Ein einstündiges signiertes Ticket bindet den Gewerkkanal an den Login-Cookie; Live-Nachrichten enthalten ausschließlich eine zufällige Revisionskennung. Tatsächliche Daten werden über den bestehenden autorisierten Workspace abgerufen. Hintergrundtabs pausieren und Ereignisbursts werden gebündelt. Bei Brokerstörungen bleiben Schreibvorgänge erfolgreich; eine unterbrochene Verbindung bietet erneuten Verbindungsaufbau. Neue Inhaltsansichten oder verlorene lange Verbindungslücken können eine einmalige Datenaktualisierung auslösen.
+## Verschlüsseltes Backup und Wiederherstellung
 
-Der bestätigte Upstash-Free-Plan enthält 500.000 Commands monatlich. Am 1. Oktober 2026 wurde das gemeinsam genutzte Neon-Marketplace-Abonnement auf ausdrücklichen Wunsch des Kontoinhabers auf `free_v3` (Free) aktualisiert. Vercel und Neon bestätigen denselben Tarif; alle 15 zugehörigen Datenbanken einschließlich `digitalmask-postgres` wurden anschließend einzeln als Free und verfügbar geprüft. Der Tarif enthält 0,5 GB Speicher und 100 CU-Stunden pro Projekt sowie bis zu 100 Projekte. Bereits entstandene Launch-Nutzungskosten bleiben davon unberührt. Der Vercel-Tarif ist davon unabhängig.
+Ein fachlicher JSON-Export ersetzt keine vollständige Sicherung. `scripts/tenant-backup.ts` sichert einen Tenant mit wiederholbarem DB-Snapshot, Fachhistorien, Eventbelegen, Yjs-Zuständen und allen referenzierten privaten Blob-Dateien. Dateiprüfsummen werden geprüft. Das Archiv ist gzip-komprimiert und mit AES-256-GCM verschlüsselt.
 
-Für die einmalige Kontaktkonsolidierung dient `npx tsx scripts/merge-people.ts` als Vorschau und `--apply` als Ausführung. Die Ausführung sichert den betroffenen Gewerkbestand vorher unter `.local`, bewahrt alternative Angaben in Notizen, ersetzt Referenzen und prüft innerhalb einer Transaktion alle Produktionskontakte. Vor Freigabe neuer Accounts verknüpft die Adminaktion eindeutige freie Maskenkontakte mit dem Konto; unklare Namensinitialen werden nicht automatisch zugeordnet.
+```powershell
+# Nur das ausdrücklich gewählte Showtime-Ziel verwenden.
+npx tsx --tsconfig tsconfig.scripts.json scripts/tenant-backup.ts backup development THEATER-ID .local/theater-backup.showtime
+npx tsx --tsconfig tsconfig.scripts.json scripts/tenant-backup.ts restore development .local/theater-backup.showtime 'Restore Test' restore-test
+```
 
-Das Neon-Wiederherstellungsfenster und Kostenalarme hängen vom Marketplace-Tarif ab. Vor Übernahme produktiver Personendaten im Anbieter-Dashboard passende Wiederherstellung und Budgetbenachrichtigungen einrichten und einen Restore in eine isolierte Datenbank prüfen. Der JSON-Export ist für fachliche Weiterverarbeitung vorgesehen und ersetzt weder PostgreSQL-Backup noch private Blob-Sicherung.
+Beim ersten Backup entsteht ein zufälliger 32-Byte-Schlüssel in `.local/backup-key`. Mit `SHOWTIME_BACKUP_KEY_FILE` lässt sich ein eigenes privates Schlüsselziel wählen. Archiv und Schlüssel getrennt und geschützt sichern. Das Werkzeug überschreibt kein vorhandenes Archiv und keinen bestehenden Tenant.
 
-Private Bilder brauchen ein separates Sicherungsziel mit gleicher Zugriffsregelung. Beim Kopieren einer Produktion werden Bildreferenzen geteilt; eine Datei wird erst physisch gelöscht, wenn kein Record mehr auf denselben Blobpfad verweist. Medien werden auf maximal 1800 Pixel und WebP komprimiert, Standortmetadaten entfernt. Die Einzeluploadgrenze beträgt 4 MB; PDF-Bildexporte sind auf 80 Bilder je Abruf begrenzt.
+Restore erzeugt ein neues Theater, neue Objekt-IDs und neue private Dateipfade. Referenzen, Counts und Datei-SHA-256 werden geprüft. Während der Wiederherstellung ist das neue Theater gesperrt; erst nach erfolgreicher Prüfung wird es aktiviert. Bei Fehlern bleibt der Zwischenstand gesperrt. Ausstehende alte Events werden zur kontrollierten Prüfung zurückgehalten, damit der Restore keine ungewollten Nebenwirkungen auslöst.
 
-Zur Begrenzung von Neon-CPU nutzt die Anwendung bedarfsabhängige Caches und keinen dauerhaften Datenbankprozess. Neon kann dadurch im Leerlauf schlafen. Fachliche Änderungen, stündliche Ticket-Erneuerungen bei aktivem Browser oder regelmäßige externe Kalenderabrufe können die Datenbank dennoch aufwecken. Live-Heartbeats und die fünfminütigen SSE-Reconnects verwenden Redis und signierte Tickets. Realen Verbrauch nach Start im Neon-/Vercel-Dashboard prüfen; es wird kein fixer kostenloser Dauerbetrieb versprochen.
+Identitäten müssen im Ziel bereits vorhanden sein. Passwörter, Sessions, Einladungen, ICS-Tokens, Push-Abonnements und laufende Timer werden nicht kopiert. Für eine vollständige Wiederherstellung in ein neues Authsystem sind deshalb zusätzlich ein gesicherter Identitätsbestand und neue Einladungen nötig. Die getestete Tenant-Wiederherstellung arbeitet in der isolierten Entwicklungsumgebung.
 
-Änderungsverlauf, allgemeines Rückgängig und Wochenfreigaben für Stunden sind entfernt. Neue Änderungen schreiben keine zusätzlichen Operations-Snapshots mehr und laden keine Wochenfreigaben. Historische `record_operations`- und `timesheets`-Daten sowie das bestehende Schema bleiben erhalten. Dateilöschungen entfernen die Metadaten in derselben Transaktion wie die Zuordnung und legen direkt einen wiederholbaren `FileDeletionRequestedV1`-Auftrag in der bestehenden Outbox an. Bereits vor dem Update aufgeschobene Löschungen werden von einem Kompatibilitäts-Handler abgeschlossen, der damalige Wiederherstellungen weiterhin schützt. Fachliches Audit, Live-Signale, kontexterhaltendes Zurück und Rückgängig im Dokumenteditor bleiben bestehen. Reservierungen und Diensttausch benötigen keine zusätzlichen Dienste oder Anbieterintegrationen.
+## Kosten und Kontingente
 
-Admins starten den Ensemble-Import im Schauspielerkatalog über „Ensemble laden“ und prüfen vor dem Übernehmen die Vorschau. Die Haus-Ensemble-Liste der verlinkten Theaterseite ist die Quelle; Gäste werden nicht zusätzlich importiert. Mehrdeutige doppelte Katalogeinträge zuerst fachlich prüfen. Fehlgeschlagene Profile oder Bilder erscheinen im Ergebnis mit Namen und können durch erneuten Import ergänzt werden. Die letzte erfolgreiche Information bleibt bei nicht erreichbaren Profilen erhalten; eigene Hinweise, Maße und Fotos sowie Produktionsverknüpfungen bleiben bestehen. Imports laufen ausschließlich auf Anforderung, ohne Neon-Abfragen im Hintergrund.
+Neue Datenbanken bleiben auf Neon Free; es wurde kein neuer kostenpflichtiger Datenbank- oder Redis-Tarif gekauft. Private Blob-Speicher, Queue-, Function- und Datenverkehrsnutzung unterliegen den Freikontingenten beziehungsweise der Abrechnung des vorhandenen Vercel-Pro-Kontos. Das ist keine Garantie für kostenlosen Betrieb bei beliebiger Nutzung.
+
+Die Erstinstallation arbeitet ohne Redis. Aktive Live- und Dokumentansichten prüfen PostgreSQL regelmäßig; Hintergrundtabs pausieren, aber dauerhaft aktive Clients können Neon am Einschlafen hindern. Listen sind paginiert, Kalender zeitlich begrenzt, Uploads auf 4 MB pro Datei beschränkt und Exportmengen begrenzt. Die Theaterkontingente sind technische Zugangsgrenzen und ersetzen keine anbieterweiten Budgetalarme. Verbrauch bei wachsender Nutzung im Neon- und Vercel-Dashboard prüfen.

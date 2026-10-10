@@ -1,11 +1,19 @@
-import { headers } from "next/headers";
-import { unstable_cache } from "next/cache";
-import { createHash } from "node:crypto";
-import { eq } from "drizzle-orm";
-import { auth } from "@/platform/auth";
-import { db } from "@/platform/db";
-import { memberships, organizations, departments, profilePreferences } from "@/platform/db/schema";
-import { HttpError } from "@/platform/http";
+import { and, eq } from "drizzle-orm";
+import { auth } from "./auth";
+import { authDb } from "./db/connections";
+import {
+  memberships,
+  organizations,
+  departments,
+  profilePreferences,
+  tenantMembers,
+  permissionGrants,
+  tenantSettings,
+  platformAdmins,
+} from "./db/schema";
+import { HttpError } from "./http";
+import { currentRequest } from "./request";
+import { hasPermission, rolePermissions, type Grant, type Permission } from "./access";
 import type { Member } from "@/shared/contracts";
 export interface Context {
   user: Member;
@@ -13,78 +21,174 @@ export interface Context {
   departmentId: string;
   organizationName: string;
   departmentName: string;
+  grants: Grant[];
+  platformAdmin?: boolean;
 }
 export const scopeTag = (departmentId: string) => `workspace:${departmentId}`;
-async function membershipFor(userId: string, fresh = false) {
-  const get = () =>
-    db
-      .select({
-        membership: memberships,
-        organization: organizations,
-        department: departments,
-        preferences: profilePreferences,
-      })
-      .from(memberships)
-      .innerJoin(organizations, eq(memberships.organizationId, organizations.id))
-      .innerJoin(departments, eq(memberships.departmentId, departments.id))
-      .leftJoin(profilePreferences, eq(memberships.userId, profilePreferences.userId))
-      .where(eq(memberships.userId, userId))
-      .limit(1);
-  return fresh
-    ? get()
-    : unstable_cache(get, ["membership-profile-v2", userId], {
-        revalidate: 60,
-        tags: [`member:${userId}`],
-      })();
+export function cookieValue(cookie: string, key: string) {
+  const part = cookie
+    .split(";")
+    .map((v) => v.trim())
+    .find((v) => v.startsWith(`${key}=`));
+  try {
+    return part ? decodeURIComponent(part.slice(key.length + 1)) : "";
+  } catch {
+    return "";
+  }
 }
-export async function requireContext(fresh = false): Promise<Context> {
-  const requestHeaders = await headers();
-  const readSession = () =>
-    auth.api.getSession({ headers: requestHeaders, query: { disableCookieCache: fresh } });
-  const cookie = requestHeaders.get("cookie") || "";
-  const result =
-    fresh || !cookie
-      ? await readSession()
-      : await unstable_cache(
-          readSession,
-          ["session-context", createHash("sha256").update(cookie).digest("hex")],
-          { revalidate: 60 },
-        )();
+export async function identity() {
+  const result = await auth.api.getSession({
+    headers: currentRequest().request.headers,
+    query: { disableCookieCache: true },
+  });
   if (!result) throw new HttpError(401, "Bitte melde dich an.");
-  const [row] = await membershipFor(result.user.id, fresh);
-  if (!row) throw new HttpError(403, "Dein Zugang wurde noch keiner Abteilung zugeordnet.");
-  if (row.membership.status !== "active")
-    throw new HttpError(
-      403,
-      row.membership.status === "pending"
-        ? "Dein Zugang wartet auf Freigabe."
-        : "Dein Zugang ist deaktiviert.",
-      { pending: row.membership.status === "pending" },
+  return result.user;
+}
+export async function availableScopes(userId: string) {
+  return authDb
+    .select({
+      organizationId: organizations.id,
+      organizationName: organizations.name,
+      departmentId: departments.id,
+      departmentName: departments.name,
+      status: memberships.status,
+    })
+    .from(memberships)
+    .innerJoin(organizations, eq(memberships.organizationId, organizations.id))
+    .innerJoin(
+      departments,
+      and(
+        eq(memberships.departmentId, departments.id),
+        eq(memberships.organizationId, departments.organizationId),
+      ),
+    )
+    .innerJoin(
+      tenantMembers,
+      and(
+        eq(tenantMembers.organizationId, memberships.organizationId),
+        eq(tenantMembers.userId, memberships.userId),
+      ),
+    )
+    .innerJoin(tenantSettings, eq(tenantSettings.organizationId, memberships.organizationId))
+    .where(
+      and(
+        eq(memberships.userId, userId),
+        eq(tenantMembers.status, "active"),
+        eq(tenantSettings.status, "active"),
+      ),
     );
-  return {
-    user: {
-      id: result.user.id,
-      name: result.user.name,
-      username: result.user.username || "",
-      role: row.membership.role,
-      status: row.membership.status,
-      preferences: {
-        accentPalette: row.preferences?.accentPalette || "green",
-        onboardingVersion: row.preferences?.onboardingVersion || 0,
-        ...(row.preferences?.workingTime ? { workingTime: row.preferences.workingTime } : {}),
-      },
+}
+export async function effectiveGrants(
+  userId: string,
+  organizationId: string,
+  scopes?: Awaited<ReturnType<typeof availableScopes>>,
+): Promise<Grant[]> {
+  const activeDepartments = new Set(
+    (scopes || (await availableScopes(userId)))
+      .filter((s) => s.organizationId === organizationId && s.status === "active")
+      .map((s) => s.departmentId),
+  );
+  if (!activeDepartments.size) return [];
+  const raw = await authDb
+    .select()
+    .from(permissionGrants)
+    .where(
+      and(eq(permissionGrants.organizationId, organizationId), eq(permissionGrants.userId, userId)),
+    );
+  return raw
+    .filter(
+      (g) =>
+        (!g.expiresAt || g.expiresAt > new Date()) &&
+        rolePermissions[g.role]?.length &&
+        (g.scope !== "department" || activeDepartments.has(g.scopeId || "")),
+    )
+    .map((g) => ({
+      role: g.role,
+      scope: g.scope,
+      scopeId: g.scopeId,
+      expiresAt: g.expiresAt?.toISOString(),
+    }));
+}
+export async function requireContext(_fresh = true): Promise<Context> {
+  const scope = currentRequest();
+  if (scope.context) return scope.context;
+  const person = await identity();
+  const list = await availableScopes(person.id);
+  const selected = cookieValue(scope.request.headers.get("cookie") || "", "showtime.scope");
+  const row = selected
+    ? list.find((r) => `${r.organizationId}:${r.departmentId}` === selected)
+    : list.length === 1
+      ? list[0]
+      : undefined;
+  if (!row)
+    throw new HttpError(
+      list.length ? 409 : 403,
+      list.length
+        ? "Bitte wähle dein Theater und Gewerk."
+        : "Dein Zugang wartet auf eine Theaterzuordnung.",
+      { scopeRequired: !!list.length, pending: !list.length },
+    );
+  if (row.status !== "active")
+    throw new HttpError(403, "Dein Zugang für dieses Gewerk ist deaktiviert.");
+  const [preference] = await authDb
+    .select()
+    .from(profilePreferences)
+    .where(eq(profilePreferences.userId, person.id))
+    .limit(1);
+  const grants = await effectiveGrants(person.id, row.organizationId, list);
+  if (!grants.length)
+    throw new HttpError(403, "Deine Theaterzuordnung ist abgelaufen oder wurde entzogen.");
+  const permissions = [
+    ...new Set(
+      grants
+        .filter(
+          (g) =>
+            g.scope === "tenant" || (g.scope === "department" && g.scopeId === row.departmentId),
+        )
+        .flatMap((g) => rolePermissions[g.role] || []),
+    ),
+  ];
+  const [admin] = await authDb
+    .select()
+    .from(platformAdmins)
+    .where(eq(platformAdmins.userId, person.id))
+    .limit(1);
+  const user: Member = {
+    id: person.id,
+    departmentId: row.departmentId,
+    name: person.name,
+    username: person.username || "",
+    role: permissions.includes("task.manage") ? "admin" : "user",
+    status: "active",
+    permissions,
+    grants,
+    preferences: {
+      accentPalette: preference?.accentPalette || "green",
+      onboardingVersion: preference?.onboardingVersion || 0,
     },
-    organizationId: row.membership.organizationId,
-    departmentId: row.membership.departmentId,
-    organizationName: row.organization.name,
-    departmentName: row.department.name,
   };
+  const context = { ...row, user, grants, platformAdmin: !!admin };
+  scope.context = context;
+  return context;
+}
+export function can(
+  context: Context,
+  permission: Permission,
+  productionId?: string,
+  departmentId = context.departmentId,
+) {
+  return hasPermission({ id: context.user.id, grants: context.grants }, permission, {
+    departmentId,
+    productionId,
+  });
+}
+export function requirePermission(context: Context, permission: Permission, productionId?: string) {
+  if (!can(context, permission, productionId))
+    throw new HttpError(403, "Dir fehlt die Berechtigung für diese Aktion.");
 }
 export function requireAdmin(context: Context) {
-  if (context.user.role === "user")
-    throw new HttpError(403, "Diese Aktion ist Admins vorbehalten.");
+  requirePermission(context, "members.manage");
 }
 export function requireSuperadmin(context: Context) {
-  if (context.user.role !== "superadmin")
-    throw new HttpError(403, "Diese Aktion ist dem Superadmin vorbehalten.");
+  requirePermission(context, "roles.assign");
 }

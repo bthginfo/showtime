@@ -7,11 +7,11 @@ import type { RecordKind } from "@/shared/contracts";
 export async function acquireWorkflowLock(context: Context, kind: RecordKind, tx: Transaction) {
   const group = ["materials", "reservations"].includes(kind)
     ? "inventory"
-    : ["events", "shiftSwaps", "calendarCategories"].includes(kind)
+    : ["events", "casting", "shiftSwaps", "calendarCategories"].includes(kind)
       ? "calendar"
       : undefined;
   if (group)
     await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${context.departmentId + ":" + group}))`,
+      sql`select pg_advisory_xact_lock(hashtext(${context.organizationId + ":" + group}))`,
     );
 }

@@ -17,9 +17,10 @@ describe("safe request failure diagnostics", () => {
       throw error;
     });
     expect(response.status).toBe(500);
-    expect(log).toHaveBeenCalledWith("DigitalMask request failed", {
+    expect(log).toHaveBeenCalledWith("Showtime request failed", {
       name: "Error",
       code: "unknown",
+      dependency: undefined,
       frames: ["    at getChanges (/app/feed.ts:59:35)", "    at async GET (/app/route.ts:10:8)"],
     });
     expect(JSON.stringify(log.mock.calls)).not.toContain("PRIVATE_INPUT");

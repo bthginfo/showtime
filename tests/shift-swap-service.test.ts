@@ -202,7 +202,7 @@ describe("atomic shift-swap service", () => {
     const data = fixture(true);
     const result = await decideShiftSwap(admin, "request", { action: "approve", version: 1 });
     expect(result.data.status).toBe("approved");
-    expect(data.logs[0]).toBe("lock:fictional-makeup:calendar");
+    expect(data.logs[0]).toBe("lock:fictional-theatre:calendar");
     expect(data.logs.indexOf("load:a-duty:locked")).toBeLessThan(
       data.logs.indexOf("load:b-duty:locked"),
     );

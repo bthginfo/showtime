@@ -1,5 +1,5 @@
 {
-  "regions": ["fra1"],
-  "ignoreCommand": "test \"$VERCEL_ENV\" = \"preview\"",
-  "crons": [{ "path": "/api/cron", "schedule": "17 3 * * *" }]
+ "framework":"sveltekit",
+ "crons":[{"path":"/api/cron","schedule":"*/15 * * * *"}],
+ "headers":[{"source":"/sw.js","headers":[{"key":"Cache-Control","value":"no-cache"}]}]
 }

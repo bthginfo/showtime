@@ -1,0 +1,11 @@
+import * as Y from "yjs";
+import { ArrowLeft, ArrowRight, Check, Pencil, Plus, Redo2, Undo2 } from "@lucide/svelte";
+import { ErrorMessage } from "@/components/ui";
+import { cellKey, MAX_SHEET_CELLS, MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, SHEETS_MAP, type SheetInfo, } from "../contracts";
+import { columnName, createSheetCalculator, displayCell } from "../sheet-values";
+import { createSheetLayout, nextSheetCell, pasteIntersectsMerge, sheetMaster, type SheetDirection, } from "../sheet-layout";
+import { SHEET_EDIT } from "../client/shared-document";
+import { useDocumentRevision } from "../client/use-document-revision";
+import { SheetGrid } from "./sheet-grid";
+export const PAGE_ROWS = 50;
+export { default as SheetEditor } from "./sheet-editor.SheetEditor.svelte";

@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties } from "@/shared/ui-types";
 import { cellKey, type SheetCellStyle, type SheetInfo } from "./contracts";
 
 export interface SheetPosition {

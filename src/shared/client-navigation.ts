@@ -1,3 +1,4 @@
+import {scopedBrowserKey} from './browser-scope';
 import type { DomainRecord } from "./contracts";
 import { value } from "./client-api";
 
@@ -22,7 +23,7 @@ export function captureNavigationScroll() {
   history.replaceState({ ...history.state, [contextKey]: { ...context(), scroll } }, "");
   if (navigationUser) {
     try {
-      sessionStorage.setItem(scrollKey(), JSON.stringify(scroll));
+      sessionStorage.setItem(scopedBrowserKey(scrollKey()), JSON.stringify(scroll));
     } catch {}
   }
 }
@@ -64,7 +65,7 @@ export function restoreNavigationScroll() {
   let saved = context().scroll;
   if (!saved && navigationUser) {
     try {
-      saved = JSON.parse(sessionStorage.getItem(scrollKey()) || "null") || undefined;
+      saved = JSON.parse(sessionStorage.getItem(scopedBrowserKey(scrollKey())) || "null") || undefined;
     } catch {}
   }
   const frame = requestAnimationFrame(() =>

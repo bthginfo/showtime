@@ -1,77 +1,49 @@
-# DigitalMask
+# Showtime
 
-Arbeitsraum für die Maske am Stadttheater Ingolstadt: Produktionen, Dienstplanung, Aufgaben, Zeitbuchungen und gemeinsame Dokumentation. Deutsche Oberfläche, Europe/Berlin, Wochenbeginn Montag, Light/Dark/System-Modus und Smartphone-Navigation.
+Ein gemeinsamer Arbeitsraum für den gesamten Theaterbetrieb: SvelteKit, getrennte Theaterdaten, fachliche Ereignisse und zwanzig konfigurierbare Gewerke. Showtime übernimmt die aktiven DigitalMask-Funktionen aus Quellstand `daafd42` und erweitert sie um Hausdisposition, Ressourcen, Vorbereitungsstände und Theaterverwaltung.
 
-## Funktionen
+## Anwendung
 
-- Benutzername/Passwort, Selbstregistrierung mit Adminfreigabe, Teammitglied/Admin/Superadmin, persönliche Passwortänderung und einmalige Wiederherstellungscodes.
-- Persönlich gespeicherte Pastell-Akzentfarben, geführte Einführung mit Wiederholung, Hilfe mit FAQ/Anleitungen und private Feature-/Fehlerberichte mit Superadmin-Bearbeitung.
-- Produktionsarbeitsräume mit Maskenteam, prominenter Maskenbetreuung, frei definierbaren Kontaktrollen (z. B. Regie, Kostüm, Assistenz), Archiv und Kopie für Wiederaufnahmen. Wiederverwendbare externe Kontakte mit E-Mail, Telefon und Notizen im Verzeichnis „Ansprechpersonen“ benötigen kein Konto; Maskenkontakte können aus dem Team gewählt oder frei eingetragen werden.
-- Figuren, Besetzungen mit mehreren privaten Bildern, Aufschriebe, Aufgaben, Sprints, Kalender, Zeiten und Chat direkt in der jeweiligen Produktion. Schauspieler und Figuren lassen sich beim Besetzen anlegen oder als freie Namen eintragen. Der Schauspielerkatalog bleibt gemeinsam verfügbar.
-- Eigenes Kanban je Produktion und separates Teamboard für allgemeine Aufgaben ohne Produktionsbezug. Sprints mit individuellen Zeiträumen, Zuweisungen, Unteraufgaben und Checklisten; Verschieben auch ohne Drag-and-drop.
-- Persönliche und überlagerte Kalender: Monat, Woche, Tag, Agenda und Teamraster für Woche und Monat. Adminplanung, verwaltbare Kategorien, ganztägige Abwesenheiten, Serien, Konflikterkennung, Freiwunschanträge und widerrufbare ICS-Abonnements. Optionale Titel verwenden sonst den Produktions- oder Kategorienamen.
-- Anwesenheit im Theater und Arbeitszeit auf Produktionen getrennt erfassen, mit unabhängigen pausierbaren Timern, manuellen Nachträgen und Korrekturen. Allgemeine Tätigkeiten ohne Produktion, Mitternachtsaufteilung, Tages-/Wochensummen und Projektstunden; Buchungen werden direkt gespeichert und bleiben ohne Wochenfreigabe bearbeitbar.
-- Projektchats, allgemeiner Maskenkanal, von Admins verwaltete Teamkanäle für das ganze Gewerk und private Direkt-/Gruppenchats mit geschützten Anhängen und Teilnehmerrechten. Neue aktive Teammitglieder sehen Teamkanäle automatisch.
-- Aufschriebe nach Schauspielern mit allgemeiner Stückdauer, Bildern und Versionsverlauf. Wiederholbare Textfelder für Vorbereitung, Makeup, Haare, Perücken und Bärte, Umbau & Wechsel sowie Einrichten; eigene Kategorien und Vorlagen. Zentrale Übersicht mit allgemeinen und produktionsbezogenen Dokumenten einschließlich Archiv und Spielzeit-/Jahresfiltern. Historische Dokumente bleiben lesbar.
-- Material-/Perückenfundus, verwaltbare Kategorien, Lagerorte, Mindestbestände, Einkaufsbedarf und QR-Links; allgemeine Dienstübergaben mit einzelnen Checklistenpunkten und wiederholbaren Hinweisen unter „Worauf muss ich achten“.
-- Suche, Benachrichtigungen, CSV-Importvorlagen, PDF/XLSX/CSV/JSON-Exporte und ICS-Kalenderexporte.
-- Installierbare PWA und ausdrücklich gespeicherte lokale Zeitentwürfe. Private API-Antworten und Bilder werden nicht im Service Worker gespeichert.
+- [Showtime öffnen](https://showtime-bthginfo.vercel.app)
+- [Architektur und Rechte](docs/ARCHITEKTUR.md)
+- [Betrieb, Migrationen und verschlüsselte Wiederherstellung](docs/BETRIEB.md)
+- [Abnahme und bekannte Grenzen](docs/ABNAHME.md)
+- [Freigegebener Umfang und Recherche](docs/APPROVED-PLAN.md)
 
-## Architektur
+Die vorhandenen Maskenansichten behalten ihre CSS-Tokens, Layouts und Gestaltung. Ein Theater- und Gewerkwechsel, die Ansicht „Theaterbetrieb“ und fachliche Rechte ergänzen diese Oberfläche. Eigene Arbeitszeiten und Anwesenheiten lassen sich nach dem Buchen bearbeiten und löschen, einschließlich manuell erfasster und aus Timern entstandener Buchungen. Versionsprüfungen verhindern das Überschreiben neuerer Korrekturen.
 
-Next.js App Router, React, TypeScript strict, Tailwind CSS mit eigenen gemeinsamen UI-Komponenten, FullCalendar Standard und dnd-kit. Servermodule verwenden Better Auth, Zod, Drizzle und PostgreSQL; Dateien liegen im privaten Vercel Blob Store. Der PDF-/Tabellenrenderer verarbeitet autorisierte Eingabedaten und führt keine Datenbankabfragen aus.
+## Entwicklung
 
-`src/app/api` enthält HTTP-Eingangspunkte, `src/modules` Fachregeln und Exporte, `src/platform` Authentifizierung, Scope, Datenbank und Outbox; `src/components/modules` die jeweiligen Benutzeroberflächen. Die Plattform ist ein modularer Monolith. Eine zusätzliche Organisation/Gewerk-Zuordnung ist im Schema vorgesehen; die aktuelle Oberfläche arbeitet mit dem zugeordneten Gewerk Maske.
-
-Das aktuelle Fachdatenmodell verwendet einen typisierten Record-Speicher: Organisations-/Gewerksscope, Art, Person, Produktion, Elternbezug, Zeitraum, Version und Zeitstempel sind relationale, indizierte Spalten. Fachliche Nutzdaten werden je Art durch Zod validiert und als JSONB gespeichert. Identitäten, Mitgliedschaften, Timer, Aufschriebversionen, Kalenderzugänge, Audit und Outbox haben eigene Tabellen. Das erleichtert neue Module; häufige komplexe Auswertungen können später dedizierte Tabellen oder Materialized Views erhalten. Projektbeziehungen werden serverseitig geprüft, Organisationsgrenzen zusätzlich durch zusammengesetzte Fremdschlüssel.
-
-## Lokal starten
-
-Node.js 24, npm und PostgreSQL-Verbindungsdaten benötigt:
+Node.js 24 und npm verwenden. Eine eigene Entwicklungsdatenbank und ein eigener privater Blob-Store sind erforderlich; keine Zugangsdaten oder Daten von DigitalMask übernehmen.
 
 ```sh
 npm ci
-# .env.example nach .env.local kopieren und ausfüllen
-npm run db:migrate
-npm run bootstrap
+# .env.example als Vorlage für ausschließlich eigene Entwicklungsressourcen nutzen
 npm run dev
-```
-
-`bootstrap` erstellt einmalig die Organisation, das Gewerk und einen Superadmin. Vorhandene Superadmins werden nicht überschrieben. Generierte Zugangsdaten stehen ausschließlich in `.local/ADMIN-ZUGANG.txt`, das von Git ausgeschlossen ist. Registrierungen erhalten keine Adminrechte; der Superadmin kann diese im Bereich Einstellungen vergeben.
-
-Prüfungen:
-
-```sh
 npm run typecheck
 npm run lint
 npm test
 npm run build
-npx playwright install chromium webkit
+```
+
+Die App läuft lokal auf `http://127.0.0.1:3100`. Für Provisionierung, Migration und Bootstrap siehe die Betriebsanleitung. Laufzeitrollen besitzen weder Tabellen noch `BYPASSRLS`; Eigentümer-Zugangsdaten gehören ausschließlich in lokale, ignorierte Betriebsdateien.
+
+## Aufbau
+
+`src/routes` enthält SvelteKit-Eingänge, `src/components` die gemeinsamen Svelte-Komponenten. Fachlogik liegt in `src/modules`, Infrastruktur und Rechte in `src/platform`, gemeinsame Verträge in `src/shared`. `src/modules/theater/registry.ts` beschreibt die Gewerke und ihre typisierten Fachfunktionen. SQL-Migrationen liegen in `drizzle`.
+
+Ein Command schreibt seine verbindliche Änderung und das Ereignis gemeinsam. Vercel Queues verarbeitet anschließend Benachrichtigungen und Folgearbeiten; PostgreSQL-Outbox und Verarbeitungsbelege ermöglichen Wiederholung und Recovery. Dokumentänderungen bleiben über PostgreSQL und Yjs dauerhaft erhalten. Live-Signale verwenden autorisierte SSE-Verbindungen und laden aktuelle Inhalte über die API nach.
+
+## Prüfungen
+
+Die normale Testsuite benötigt keine Cloud-Zugangsdaten. Echte RLS-, Pool-, Event- und Paginationstests sind ausdrücklich auf die separate Entwicklungsumgebung begrenzt:
+
+```sh
+# PowerShell
+$env:SHOWTIME_INTEGRATION='development'
+npx vitest run tests/tenancy/platform.integration.test.ts
+# Laufenden Entwicklungsserver und lokale Bootstrap-Zugangsdaten vorausgesetzt:
 npm run test:e2e
 ```
 
-Integrationstests benötigen eine laufende Anwendung sowie den lokalen Bootstrap-Zugang. Sie legen klar benannte QA-Datensätze an und entfernen Fachdaten wieder. Der vollständige PDF-Rasterlauf ist optional: `EXPORT_RENDER_QA=1 npm test` (PowerShell: `$env:EXPORT_RENDER_QA='1'; npm test`). Die gerenderten Fixtures in `artifacts/exports` enthalten ausschließlich synthetische Daten.
-
-Die UI-Prüfungen für Passwortfelder und Produktionsnavigation verwenden Dummywerte bzw. einen simulierten Workspace. Die Passworttests prüfen Chromium und WebKit auf Desktop und in mobiler Touchansicht; dafür ist kein echtes Konto erforderlich. WebKit-Prüfungen ersetzen keinen Test auf einem konkreten Safari-Gerät.
-
-## Datenbankverbrauch
-
-- Kein regelmäßiger Workspace-, Timer-, Kalender- oder Benachrichtigungs-Poll. Timeranzeige, Suche, Filter, Serientermine und Summen werden lokal aus dem geladenen Datenbestand berechnet.
-- Profileinstellungen werden in der vorhandenen Mitgliedschaftsabfrage mitgeladen. Eine persönliche Farbänderung invalidiert nur den eigenen Profilcache; Tour-Schritte erzeugen keine Schreibzugriffe.
-- Anwesenheits- und Arbeitszeittimer werden gemeinsam in einer indizierten UNION-Abfrage geladen. Bildreferenzen werden beim Speichern gebündelt statt einzeln je Bild geprüft. Private Nachrichten verwenden Teilnehmerrechte auch für Anhänge, Benachrichtigungen und Exporte.
-- Produktionsbereiche, Kontaktverzeichnis, Spielzeit-/Jahresfilter und Teamboard verwenden denselben geladenen Workspace. Kontaktpersonen und Bilder werden beim Speichern gebündelt validiert; externe Kontakte erzeugen keine Authentifizierungskonten. Kategorien werden einmalig durch Migration bzw. beim Anlegen eines neuen Gewerks bereitgestellt, ohne erneutes Anlegen gelöschter Kategorien beim Lesen.
-- Fachdaten werden pro Gewerk für 300 Sekunden serverseitig gecacht und bei Änderungen invalidiert. Das Team ist unabhängig für eine Stunde gecacht und wird bei Registrierung/Freigabe/Rollenänderung erneuert. Persönliche Timer haben einen eigenen Cachetag; eine Nachricht oder Aufgabenänderung löst keine neue Timerabfrage je Teammitglied aus.
-- Lesende Sitzungs- und Mitgliedschaftsprüfungen sind für 60 Sekunden gecacht. Schreibzugriffe prüfen die Sitzung und aktuellen Rechte unmittelbar in der Datenbank. Entzugene Zugänge können dadurch höchstens innerhalb des kurzen Lese-Cachefensters noch bereits erlaubte Inhalte sehen, aber nichts mehr verändern.
-- Änderungen anderer Personen und Chatnachrichten kommen über eine gemeinsame SSE-Verbindung mit Upstash Redis an. Nur generische Änderungssignale werden übertragen; anschließend wird der autorisierte, gecachte Workspace nachgeladen. Ereignisse werden gebündelt, inaktive Tabs pausiert und Verbindungsabbrüche mit Änderungscursor nachgeholt. Es gibt keinen regelmäßigen Chat- oder Workspace-Poll.
-- Die fünfminütigen Live-Reconnects prüfen ein an die Sitzung gebundenes, signiertes Ticket ohne Neon-Abfrage. Das Ticket gilt eine Stunde; nur bei Ablauf oder fachlichen Änderungen wird erneut autorisiert geladen.
-- Bei der Adminfreigabe eines neuen Teamkontos werden passende freie Maskenkontakte und ihre Produktionszuordnungen verknüpft. Eindeutige Nachnameninitialen und Umlautschreibweisen werden erkannt; mehrdeutige Namen bleiben unverknüpft. Kontaktangaben bleiben gespeichert, verknüpfte Personen erscheinen als Teammitglieder.
-- Nach fachlichen Writes werden nur tatsächlich angelegte Ereignisse verarbeitet. Ein CSV-Import bündelt Cacheinvalidierung und Ereignisverarbeitung. Der tägliche Cron dient ausschließlich der Wiederaufnahme liegengebliebener Aufträge.
-- PostgreSQL-Pool maximal drei Verbindungen je Funktionsinstanz, kurze Idle-Zeit, keine minutenlangen Netzwerktransaktionen. Zeitbuchungen verwenden gezielte Sperren und partielle Eindeutigkeitsindizes.
-
-Der gemeinsame Workspace lädt derzeit den Gewerkbestand einmal pro Cacheerneuerung. Für sehr große Bestände ist eine Aufteilung in zeitlich begrenzte Read-Modelle und zusätzliche Pagination vorgesehen; die aktuelle Architektur vermeidet fortlaufende Abfragen, garantiert aber keinen bestimmten Neon-Tarifverbrauch. Externe ICS-Kalenderapps bestimmen ihr eigenes Abrufintervall; jeder Abruf prüft die Widerrufbarkeit des Zugangs.
-
-## Betrieb und Exporte
-
-Infrastruktur und Freigabeprozess: [docs/BETRIEB.md](docs/BETRIEB.md). Ursprüngliche Architekturplanung und aktueller Umsetzungsstand: [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md). Details zu Drucklayouts und Formaten: [src/modules/exports/README.md](src/modules/exports/README.md).
-
-Ein JSON-Export enthält Fachdaten, aber keine Binärdateien oder Authentifizierungstabellen. Er ersetzt kein Datenbank-/Blob-Backup. Vercel- und GitHub-Verwaltungstokens gehören ausschließlich in lokale Zugangswerkzeuge, niemals in Anwendungsvariablen oder das Repository.
+Entwicklung, Preview und Produktion verwenden jeweils eigene Neon-Free-Datenbanken, Blob-Stores und Secrets. Redis ist optional; die Erstinstallation arbeitet ohne zusätzliches Redis-Abonnement. Queue- und Function-Nutzung fällt unter die Abrechnung des vorhandenen Vercel-Pro-Kontos. Es gibt keinen automatischen Import realer DigitalMask-Daten.
