@@ -830,7 +830,9 @@ try {
     });
     return { id: report };
   });
-  for (const module of moduleRegistry)
+  for (const module of moduleRegistry.filter((module) =>
+    module.features.some((feature) => feature.id === "readiness"),
+  ))
     await add(module.id, "readiness", "readiness:" + module.id, {
       ready: false,
       notes: "DEMO · Fachstand und offene Aufgaben vor Bestätigung prüfen.",

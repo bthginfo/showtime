@@ -321,7 +321,7 @@
             <Plus size={16}></Plus> Nachtragen
           </Button>{/if}
       </div>
-    </header>{:else}<PageHeader eyebrow="PRODUKTIONSSTUNDEN" title="Produktionsstunden" compact
+    </header>{:else}<PageHeader title="Produktionsstunden" compact
       ><svelte:fragment slot="secondaryActions">{@render render_secondaryActions()}</svelte:fragment
       >
       {#if workspace.user.role !== "superadmin"}<Button

@@ -85,7 +85,7 @@
 </script>
 
 <div class={styles.workspace}>
-  <PageHeader eyebrow="ZEIT IM THEATER" title="Zeit buchen" compact></PageHeader>
+  <PageHeader title="Zeit buchen" compact></PageHeader>
   {#if selfBooking}
     <div class={`dual-timers ${styles.timers}`}>
       <TimerPanel kind="attendance" onBooked={setBooked}></TimerPanel>

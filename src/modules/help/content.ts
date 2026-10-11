@@ -14,7 +14,7 @@ export const helpArticles: HelpArticle[] = [
     intro:
       "Ein Arbeitsauftrag gehört zu einer Produktion und verbindet zwei Gewerke. Auftrag, Anlagen, Rückmeldungen und Entscheidungen bleiben zusammen.",
     steps: [
-      "Öffne Theaterbetrieb → Zusammenarbeit. Wähle die Produktion und Neue Anfrage. Alternativ beginnt Mit anderem Gewerk abstimmen direkt an einem Facheintrag.",
+      "Öffne Mein Gewerk → Abstimmungen. Wähle die Produktion und Neue Anfrage. Alternativ beginnt Mit anderem Gewerk abstimmen direkt an einem Facheintrag.",
       "Wähle das empfangende Gewerk und die Art: Feedback, Freigabe, Übergabe oder Änderung. Beschreibe, was geprüft werden soll, und wann eine Rückmeldung gebraucht wird.",
       "Nach dem Senden ergänzt du Bilder, PDF, Word-, Excel- oder CSV-Dateien als Anlagen. Die Anlagen sind gespeicherte Arbeitsstände; nur die beteiligten Gewerke mit Produktionszugriff sehen sie.",
       "Empfänger kommentieren oder bitten um Überarbeitung. Bei einer fachlichen Freigabe entscheidet eine andere Teamleitung des empfangenden Gewerks. Die erstellende Person darf ihren eigenen Auftrag nicht freigeben.",
@@ -31,9 +31,9 @@ export const helpArticles: HelpArticle[] = [
     intro:
       "Die Intendanz startet mit einer Hausübersicht. Sie zeigt die zugänglichen aktiven Produktionen, erforderliche Bereitschaften, offene Abstimmungen und erfasste Budgetbindung.",
     steps: [
-      "Öffne Heute als Intendanz oder Theaterbetrieb → Hausübersicht mit einer berechtigten Leitungsrolle. Plattformadministration allein gewährt keinen Zugriff auf Geschäftsdaten.",
+      "Wähle den Arbeitsbereich Intendanz. Heute zeigt dort die Hausübersicht. In anderen Gewerken siehst du deren Arbeitsalltag, auch wenn dein Konto zusätzlich eine Intendanzrolle hat.",
       "Wähle einen Zeitraum für Vorstellungen, Besucher und Karteneinnahmen. Produktionsbereitschaft und Budgetrahmen gelten für die aktiven zugänglichen Produktionen und sind nicht auf diese Termine begrenzt.",
-      "Unter Was Aufmerksamkeit braucht stehen offene und überfällige Rückmeldungen, Überarbeitungen und blockierte Facheinträge. In Zusammenarbeit kannst du den zugänglichen Verlauf dazu öffnen.",
+      "Unter Was Aufmerksamkeit braucht stehen offene und überfällige Rückmeldungen, Überarbeitungen und blockierte Facheinträge. In Abstimmungen kannst du den zugänglichen Verlauf dazu öffnen.",
       "Die Budgetübersicht trennt freigegebene Rahmen, genehmigte Bedarfe und offene Anträge. Noch verfügbar ist Rahmen minus genehmigte Bedarfe. Tatsächliche Zahlungen und Buchhaltung sind damit nicht abgebildet.",
       "Das Vorderhaus erfasst je bereits gespielter Vorstellung einen Besucher- und Kassenbericht. Abgeschlossene Berichte liefern Besucher, angebotene Plätze und Karteneinnahmen. Ohne Berichte zeigt die Übersicht fehlende Daten, keine geschätzten Zahlen.",
       "Die Berichtsabdeckung zeigt, für wie viele vergangene Termine Daten vorliegen. Die Auslastung ist Besucherzahl geteilt durch angebotene Plätze derselben erfassten Vorstellungen.",
@@ -48,7 +48,7 @@ export const helpArticles: HelpArticle[] = [
     intro:
       "Jedes der Fachmodule hat einen eigenen Leitfaden mit typischen Arbeitsschritten und Partnern. Die Oberfläche und gemeinsamen Bereiche folgen dem vertrauten DigitalMask-Aufbau.",
     steps: [
-      "Öffne Theaterbetrieb. Der Einstieg nennt dein aktuelles Theater und Gewerk.",
+      "Öffne Mein Gewerk. Der Einstieg nennt dein aktuelles Theater und Gewerk.",
       "Geführt starten begleitet dich durch Arbeitsbereich, Produktionsauswahl, Facheinträge, Zusammenarbeit und Bereitschaft.",
       "Diesen Schritt öffnen führt zum passenden Bereich; es werden keine Daten automatisch verändert. Zurück und Weiter bleiben jederzeit verfügbar.",
       "Mit Später fortsetzen behältst du deinen Fortschritt auf diesem Gerät. Der Fortschritt ist nach Theater, Zugang und Gewerk getrennt.",
@@ -403,13 +403,13 @@ export const helpArticles: HelpArticle[] = [
 ];
 helpArticles.push({
   id: "theater",
-  title: "Theaterbetrieb & Gewerkwechsel",
+  title: "Mein Gewerk & Arbeitsbereich wechseln",
   module: "theater",
   intro:
     "Ein gemeinsamer Arbeitsraum für dein Theater, mit den passenden Aufgaben und Unterlagen je Gewerk.",
   steps: [
     "Wähle im Theater- und Gewerkwechsel deinen Arbeitsbereich. Ein anderes Theater hat seinen eigenen Datenbestand. Deine Rolle und die sichtbaren Inhalte richten sich nach dem ausgewählten Bereich.",
-    "Unter Theaterbetrieb findest du die Fachansicht deines Gewerks, zentrale Produktionen, Planung und Ressourcen. Wähle eine Produktion, um ihre Unterlagen, Abhängigkeiten und Bereitschaft zu sehen.",
+    "Unter Mein Gewerk findest du die Fachansicht deines Gewerks, zentrale Produktionen, Planung und Ressourcen. Wähle eine Produktion, um ihre Unterlagen, Abhängigkeiten und Bereitschaft zu sehen.",
     "Die zuständige Disposition erstellt Planentwürfe, prüft Konflikte und veröffentlicht freigegebene Planstände. Änderungen an einer bereits geprüften Planung benötigen einen neuen Entwurf.",
     "Teamleitungen melden die Bereitschaft ihres Gewerks. Offene Abhängigkeiten und erforderliche Rückmeldungen bleiben vor der Produktionsfreigabe sichtbar.",
     "Eigene Arbeitszeiten und Anwesenheiten kannst du nach dem Buchen über das Stiftsymbol korrigieren und über Löschen entfernen. Das gilt auch für Timerbuchungen; neuere Korrekturen werden nicht stillschweigend überschrieben.",

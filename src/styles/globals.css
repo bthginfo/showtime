@@ -1483,6 +1483,16 @@ input[type="color"] {
 .dialog > form > label {
   margin-bottom: 18px;
 }
+.dialog > form.form-grid > label {
+  margin-bottom: 0;
+}
+.dialog form > .dialog-footer {
+  margin-top: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: var(--surface);
+}
 .error-message {
   color: var(--coral);
   padding: 12px 15px;

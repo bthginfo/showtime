@@ -58,56 +58,60 @@ export function readinessSnapshot(
     (Array.isArray(configuration.requiredReadinessModules)
       ? (configuration.requiredReadinessModules as string[])
       : defaultRequired);
-  return modules.map((module) => {
-    const current = workspaces
-      .filter(
+  return modules
+    .filter((module) =>
+      moduleById(module.moduleId)?.features.some((feature) => feature.id === "readiness"),
+    )
+    .map((module) => {
+      const current = workspaces
+        .filter(
+          (w) =>
+            w.moduleId === module.moduleId &&
+            w.type === "readiness" &&
+            !["archived", "cancelled"].includes(w.status) &&
+            (performanceId
+              ? w.performanceId === performanceId ||
+                w.data.performanceId === performanceId ||
+                (!w.performanceId && !w.data.performanceId)
+              : !w.performanceId && !w.data.performanceId),
+        )
+        .sort((a, b) => {
+          const exact = (item: typeof a) =>
+            performanceId &&
+            (item.performanceId === performanceId || item.data.performanceId === performanceId)
+              ? 1
+              : 0;
+          return exact(b) - exact(a) || b.updatedAt.getTime() - a.updatedAt.getTime();
+        })[0];
+      const checked = (current?.data._checkedSources || {}) as Record<string, number>;
+      const sources = workspaces.filter(
         (w) =>
           w.moduleId === module.moduleId &&
-          w.type === "readiness" &&
-          !["archived", "cancelled"].includes(w.status) &&
-          (performanceId
-            ? w.performanceId === performanceId ||
-              w.data.performanceId === performanceId ||
-              (!w.performanceId && !w.data.performanceId)
-            : !w.performanceId && !w.data.performanceId),
-      )
-      .sort((a, b) => {
-        const exact = (item: typeof a) =>
-          performanceId &&
-          (item.performanceId === performanceId || item.data.performanceId === performanceId)
-            ? 1
-            : 0;
-        return exact(b) - exact(a) || b.updatedAt.getTime() - a.updatedAt.getTime();
-      })[0];
-    const checked = (current?.data._checkedSources || {}) as Record<string, number>;
-    const sources = workspaces.filter(
-      (w) =>
-        w.moduleId === module.moduleId &&
-        !["readiness", "workspace", "collaboration"].includes(w.type) &&
-        !moduleById(w.moduleId)?.features.find((f) => f.id === w.type)?.private &&
-        !["archived", "cancelled"].includes(w.status),
-    );
-    const stale =
-      !!current &&
-      (sources.length !== Object.keys(checked).length ||
-        sources.some((source) => checked[source.id] !== source.version));
-    const waiver = policy?.waivers?.find(
-      (w) => w.moduleId === module.moduleId && Date.parse(w.expiresAt) > Date.now(),
-    );
-    return {
-      moduleId: module.moduleId,
-      departmentId: String(module.config.departmentId || ""),
-      label: moduleById(module.moduleId)?.label || module.moduleId,
-      required: required.includes(module.moduleId),
-      ready: !!waiver || (!!current && current.data.ready === true && !stale),
-      stale,
-      waiver: waiver
-        ? { reason: waiver.reason, expiresAt: waiver.expiresAt, approvedBy: waiver.approvedBy }
-        : null,
-      version: current?.version || 0,
-      updatedAt: current?.updatedAt || null,
-    };
-  });
+          !["readiness", "workspace", "collaboration"].includes(w.type) &&
+          !moduleById(w.moduleId)?.features.find((f) => f.id === w.type)?.private &&
+          !["archived", "cancelled"].includes(w.status),
+      );
+      const stale =
+        !!current &&
+        (sources.length !== Object.keys(checked).length ||
+          sources.some((source) => checked[source.id] !== source.version));
+      const waiver = policy?.waivers?.find(
+        (w) => w.moduleId === module.moduleId && Date.parse(w.expiresAt) > Date.now(),
+      );
+      return {
+        moduleId: module.moduleId,
+        departmentId: String(module.config.departmentId || ""),
+        label: moduleById(module.moduleId)?.label || module.moduleId,
+        required: required.includes(module.moduleId),
+        ready: !!waiver || (!!current && current.data.ready === true && !stale),
+        stale,
+        waiver: waiver
+          ? { reason: waiver.reason, expiresAt: waiver.expiresAt, approvedBy: waiver.approvedBy }
+          : null,
+        version: current?.version || 0,
+        updatedAt: current?.updatedAt || null,
+      };
+    });
 }
 export async function assertStageReady(context: Context, productionId: string, stage: string) {
   if (!["dress-rehearsal", "performance"].includes(stage)) return;

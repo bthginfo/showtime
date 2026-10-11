@@ -49,7 +49,7 @@ $: filtered = (() => filterPeople(people, query, organization))();
 </script>
 
 <section class={styles.directory}>
-      <PageHeader eyebrow="Kontakte" title="Ansprechpersonen" >
+      <PageHeader title="Ansprechpersonen" >
         <ExportButton onClick={() => open({ type: "export" })}></ExportButton>
         {#if canManage}<Button variant="primary" onClick={() => open({ type: "create" })} disabled={busy || !online}>
             <Plus size={16}></Plus>

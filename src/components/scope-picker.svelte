@@ -7,6 +7,8 @@
   import PlatformConsole from "./platform-console.svelte";
   export let onSelect: (organizationId: string, departmentId: string) => Promise<void>;
   export let compact = false;
+  export let initialOrganization = "";
+  export let initialDepartment = "";
   type Scope = {
     organizationId: string;
     organizationName: string;
@@ -34,6 +36,14 @@
       platformAdmin = result.platformAdmin;
       const organizations = [...new Set(scopes.map((s) => s.organizationId))];
       if (organizations.length === 1) theater = organizations[0];
+      if (scopes.some((scope) => scope.organizationId === initialOrganization))
+        theater = initialOrganization;
+      if (
+        scopes.some(
+          (scope) => scope.organizationId === theater && scope.departmentId === initialDepartment,
+        )
+      )
+        department = initialDepartment;
     } catch (e) {
       error =
         e instanceof Error ? e.message : "Die Theaterzuordnungen konnten nicht geladen werden.";

@@ -2,7 +2,7 @@
   import { useTheaterTime } from "@/components/theater-time";
   const { localDate } = useTheaterTime();
   import { theaterLabel, theaterInstant } from "@/shared/theater-time";
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { useWorkspace } from "@/components/workspace-context";
   import { PageHeader, Button, ErrorMessage, Modal, Empty, Badge } from "@/components/ui";
   import { api, post, shiftDate } from "@/shared/client-api";
@@ -22,10 +22,14 @@
   import TradeDetail from "./trade-detail.svelte";
   import ReadinessPanel from "./readiness-panel.svelte";
   import TheaterIntegrations from "./theater-integrations.svelte";
+  import SelectionList from "@/components/selection-list.svelte";
+  import { hasLeadershipOverview } from "@/shared/workspace-home";
   export let initialView = "trade";
   export let productionId = "";
   export let requestId = "";
   export let itemId = "";
+  export let featureId = "";
+  export let createEntry = false;
   const store = useWorkspace();
   $: workspace = $store.workspace;
   let view = [
@@ -58,7 +62,10 @@
     selectedProduction = workspace.records.productions[0].id;
   let collaborationSource: TradeItem | null = null;
   let selectedModule = "";
-  let selectedFeature = "";
+  let selectedFeature = featureId;
+  let createOpened = false,
+    search = "",
+    statusFilter = "all";
   let editor: TradeItem | null = null;
   let detailItem: TradeItem | null = null;
   let includeArchived = false,
@@ -91,12 +98,21 @@
         i.type !== "workspace" &&
         i.moduleId === selected?.moduleId &&
         i.type === feature?.id &&
+        (!search.trim() ||
+          i.title.toLocaleLowerCase("de").includes(search.trim().toLocaleLowerCase("de"))) &&
+        (statusFilter === "all" ||
+          (statusFilter === "open"
+            ? !["done", "archived", "cancelled", "approved", "ready"].includes(i.status)
+            : i.status === statusFilter)) &&
         (includeArchived || !["archived", "cancelled"].includes(i.status)),
     ) || [];
   $: views = [
-    ...(allowed("budget.read") ? [["overview", "Hausübersicht"]] : []),
-    ["trade", "Mein Gewerk"],
-    ["collaborations", "Zusammenarbeit"],
+    ...(hasLeadershipOverview(workspace) ? [["overview", "Hausübersicht"]] : []),
+    [
+      "trade",
+      workspace.currentModuleId === "intendance" ? "Entscheidungen & Ziele" : "Arbeitsstände",
+    ],
+    ["collaborations", "Abstimmungen"],
     ["resources", "Ressourcen"],
     ["schedule", "Spielplan"],
     ["readiness", "Bereitschaft"],
@@ -107,6 +123,13 @@
         ]
       : []),
   ];
+  $: primaryViews = views.filter(
+    ([id]) => !["resources", "integrations", "administration"].includes(id),
+  );
+  $: otherViews = views.filter(([id]) =>
+    ["resources", "integrations", "administration"].includes(id),
+  );
+  $: if (view === "overview" && !hasLeadershipOverview(workspace)) view = "trade";
   const itemStatus: Record<string, string> = {
     draft: "Entwurf",
     review: "Zur Prüfung",
@@ -156,6 +179,18 @@
         selectedFeature = selectedManifest?.features[0]?.id || "";
       if (allowed("tenant.configure"))
         configuration = await api<Configuration>("/api/platform/configuration");
+      if (
+        createEntry &&
+        !createOpened &&
+        selectedManifest?.features.some(
+          (feature) => feature.id === selectedFeature && allowed(feature.permission),
+        )
+      ) {
+        createOpened = true;
+        busy = false;
+        await tick();
+        start();
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : "Laden fehlgeschlagen.";
     } finally {
@@ -298,7 +333,10 @@
 </script>
 
 <div class="theater-workspace">
-  <PageHeader eyebrow={workspace.department.name} title="Theaterbetrieb"
+  <PageHeader
+    title={view === "trade"
+      ? workspace.department.name
+      : views.find(([id]) => id === view)?.[1] || "Theaterbetrieb"}
     ><a class="button secondary" href="/?module=help&guide=collaboration">Hilfe & Einstieg</a
     >{#if view !== "overview" && view !== "collaborations"}<Button
         onClick={() => void load()}
@@ -306,13 +344,20 @@
       >{/if}</PageHeader
   >
   <div class="segmented" role="tablist" aria-label="Theaterbereiche">
-    {#each views as [id, label]}<button
+    {#each primaryViews as [id, label]}<button
         role="tab"
         aria-selected={view === id}
         class:active={view === id}
         on:click={() => navigateTheater(id)}>{label}</button
       >{/each}
   </div>
+  <details class="theater-more">
+    <summary>Weitere Bereiche</summary>
+    <div class="button-row">
+      {#each otherViews as [id, label]}<Button onClick={() => navigateTheater(id)}>{label}</Button
+        >{/each}
+    </div>
+  </details>
   <label class="theater-view-picker"
     >Theaterbereich<select bind:value={view} on:change={() => navigateTheater(view)}
       >{#each views as [id, label]}<option value={id}>{label}</option>{/each}</select
@@ -351,7 +396,7 @@
   {/if}
   <ErrorMessage message={error} />
   {#if !planning}<p class="muted">Theaterdaten werden geladen …</p>
-  {:else if view === "overview" && allowed("budget.read")}<TheaterOverview
+  {:else if view === "overview" && hasLeadershipOverview(workspace)}<TheaterOverview
       onProduction={(id) => navigateTheater("readiness", id)}
     />
   {:else if view === "collaborations"}{#key `${selectedProduction}:${collaborationSource?.id || ""}`}<TheaterCollaborations
@@ -367,7 +412,7 @@
   {:else if view === "trade"}
     <div class="filters">
       <label
-        >Modul<select
+        >Gewerk<select
           bind:value={selectedModule}
           on:change={() =>
             (selectedFeature =
@@ -377,7 +422,7 @@
             >{/each}</select
         ></label
       ><label
-        >Arbeitsablauf<select bind:value={selectedFeature}
+        >Was möchtest du bearbeiten?<select bind:value={selectedFeature}
           >{#each selected?.manifest.features || [] as f (f.id)}<option value={f.id}
               >{f.label}</option
             >{/each}</select
@@ -385,8 +430,23 @@
       >{#if feature && allowed(feature.permission)}<Button
           variant="primary"
           disabled={busy}
-          onClick={() => start()}>Eintrag anlegen</Button
+          onClick={() => start()}>{feature.label} anlegen</Button
         >{/if}
+    </div>
+    <div class="filters trade-list-filters">
+      <label
+        >Arbeitsstände suchen<input
+          type="search"
+          placeholder="Titel suchen …"
+          bind:value={search}
+        /></label
+      ><label
+        >Anzeige<select bind:value={statusFilter}
+          ><option value="all">Alle aktuellen Stände</option><option value="open">Nur offene</option
+          ><option value="blocked">Blockierte</option><option value="done">Erledigte</option
+          ></select
+        ></label
+      >
     </div>
     {#if !selected}<Empty
         title="Kein Fachmodul aktiviert"
@@ -427,7 +487,9 @@
               )}
             </p>{/if}
           <dl class="detail-grid">
-            {#each contract?.fields || [] as field (field.key)}{#if item.data[field.key] !== undefined && item.data[field.key] !== ""}<div
+            {#each (contract?.fields || [])
+              .filter((field) => item.data[field.key] !== undefined && item.data[field.key] !== "")
+              .slice(0, 3) as field (field.key)}{#if item.data[field.key] !== undefined && item.data[field.key] !== ""}<div
                 >
                   <dt>
                     {field.key === "amountCents"
@@ -442,7 +504,7 @@
               "Erstellende Person"}{item.dueAt ? " · fällig " + dateLabel(item.dueAt) : ""}
           </p>
           <div class="button-row">
-            <Button onClick={() => (detailItem = item)}>Details, Fassungen & Anlagen</Button
+            <Button onClick={() => (detailItem = item)}>Details öffnen</Button
             >{#if item.type === "asset" && item.data._stock}<span class="small"
                 >Verfügbar: {String((item.data._stock as { available: number }).available)} · ausgeliehen:
                 {String((item.data._stock as { loaned: number }).loaned)}</span
@@ -487,12 +549,14 @@
               onClick={() => {
                 collaborationSource = item;
                 view = "collaborations";
-              }}>Mit anderem Gewerk abstimmen</Button
+              }}>Rückmeldung anfragen</Button
             >{/if}
         </article>{/each}
     </div>
     {#if !items.length && selected}<Empty
-        title="Noch keine Einträge"
+        title={search.trim() || statusFilter !== "all"
+          ? "Keine passenden Arbeitsstände"
+          : `Noch keine ${feature?.label || "Einträge"} erfasst`}
         description={feature && allowed(feature.permission)
           ? "Wähle die passende Produktion und lege einen Arbeitsstand an. Verknüpfte Personen und Geräte werden beim Speichern geprüft."
           : "Hier erscheinen die für dich freigegebenen Arbeitsstände. Deine zuständige Leitung kann neue Einträge anlegen."}
@@ -543,41 +607,21 @@
       onClose={() => (editing = false)}
       wide
       ><form class="form-grid" on:submit|preventDefault={() => void save()}>
-        <label class="full">Titel<input bind:value={title} required maxlength="200" /></label
-        ><TradeFields
-          privateData={feature.private || false}
-          fields={feature.fields}
-          data={fields}
-          {planning}
-          productionId={selectedProduction}
-          update={(key, value) => (fields = { ...fields, [key]: value })}
-        /><label
-          >Verantwortlich<select bind:value={ownerId}
-            >{#each workspace.members.filter((m) => m.id === workspace.user.id || allowed("task.assign")) as member (member.id)}<option
-                value={member.id}>{member.name}</option
+        <label class="full"
+          >Titel<input
+            bind:value={title}
+            required
+            maxlength="200"
+            placeholder={`z. B. ${feature.label} – ${selectedProduction ? String(workspace.records.productions.find((row) => row.id === selectedProduction)?.data.title || "Produktion") : "kurze, eindeutige Bezeichnung"}`}
+          /></label
+        ><label
+          >Produktion<select bind:value={selectedProduction}
+            ><option value="">Ohne Produktionszuordnung</option
+            >{#each workspace.records.productions as production (production.id)}<option
+                value={production.id}>{String(production.data.title)}</option
               >{/each}</select
           ></label
-        >{#if allowed("task.assign")}<label
-            >Vertretung<select bind:value={deputyId}
-              ><option value="">Keine</option>{#each workspace.members as member (member.id)}<option
-                  value={member.id}>{member.name}</option
-                >{/each}</select
-            ></label
-          >{/if}<label>Frist<input type="date" bind:value={dueAt} /></label
-        >{#if !feature.private}<fieldset class="form-multi full">
-            <legend>Erforderliche Vorarbeiten</legend
-            >{#each planning.items.filter((i) => i.productionId === (selectedProduction || null) && i.id !== editor?.id && i.type !== "workspace" && featureFor(i) && !featureFor(i)?.private) as dependency (dependency.id)}<label
-                class="check-label"
-                ><input
-                  type="checkbox"
-                  checked={dependencies.includes(dependency.id)}
-                  on:change={(e) =>
-                    (dependencies = e.currentTarget.checked
-                      ? [...dependencies, dependency.id]
-                      : dependencies.filter((id) => id !== dependency.id))}
-                />{dependency.title} · {dependency.status}</label
-              >{/each}
-          </fieldset>{/if}<label
+        ><label
           >Status<select bind:value={status}
             ><option value="draft">Entwurf</option><option value="review">Zur Prüfung</option
             >{#if allowed(feature.id === "budget" ? "budget.approve" : feature.permission === "schedule.manage" ? "schedule.publish" : "document.publish")}<option
@@ -586,11 +630,62 @@
               >{/if}<option value="done">Erledigt</option><option value="blocked">Blockiert</option
             ></select
           ></label
-        >{#if error}<div class="full"><ErrorMessage message={error} /></div>{/if}
+        ><TradeFields
+          privateData={feature.private || false}
+          fields={feature.fields}
+          data={fields}
+          {planning}
+          productionId={selectedProduction}
+          update={(key, value) => (fields = { ...fields, [key]: value })}
+        />
+        <details class="form-disclosure full">
+          <summary>Zuständigkeit, Frist & Vorarbeiten</summary>
+          <div class="form-grid">
+            <label
+              >Verantwortlich<select bind:value={ownerId}
+                >{#each workspace.members.filter((m) => m.id === workspace.user.id || allowed("task.assign")) as member (member.id)}<option
+                    value={member.id}>{member.name}</option
+                  >{/each}</select
+              ></label
+            >{#if allowed("task.assign")}<label
+                >Vertretung<select bind:value={deputyId}
+                  ><option value="">Keine</option
+                  >{#each workspace.members as member (member.id)}<option value={member.id}
+                      >{member.name}</option
+                    >{/each}</select
+                ></label
+              >{/if}<label>Frist<input type="date" bind:value={dueAt} /></label
+            >{#if !feature.private}<SelectionList
+                label="Erforderliche Vorarbeiten"
+                options={planning.items
+                  .filter(
+                    (i) =>
+                      i.productionId === (selectedProduction || null) &&
+                      i.id !== editor?.id &&
+                      i.type !== "workspace" &&
+                      featureFor(i) &&
+                      !featureFor(i)?.private,
+                  )
+                  .map((dependency) => ({
+                    id: dependency.id,
+                    label: dependency.title,
+                    detail: itemStatus[dependency.status] || dependency.status,
+                  }))}
+                selected={dependencies}
+                onChange={(ids) => (dependencies = ids)}
+              />{/if}
+          </div>
+        </details>
+        {#if error}<div class="full"><ErrorMessage message={error} /></div>{/if}
         <div class="dialog-footer full">
           <Button disabled={busy} onClick={() => (editing = false)}>Abbrechen</Button><button
             class="button primary"
-            disabled={busy}>Speichern</button
+            disabled={busy}
+            >{busy
+              ? "Wird gespeichert …"
+              : editor
+                ? "Änderungen speichern"
+                : `${feature.label} anlegen`}</button
           >
         </div>
       </form></Modal

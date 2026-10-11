@@ -54,6 +54,15 @@ describe("calendar titles and colors", () => {
       allDay: true,
     });
   });
+  it("puts the appointment purpose first in narrow cells while retaining the full export title", () => {
+    const presentation = calendarPresentation(
+      event({ title: "Generalprobe", productionId: "gym", category: "ama" }),
+      [production],
+      [category],
+    );
+    expect(presentation.compactTitle).toBe("Generalprobe · Gym");
+    expect(presentation.title).toBe("Gym – AMA · Generalprobe");
+  });
   it("fades only all-day backgrounds and selects contrasting text for timed colors", () => {
     expect(calendarEventPaint("#123456", true)).toEqual({
       backgroundColor: "rgba(18, 52, 86, 0.5)",

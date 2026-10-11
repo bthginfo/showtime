@@ -27,6 +27,8 @@ export type Field = {
   source?: RecordKind;
   options?: string[];
   required?: boolean;
+  /** Explicit hierarchy for domain inputs; required fields always remain visible. */
+  primary?: boolean;
   managed?: "approval";
 };
 export type Feature = {
@@ -102,17 +104,18 @@ const mod = (
   id,
   label,
   department,
-  features: features.some((f) => f.id === "readiness")
-    ? features
-    : [
-        ...features,
-        feature(
-          "readiness",
-          "Bereitschaft",
-          [check("ready", "Bereit"), note("notes", "Offene Punkte")],
-          "readiness.manage",
-        ),
-      ],
+  features:
+    id === "intendance" || features.some((f) => f.id === "readiness")
+      ? features
+      : [
+          ...features,
+          feature(
+            "readiness",
+            "Bereitschaft",
+            [check("ready", "Bereit"), note("notes", "Offene Punkte")],
+            "readiness.manage",
+          ),
+        ],
   dependencies: ["productions", "calendar", "tasks", "documents", "chat"],
   schemaVersion: 1,
   events: ["TradeItemChangedV1"],
@@ -241,9 +244,9 @@ export const moduleRegistry: ModuleManifest[] = [
   ]),
   mod("lighting", "Licht", "Licht", [
     feature("patch", "Patch / Fokus", [
-      text("fixture", "Gerät", true),
-      text("address", "Adresse"),
-      text("universe", "Universe"),
+      text("fixture", "Gerätebezeichnung", true),
+      { ...text("address", "Frühere Adressnotiz (Freitext)"), primary: false },
+      { ...text("universe", "Frühere Universe-Notiz (Freitext)"), primary: false },
       text("position", "Position"),
       note("focus", "Fokusauftrag"),
     ]),
@@ -547,6 +550,32 @@ export const moduleRegistry: ModuleManifest[] = [
         note("handover", "Übergabe"),
       ],
       "task.create",
+    ),
+  ]),
+  mod("intendance", "Intendanz", "Intendanz", [
+    feature(
+      "decision",
+      "Leitungsentscheidung",
+      [
+        note("question", "Was soll entschieden werden?"),
+        note("decision", "Entscheidung und Begründung"),
+        { key: "responsibleId", label: "Verantwortlich für die Umsetzung", type: "member" },
+        date("deadline", "Umsetzen bis"),
+      ],
+      "budget.approve",
+      true,
+    ),
+    feature(
+      "priority",
+      "Ziel & Vorhaben",
+      [
+        note("goal", "Was soll erreicht werden?"),
+        { key: "responsibleId", label: "Verantwortlich", type: "member" },
+        date("deadline", "Zieldatum"),
+        note("nextStep", "Nächster Schritt"),
+      ],
+      "budget.approve",
+      true,
     ),
   ]),
 ];

@@ -1,6 +1,98 @@
 .theater-view-picker {
   display: none;
 }
+.workplace-switch {
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  width: calc(100% - 30px);
+}
+.workplace-switch:hover {
+  border-color: var(--accent);
+}
+.workplace-switch .small {
+  font-size: 11px;
+}
+.workplace-switch .badge {
+  font-size: 11px;
+}
+/* Common task disclosure: secondary work stays available without filling the page. */
+.theater-workspace .surface.task-disclosure {
+  padding: 0;
+}
+.task-disclosure > summary {
+  padding: 20px 24px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  min-height: 64px;
+}
+.task-disclosure > summary > .small {
+  display: block;
+  margin: 6px 0 0 17px;
+  font-weight: 400;
+}
+.disclosure-body {
+  padding: 4px 24px 24px;
+}
+.disclosure-body > p {
+  margin-bottom: 16px;
+  max-width: 72ch;
+}
+.disclosure-body > ul {
+  padding-left: 20px;
+  margin: 16px 0;
+}
+.disclosure-body li {
+  padding-block: 6px;
+}
+.form-disclosure {
+  border-block: 1px solid var(--border);
+  padding-block: 4px;
+}
+.form-disclosure > summary {
+  min-height: 44px;
+  padding-block: 12px;
+  cursor: pointer;
+  font-weight: 550;
+}
+.form-disclosure > summary .small {
+  margin-left: 8px;
+  font-weight: 400;
+}
+.form-disclosure > .form-grid {
+  padding-block: 12px 16px;
+}
+.theater-more {
+  margin-top: -12px;
+}
+.theater-more > summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding-block: 12px;
+  color: var(--muted);
+}
+.theater-more > .button-row {
+  padding-top: 8px;
+}
+.trade-list-filters {
+  margin-top: -8px;
+}
+@media (max-width: 760px) {
+  .task-disclosure > summary {
+    padding: 18px;
+  }
+  .disclosure-body {
+    padding: 0 18px 18px;
+  }
+  .theater-more {
+    display: none;
+  }
+  .form-disclosure > summary .small {
+    display: block;
+    margin: 6px 0 0 17px;
+  }
+}
 /* These primitives are also used on role home pages and in dialogs. */
 .section-heading {
   display: flex;

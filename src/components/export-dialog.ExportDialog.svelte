@@ -8,7 +8,7 @@
   import { Button, ErrorMessage, Modal } from "./ui";
   import { isActiveStaff } from "@/shared/client-members";
   import { useWorkspace } from "./workspace-context";
-  import { fields, labels } from "./resource-fields";
+  import { fields, workspaceResourceLabels } from "./resource-fields";
   import {
     createEffects,
     createId,
@@ -42,6 +42,7 @@
   const workspaceStore = useWorkspace();
   let { workspace } = $workspaceStore;
   $: ({ workspace } = $workspaceStore);
+  $: entryLabels = workspaceResourceLabels(kind, workspace.currentModuleId);
   let contextTitle = filters.productionId
     ? String(
         workspace.records.productions.find((row) => row.id === filters.productionId)?.data.title ||
@@ -125,7 +126,7 @@
       : "";
 </script>
 
-<Modal title={`${labels[kind][0]} exportieren`} {onClose}>
+<Modal title={`${entryLabels[0]} exportieren`} {onClose}>
   {#if contextTitle}<p class="export-context">
       <strong>{contextTitle}</strong>
     </p>{/if}

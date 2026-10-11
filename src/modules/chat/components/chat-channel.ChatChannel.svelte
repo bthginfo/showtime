@@ -19,6 +19,7 @@
     X,
   } from "@lucide/svelte";
   import type { DomainRecord } from "@/shared/contracts";
+  import { teamChannelLabel, chatAudienceHint } from "@/shared/chat-presentation";
   import { api, initials, post, value } from "@/shared/client-api";
   import { prepareUpload } from "@/shared/client-files";
   import { useWorkspace } from "@/components/workspace-context";
@@ -364,9 +365,7 @@
       <span class="small muted">
         {conversation
           ? conversation.data.mode === "team"
-            ? conversation.data.scope === "theater"
-              ? "Theaterkanal · Alle Gewerke"
-              : "Teamkanal · " + workspace.department.name
+            ? teamChannelLabel(conversation, workspace)
             : `${conversation.data.mode === "direct" ? "Direktchat" : "Gruppenchat"} · ${Array.isArray(conversation.data.participantIds) ? conversation.data.participantIds.length : 0} Teilnehmende · privat`
           : productionId
             ? "Produktionskanal · Gemeinsame Absprachen & Dateien"
@@ -479,6 +478,9 @@
       <label class="visually-hidden" for="message">
         Nachricht an {title}
       </label>
+      <p id="message-audience" class="small muted chat-audience">
+        {chatAudienceHint(conversation, productionId, workspace)}
+      </p>
       <div class="chat-input-row">
         <ChatActionMenu
           label="Anhänge und Dokumente"
@@ -496,6 +498,7 @@
         </ChatActionMenu>
         <textarea
           id="message"
+          aria-describedby="message-audience"
           bind:this={messageInput.current}
           rows={1}
           required={!files.length}
@@ -538,11 +541,6 @@
             <span class="chat-document-prefix">Gemeinsames </span>Dokument
           </span>
         </Button>
-        <span class="small muted">
-          {conversation && conversation.data.mode !== "team"
-            ? "Nur die Teilnehmenden haben Zugriff."
-            : "Nur das Team hat Zugriff."}
-        </span>
         <Button
           type="submit"
           variant="primary"
@@ -628,3 +626,12 @@
       onClose={() => setExporting(false)}
     ></ExportDialog>{/if}
 </section>
+
+<style>
+  .chat-audience {
+    margin: 0 0 8px;
+  }
+  .composer-actions :global(.button:last-child) {
+    margin-left: auto;
+  }
+</style>

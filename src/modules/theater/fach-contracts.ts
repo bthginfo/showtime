@@ -396,6 +396,7 @@ export function extendFachContracts(modules: ModuleManifest[]) {
     ],
   });
   for (const module of modules) {
+    if (module.id === "intendance") continue;
     module.features.push(...(add[module.id] || []));
     module.features.push(
       feature(
@@ -507,10 +508,10 @@ export function extendFachContracts(modules: ModuleManifest[]) {
     }
     if (module.id === "lighting")
       extend("patch", [
-        ref("assetId", "Gerät", ["asset"]),
-        f("dmxAddress", "DMX-Startadresse", "number"),
-        f("dmxUniverse", "DMX-Universe", "number"),
-        f("footprint", "DMX-Kanalanzahl", "number"),
+        { ...ref("assetId", "Gerät aus dem Fundus", ["asset"]), primary: true },
+        { ...f("dmxAddress", "DMX-Startadresse", "number"), primary: true },
+        { ...f("dmxUniverse", "DMX-Universe", "number"), primary: true },
+        { ...f("footprint", "DMX-Kanalanzahl", "number"), primary: true },
         f("gdtfMode", "GDTF-Modus"),
       ]);
     if (module.id === "sound") {

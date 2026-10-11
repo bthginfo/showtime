@@ -288,6 +288,7 @@ export const schemas: Record<RecordKind, z.ZodType> = {
     idempotencyKey: z.string().max(100).default(""),
   }),
   looks: z.object({
+    documentMode: z.enum(["look", "general"]).default("look"),
     title: short.default(""),
     productionId: id,
     characterId: id,

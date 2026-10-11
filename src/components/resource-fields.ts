@@ -48,6 +48,11 @@ export const labels: Record<RecordKind, [string, string]> = {
   people: ["Ansprechpersonen", "Person"],
   categories: ["Kategorien", "Kategorie"],
 };
+export function workspaceResourceLabels(kind: RecordKind, moduleId?: string): [string, string] {
+  return kind === "looks" && moduleId !== "makeup"
+    ? ["Dokumentationen", "Dokumentation"]
+    : labels[kind];
+}
 const production: Field = {
   key: "productionId",
   label: "Produktion",
@@ -142,7 +147,7 @@ export const fields: Partial<Record<RecordKind, Field[]>> = {
       label: "Spalte",
       type: "select",
       options: [
-        ["backlog", "Backlog"],
+        ["backlog", "Später"],
         ["todo", "Offen"],
         ["doing", "In Arbeit"],
         ["review", "Prüfung"],
@@ -286,7 +291,7 @@ export const statusLabels: Record<string, string> = {
   preparation: "Vorbereitung",
   active: "Aktiv",
   archived: "Archiviert",
-  backlog: "Backlog",
+  backlog: "Später",
   todo: "Offen",
   doing: "In Arbeit",
   review: "Prüfung",

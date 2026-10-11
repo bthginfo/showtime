@@ -94,7 +94,7 @@ export function expandEvents(
       zone,
     ).map((instance) => ({
       id: `${record.id}:${instance.start.toISOString()}`,
-      title: presentation.title,
+      title: presentation.compactTitle,
       allDay: presentation.allDay,
       categoryName: presentation.categoryName,
       background: presentation.background,

@@ -87,7 +87,7 @@ $: admin = memberCan(workspace.user, 'members.manage');
 </script>
 
 
-      <PageHeader eyebrow="DEIN ARBEITSRAUM" title="Einstellungen" ></PageHeader>
+      <PageHeader title="Einstellungen" ></PageHeader>
       <ErrorMessage message={error}></ErrorMessage>
       {#if notice}<p class="success-message" role="status">
           <Check size={16}></Check>

@@ -46,6 +46,17 @@ describe("document compatibility and historical period selection", () => {
     );
     expect(lookTitle({ actorName: "Freier Name" })).toBe("Freier Name");
     expect(lookTitle({ title: "Historisch" })).toBe("Historisch");
+    expect(
+      lookTitle(
+        {
+          documentMode: "general",
+          title: "Regiehinweise",
+          actorId: "actor",
+          actorName: "Snapshot",
+        },
+        actors,
+      ),
+    ).toBe("Regiehinweise");
     const productions = [row("productions", "play", { durationMinutes: 95 })];
     expect(pieceDuration({ productionId: "play" }, productions)).toBe(95);
     expect(pieceDuration({ productionId: "play", productionDurationMinutes: 0 }, productions)).toBe(

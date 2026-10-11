@@ -211,14 +211,30 @@ export async function tenantConfiguration(context: Context, input: unknown) {
         .limit(1);
       if (!department) throw new HttpError(400, "Gewerk nicht gefunden.");
     }
+    const [existing] = await db
+      .select()
+      .from(moduleActivations)
+      .where(eq(moduleActivations.moduleId, data.moduleId))
+      .limit(1);
+    if (!existing && !data.departmentId)
+      throw new HttpError(400, "Ordne das neue Modul zuerst einem Gewerk zu.");
     await db
-      .update(moduleActivations)
-      .set({
+      .insert(moduleActivations)
+      .values({
+        organizationId: context.organizationId,
+        moduleId: data.moduleId,
         enabled: data.enabled,
-        ...(data.departmentId ? { config: { departmentId: data.departmentId } } : {}),
-        version: sql`${moduleActivations.version}+1`,
+        config: { departmentId: data.departmentId || String(existing?.config.departmentId || "") },
       })
-      .where(eq(moduleActivations.moduleId, data.moduleId));
+      .onConflictDoUpdate({
+        target: [moduleActivations.organizationId, moduleActivations.moduleId],
+        set: {
+          enabled: data.enabled,
+          ...(data.departmentId ? { config: { departmentId: data.departmentId } } : {}),
+          version: sql`${moduleActivations.version}+1`,
+        },
+      });
+    await auditChange(db as never, context, "theater.module.configured", data.moduleId);
     return { ok: true };
   }
   if (body.action === "settings") {

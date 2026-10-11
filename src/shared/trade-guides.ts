@@ -8,6 +8,18 @@ export type TradeGuide = {
   check: string;
 };
 export const tradeGuides: Record<string, TradeGuide> = {
+  intendance: {
+    label: "Intendanz",
+    purpose:
+      "Den Spielbetrieb überblicken, Prioritäten setzen und Entscheidungen nachvollziehbar machen.",
+    work: "Besucher, Einnahmen und Budgets einordnen, offene Leitungsentscheidungen klären und die Umsetzung von Zielen verfolgen.",
+    partners: "Disposition, Produktionsleitungen, Verwaltung und künstlerische Gewerke",
+    example:
+      "Eine Produktionsentscheidung mit der Disposition abstimmen und die Umsetzung verfolgen",
+    target: "disposition",
+    check:
+      "Entscheidung, Begründung, Zuständigkeit und nächster Termin sind festgehalten. Fachliche und gesetzliche Abnahmen bleiben bei den zuständigen Gewerken.",
+  },
   design: {
     label: "Ausstattung & Bühnenbild",
     purpose:

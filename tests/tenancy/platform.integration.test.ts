@@ -113,6 +113,95 @@ describe.skipIf(!enabled)("real Neon tenant isolation and event commands", () =>
       pools.controlSql.end(),
     ]);
   });
+  it("activates a newly added trade once and rejects another tenant's department", async () => {
+    const { tenantConfiguration } = await import("@/modules/theater/tenants");
+    const [department] = await run(a, () =>
+      db.select().from(tables.departments).where(op.eq(tables.departments.name, "Intendanz")),
+    );
+    const [foreign] = await run(b, () =>
+      db.select().from(tables.departments).where(op.eq(tables.departments.name, "Intendanz")),
+    );
+    await run(a, () =>
+      db
+        .delete(tables.moduleActivations)
+        .where(op.eq(tables.moduleActivations.moduleId, "intendance")),
+    );
+    await expect(
+      run(a, () =>
+        tenantConfiguration(a, {
+          action: "module",
+          data: { moduleId: "intendance", enabled: true },
+        }),
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(
+      run(a, () =>
+        tenantConfiguration(a, {
+          action: "module",
+          data: { moduleId: "intendance", enabled: true, departmentId: foreign.id },
+        }),
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    await run(a, () =>
+      tenantConfiguration(a, {
+        action: "module",
+        data: { moduleId: "intendance", enabled: true, departmentId: department.id },
+      }),
+    );
+    await run(a, () =>
+      tenantConfiguration(a, {
+        action: "module",
+        data: { moduleId: "intendance", enabled: false },
+      }),
+    );
+    const rows = await run(a, () =>
+      db
+        .select()
+        .from(tables.moduleActivations)
+        .where(op.eq(tables.moduleActivations.moduleId, "intendance")),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].enabled).toBe(false);
+    expect(rows[0].config.departmentId).toBe(department.id);
+    await run(a, () =>
+      tenantConfiguration(a, { action: "module", data: { moduleId: "intendance", enabled: true } }),
+    );
+    const planning = await run(a, () => theater.theaterWorkspace(a, production));
+    expect(planning.readiness.some((state) => state.moduleId === "intendance")).toBe(false);
+    const employee = {
+      ...a,
+      grants: [{ role: "employee" as const, scope: "tenant" as const, scopeId: null }],
+    };
+    await expect(
+      run(employee, () =>
+        tenantConfiguration(employee, {
+          action: "module",
+          data: { moduleId: "intendance", enabled: false },
+        }),
+      ),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+  it("saves named general documentation without a fictional actor while preserving Maskenaufschrieb validation and tenant isolation", async () => {
+    const note = await run(a, () =>
+      save(a, "looks", {
+        documentMode: "general",
+        title: "QA Regiehinweise",
+        sections: [{ key: "notes", entries: [{ id: randomUUID(), text: "Synthetischer Ablauf" }] }],
+      }),
+    );
+    expect(note.data.title).toBe("QA Regiehinweise");
+    expect(note.data.actorId).toBe("");
+    expect(note.data.documentMode).toBe("general");
+    expect(
+      await run(b, () => db.select().from(tables.records).where(op.eq(tables.records.id, note.id))),
+    ).toHaveLength(0);
+    await expect(
+      run(a, () => save(a, "looks", { documentMode: "general", title: "", sections: [] })),
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(run(a, () => save(a, "looks", { sections: [] }))).rejects.toMatchObject({
+      status: 400,
+    });
+  });
   it("uses nonowner roles, denies role escalation and separates auth/control/business privileges", async () => {
     for (const client of [app, auth, control, worker]) {
       const [role] =

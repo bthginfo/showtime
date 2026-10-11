@@ -120,7 +120,7 @@
   );
 </script>
 
-<PageHeader eyebrow="SICHER DURCH DEN ARBEITSALLTAG" title="Hilfe & Orientierung">
+<PageHeader title="Hilfe & Orientierung">
   <Button onClick={onStartTour}>
     <Compass size={17}></Compass>
     Einführung neu starten

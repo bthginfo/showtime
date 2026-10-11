@@ -27,11 +27,14 @@ const setError = (next: typeof error | ((current: typeof error) => typeof error)
 let rows = (workspace.records.categories || []).filter((row) => row.data.scope === scope);
 
 $: rows = (workspace.records.categories || []).filter((row) => row.data.scope === scope);
+$: sectionLabel = scope === "looks" && workspace.currentModuleId !== "makeup"
+    ? "Dokumentationsabschnitte"
+    : scopes[scope];
 
 </script>
 
 
-      {#if !editing}<Modal title={`${scopes[scope]} verwalten`} onClose={onClose}>
+      {#if !editing}<Modal title={`${sectionLabel} verwalten`} onClose={onClose}>
           <p class="muted">
             Bezeichnungen, Reihenfolge und Farben für euren Arbeitsalltag. Verwendete Kategorien
             bleiben geschützt.

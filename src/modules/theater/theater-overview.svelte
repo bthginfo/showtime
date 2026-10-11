@@ -104,6 +104,7 @@
       >
     </div>
   </header>
+  <slot />
   <div class="dashboard-period" class:is-expanded={customPeriod}>
     <div class="dashboard-mobile-period">
       <span

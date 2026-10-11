@@ -1,6 +1,7 @@
 <script lang="ts">
   import { afterNavigate } from "$app/navigation";
   import MoreRecords from "./more-records.svelte";
+  import ScopePicker from "./scope-picker.svelte";
   import { clearPrivateBrowserData } from "@/shared/private-browser-data";
   import { initialState } from "@/shared/svelte-runtime";
 
@@ -97,8 +98,19 @@
   const workspaceStore = useWorkspace();
   let { workspace, notice, notify, online, action } = $workspaceStore;
   $: ({ workspace, notice, notify, online, action } = $workspaceStore);
-  let nav = visibleNavigation(allNav, workspace.user);
-  $: nav = visibleNavigation(allNav, workspace.user);
+  const workplaceNavigation = (current: typeof workspace) =>
+    visibleNavigation(allNav, current.user).map((item) => ({
+      ...item,
+      label:
+        item.id === "theater"
+          ? "Mein Gewerk"
+          : item.id === "documentation" && current.currentModuleId !== "makeup"
+            ? "Dokumentation"
+            : item.label,
+    }));
+  let nav = workplaceNavigation(workspace);
+  $: nav = workplaceNavigation(workspace);
+  let scopeOpen = false;
   const queryStore = externalStore(
     subscribeLocation,
     () => location.search,
@@ -385,11 +397,13 @@
 </script>
 
 {#if true}
-  {#snippet render_screen()}{#if activeModule === "theater"}{#key `${params.get("view") || ""}:${params.get("productionId") || ""}:${params.get("requestId") || ""}:${params.get("itemId") || ""}`}<TheaterModule
+  {#snippet render_screen()}{#if activeModule === "theater"}{#key `${workspace.department.id}:${params.get("view") || ""}:${params.get("productionId") || ""}:${params.get("requestId") || ""}:${params.get("itemId") || ""}:${params.get("featureId") || ""}:${params.get("create") || ""}`}<TheaterModule
           initialView={params.get("view") || "trade"}
           productionId={params.get("productionId") || ""}
           requestId={params.get("requestId") || ""}
           itemId={params.get("itemId") || ""}
+          featureId={params.get("featureId") || ""}
+          createEntry={params.get("create") === "1"}
         />{/key}{:else if activeModule === "today"}<TodayModule {navigate}
       ></TodayModule>{:else}{#if activeModule === "productions"}<ProductionsModule
           productionId={params.get("productionId") || ""}
@@ -425,7 +439,9 @@
                     ></ActorsModule>{:else}{#if activeModule === "documentation"}<DocumentationModule
                       ></DocumentationModule>{:else}{#if activeModule === "inventory"}<ResourceView
                           kind="materials"
-                          description="Perücken, Produkte und Werkzeuge. Lagerorte, Bestand und Einkaufsbedarf im Blick."
+                          description={workspace.currentModuleId === "makeup"
+                            ? "Perücken, Produkte und Werkzeuge. Lagerorte, Bestand und Einkaufsbedarf im Blick."
+                            : "Material, Werkzeuge und Ausstattung. Lagerorte, Bestand und Einkaufsbedarf im Blick."}
                         ></ResourceView>{:else}{#if activeModule === "handovers"}<ResourceView
                             kind="handovers"
                             description="Was bei der nächsten Vorstellung wichtig ist: Checklisten, offene Punkte und klare Übergaben."
@@ -485,7 +501,14 @@
       >
         <X size={20}></X>
       </button>
-      <div class="department-switch">
+      <button
+        class="department-switch workplace-switch"
+        aria-label="Arbeitsbereich wechseln"
+        on:click={() => {
+          setMobileMenu(false);
+          scopeOpen = true;
+        }}
+      >
         <span class="department-icon">
           <Theater size={19}></Theater>
         </span>
@@ -493,8 +516,8 @@
           <strong>{workspace.department.name}</strong>
           <span class="small muted">{workspace.organization.name}</span>
         </div>
-        <Badge tone="green">Team</Badge>
-      </div>
+        <Badge tone="green">Wechseln</Badge>
+      </button>
       <nav aria-label="Hauptnavigation">
         {#each ["ARBEITSRAUM", "WISSEN & FUNDUS", "VERWALTUNG"] as group (group)}<div
             class="nav-group"
@@ -719,6 +742,17 @@
             description="Neue Aufgaben und wichtige Änderungen erscheinen hier."
           ></Empty>{/if}
       </Modal>{/if}
+    {#if scopeOpen}<Modal title="Arbeitsbereich wechseln" onClose={() => (scopeOpen = false)}
+        ><ScopePicker
+          compact
+          initialOrganization={workspace.organization.id}
+          initialDepartment={workspace.department.id}
+          onSelect={async (organizationId, departmentId) => {
+            await post("/api/platform/switch", { organizationId, departmentId });
+            location.assign("/");
+          }}
+        /></Modal
+      >{/if}
     {#if tourRequested || needsTour}<OnboardingTour
         {navigate}
         onDone={() => {

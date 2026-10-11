@@ -74,6 +74,10 @@ export function calendarPresentation(
   return {
     ...calendarCategoryBehavior(key, category),
     title,
+    // The appointment's purpose comes first in narrow calendar cells; exports keep the full title.
+    compactTitle: productionTitle
+      ? `${customTitle && customTitle !== productionTitle && customTitle !== combinedTitle ? customTitle : name} · ${productionTitle}`
+      : customTitle || name,
     categoryName: name,
     color:
       textValue(production?.data.color).trim() ||

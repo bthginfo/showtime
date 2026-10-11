@@ -644,7 +644,7 @@
     class={`calendar-module ${calendarStyles.calendar}${presentation.collapsed ? ` ${presentationStyles.collapsed}` : ""}${presentation.fullscreen ? ` ${presentationStyles.focus} calendar-focus-view` : ""}`}
     data-calendar-fullscreen={presentation.fullscreen || undefined}
   >
-    <PageHeader eyebrow="DEIN DIENSTPLAN. GEMEINSAM GEPLANT." title="Kalender">
+    <PageHeader title="Kalender">
       <div class="calendar-desktop-actions">
         <CalendarPresentationControls
           collapsed={presentation.collapsed}

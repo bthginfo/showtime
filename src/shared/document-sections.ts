@@ -56,6 +56,7 @@ export function sectionName(
   kind: "looks" | "handovers",
   categories: DomainRecord[] = [],
 ) {
+  if (kind === "looks" && key === "notes") return "Inhalt und Hinweise";
   const category = categories.find((row) => row.data.scope === kind && row.data.key === key);
   return (
     textValue(category?.data.name) ||
@@ -65,6 +66,7 @@ export function sectionName(
 }
 
 export function lookTitle(data: RecordData, actors: DomainRecord[] = []) {
+  if (data.documentMode === "general") return textValue(data.title) || "Dokumentation ohne Titel";
   const actor = actors.find((row) => row.id === data.actorId);
   return (
     textValue(actor?.data.name) ||

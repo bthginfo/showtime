@@ -95,11 +95,11 @@ test.afterAll(async () => {
     }
 });
 
-test("all twenty trades load their own module and validated feature contracts", async () => {
+test("all trades load their own module and validated feature contracts", async () => {
   const scopes = await call(admin, "/api/platform/scopes", undefined, "GET");
   expect(
     scopes.scopes.filter((scope: { organizationId: string }) => scope.organizationId === tenant.id),
-  ).toHaveLength(21);
+  ).toHaveLength(tenant.departments.length);
   for (const team of tenant.departments) {
     await switchTo(admin, team.id);
     const workspace = await call(admin, "/api/workspace", undefined, "GET");

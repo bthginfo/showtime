@@ -120,29 +120,29 @@
       >Weitere Ressourcen laden</Button
     >{/if}
 </section>
-{#if allowed("inventory.reserve")}<section class="surface">
-    <h2>Ressource reservieren</h2>
-    <form class="form-grid" on:submit|preventDefault={(e) => void reserve(e)}>
-      <label
-        >Ressource<select name="resourceId" required
-          >{#each planning.resources as r (r.id)}<option value={r.id}>{r.name}</option
-            >{/each}</select
-        ></label
-      ><label
-        >Produktion<select name="productionId"
-          ><option value="">Ohne Produktion</option
-          >{#each workspace.records.productions as p (p.id)}<option value={p.id}
-              >{String(p.data.title)}</option
-            >{/each}</select
-        ></label
-      ><label>Beginn<input name="startAt" type="datetime-local" required /></label><label
-        >Ende<input name="endAt" type="datetime-local" required /></label
-      ><label>Menge<input name="quantity" type="number" min="1" value="1" required /></label><button
-        class="button primary"
-        disabled={busy}>Reservieren</button
-      >
-    </form>
-  </section>{/if}
+{#if allowed("inventory.reserve")}<details class="surface task-disclosure">
+    <summary>Raum oder Ausstattung reservieren</summary>
+    <div class="disclosure-body">
+      <form class="form-grid" on:submit|preventDefault={(e) => void reserve(e)}>
+        <label
+          >Ressource<select name="resourceId" required
+            >{#each planning.resources as r (r.id)}<option value={r.id}>{r.name}</option
+              >{/each}</select
+          ></label
+        ><label
+          >Produktion<select name="productionId"
+            ><option value="">Ohne Produktion</option
+            >{#each workspace.records.productions as p (p.id)}<option value={p.id}
+                >{String(p.data.title)}</option
+              >{/each}</select
+          ></label
+        ><label>Beginn<input name="startAt" type="datetime-local" required /></label><label
+          >Ende<input name="endAt" type="datetime-local" required /></label
+        ><label>Menge<input name="quantity" type="number" min="1" value="1" required /></label
+        ><button class="button primary" disabled={busy}>Reservieren</button>
+      </form>
+    </div>
+  </details>{/if}
 <section class="surface">
   <h2>Belegungen</h2>
   <p class="small muted">Auf- und Abbauzeiten sind in den reservierten Zeiträumen enthalten.</p>

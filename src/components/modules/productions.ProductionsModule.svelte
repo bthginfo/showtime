@@ -62,6 +62,16 @@
   const workspaceStore = useWorkspace();
   let { workspace } = $workspaceStore;
   $: ({ workspace } = $workspaceStore);
+  $: makeupWorkspace = workspace.currentModuleId === "makeup";
+  $: displayedSections = productionSections.map(([key, label]) => [
+    key,
+    key === "looks" && !makeupWorkspace ? "Dokumentation" : key === "tasks" ? "Aufgaben" : label,
+  ]);
+  $: mainContacts = production
+    ? contactsValue(production.data.contacts).filter(
+        (contact) => !makeupWorkspace || contact.type === "makeup",
+      )
+    : [];
   let selected = productionId;
   let tab = productionSections.some(([key]) => key === activeTab) ? activeTab : "overview";
   let setSelected = (id: string) => onNavigate(id, "overview");
@@ -250,13 +260,13 @@
         value={tab}
         on:change={(event) => setTab(event.currentTarget.value)}
       >
-        {#each productionSections as [key, label] (key)}<option value={key}>
+        {#each displayedSections as [key, label] (key)}<option value={key}>
             {label}
           </option>{/each}
       </select>
     </label>
     <div bind:this={tabs.current} class="tabs production-tabs" aria-label="Produktionsbereiche">
-      {#each productionSections as [key, label] (key)}<button
+      {#each displayedSections as [key, label] (key)}<button
           aria-current={tab === key ? "page" : undefined}
           class={tab === key ? "active" : ""}
           on:click={() => setTab(key)}
@@ -268,23 +278,22 @@
       <section class="production-makeup-contact">
         <Users size={22}></Users>
         <div>
-          <span class="eyebrow">MASKENBETREUUNG</span>
+          <span class="eyebrow">{makeupWorkspace ? "MASKENBETREUUNG" : "ANSPRECHPERSONEN"}</span>
           <strong>
-            {#if contactsValue(production.data.contacts).some((contact) => contact.type === "makeup")}<span
-                class={relationStyles.compact}
-              >
-                {#each contactsValue(production.data.contacts).filter((contact) => contact.type === "makeup") as contact}{@const person =
-                    workspace.records.people.find(
-                      (person) =>
-                        person.id === contact.personId && !value(person.data, "linkedMemberId"),
-                    )}{@const name = productionContactName(
+            {#if mainContacts.length}<span class={relationStyles.compact}>
+                {#each mainContacts as contact}{@const person = workspace.records.people.find(
+                    (person) =>
+                      person.id === contact.personId && !value(person.data, "linkedMemberId"),
+                  )}{@const name = productionContactName(
                     contact,
                     workspace.members,
                     workspace.records.people,
                   )}{#if person}{#key contact.id}<RecordLink record={person}>
                         {name}
                       </RecordLink>{/key}{:else}<span>{name}</span>{/if}{/each}
-              </span>{:else}{"Noch keine Maskenbetreuung eingetragen"}{/if}
+              </span>{:else}{makeupWorkspace
+                ? "Noch keine Maskenbetreuung eingetragen"
+                : "Noch keine Ansprechpersonen eingetragen"}{/if}
           </strong>
           <p class="small muted">Deine Ansprechpersonen für dieses Stück.</p>
         </div>
@@ -335,7 +344,7 @@
         </section>
       </div>
       <div class="overview-links">
-        {#each [["tasks", "Offene Aufgaben", workspace.records.tasks.filter((x) => x.data.productionId === production.id && x.data.status !== "done").length], ["casting", "Figuren", castingCounts.characters], ["casting", "Besetzungen", castingCounts.casting], ["looks", "Aufschriebe", workspace.records.looks.filter((x) => x.data.productionId === production.id).length]] as [key, label, count] (label)}<button
+        {#each [["tasks", "Offene Aufgaben", workspace.records.tasks.filter((x) => x.data.productionId === production.id && x.data.status !== "done").length], ["casting", "Figuren", castingCounts.characters], ["casting", "Besetzungen", castingCounts.casting], ["looks", makeupWorkspace ? "Aufschriebe" : "Dokumentation", workspace.records.looks.filter((x) => x.data.productionId === production.id).length]] as [key, label, count] (label)}<button
             on:click={() => setTab(String(key))}
           >
             <span>{label}</span>
@@ -369,13 +378,15 @@
                           defaults={{ productionId: production.id }}
                           filter={(x) => x.data.productionId === production.id}
                           description={tab === "looks"
-                            ? "Aufschriebe, Bildgalerien und Arbeitsabläufe für diese Produktion."
+                            ? makeupWorkspace
+                              ? "Aufschriebe, Bildgalerien und Arbeitsabläufe für diese Produktion."
+                              : "Dokumentation, Bildgalerien und Arbeitsabläufe für diese Produktion."
                             : "Checklisten, Absprachen und offene Punkte zu den Vorstellungen."}
                         ></ResourceView>{/key}{/if}{/if}{/if}{/if}{/if}{/if}{/if}{/if}{/if}
     {#if details}<RecordDetail record={production} onClose={() => setDetails(false)}
       ></RecordDetail>{/if}
   </section>{:else}<section class={styles.productionBrowse}>
-    <PageHeader compact eyebrow="JEDES STÜCK HAT SEINE GESCHICHTE" title="Produktionen"
+    <PageHeader compact title="Produktionen"
       ><svelte:fragment slot="secondaryActions">
         <ExportButton onClick={() => setExporting(true)}></ExportButton>
         {#if memberCan(workspace.user, "production.manage")}<Button
@@ -438,7 +449,9 @@
             <h2>{value(project.data, "title")}</h2>
             <p>
               {value(project.data, "description") ||
-                "Alle Aufgaben, Figuren und Aufschriebe für dieses Stück."}
+                (makeupWorkspace
+                  ? "Alle Aufgaben, Figuren und Aufschriebe für dieses Stück."
+                  : "Aufgaben, Besetzung, Termine und Dokumentation für dieses Stück.")}
             </p>
             <div class="production-card-meta">
               <span>
@@ -452,25 +465,35 @@
                 {ids(project.data, "memberIds").length} im Team
               </span>
             </div>
-            <div class="production-card-makeup">
-              <Users size={15}></Users>
-              <span>
-                <span class="small muted">Maskenbetreuung</span>
-                <strong>{makeupNames(project.data) || "Noch offen"}</strong>
-              </span>
-            </div>
+            {#if makeupWorkspace}<div class="production-card-makeup">
+                <Users size={15}></Users>
+                <span>
+                  <span class="small muted">Maskenbetreuung</span>
+                  <strong>{makeupNames(project.data) || "Noch offen"}</strong>
+                </span>
+              </div>{/if}
             <footer>
               <span>{remaining} offene Aufgaben</span>
               <ArrowUpRight size={20}></ArrowUpRight>
             </footer>
           </button>{/each}
       </div>{:else}<Empty
-        title={search || status === "archived"
+        title={workspace.records.productions.length
           ? "Keine Produktionen in dieser Ansicht."
           : "Platz für euer nächstes Stück."}
-        description="Lege eine Produktion an. Hier laufen Aufgaben, Besetzung, Dokumentation, Termine und Arbeitszeit zusammen."
-        action="Erste Produktion anlegen"
-        onAction={() => setEditor(true)}
+        description={workspace.records.productions.length
+          ? "Die gewählte Spielzeit, der Status oder der Suchtext blendet vorhandene Produktionen aus. Setze die Filter zurück, um alle geladenen Produktionen zu sehen."
+          : "Lege eine Produktion an. Hier laufen Aufgaben, Besetzung, Dokumentation, Termine und Arbeitszeit zusammen."}
+        action={workspace.records.productions.length
+          ? "Alle Produktionen anzeigen"
+          : "Erste Produktion anlegen"}
+        onAction={() => {
+          if (workspace.records.productions.length) {
+            setPeriod({});
+            setSearch("");
+            setStatus("all");
+          } else setEditor(true);
+        }}
       ></Empty>{/if}
     {#if editor}<ResourceEditor
         kind="productions"

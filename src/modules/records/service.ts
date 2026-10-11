@@ -287,7 +287,14 @@ async function validateRelations(
     (!(data.actorId || data.actorName) || !(data.characterId || data.characterName))
   )
     throw new HttpError(400, "Bitte wähle Schauspieler und Figur oder trage deren Namen ein.");
-  if (kind === "looks" && data.sections !== undefined && !(data.actorId || data.actorName))
+  if (kind === "looks" && data.documentMode === "general" && !textValue(data.title).trim())
+    throw new HttpError(400, "Bitte gib der Dokumentation einen Titel.");
+  if (
+    kind === "looks" &&
+    data.documentMode !== "general" &&
+    data.sections !== undefined &&
+    !(data.actorId || data.actorName)
+  )
     throw new HttpError(400, "Bitte wähle eine Schauspielperson oder trage ihren Namen ein.");
   if (kind === "tasks" && data.parentId) {
     let parent = String(data.parentId);

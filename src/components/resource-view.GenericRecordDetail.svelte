@@ -266,7 +266,7 @@
           </p>{/if}
       </section>{/if}
     <dl class="detail-grid">
-      {#each (fields[current.kind] || []).filter((field) => !["title", "name", "checklist", "imageIds"].includes(field.key) && current.data[field.key] !== undefined && current.data[field.key] !== "") as field (field.key)}<div
+      {#each (fields[current.kind] || []).filter((field) => !["title", "name", "checklist", "imageIds"].includes(field.key) && current.data[field.key] != null && current.data[field.key] !== "" && !(Array.isArray(current.data[field.key]) && !(current.data[field.key] as unknown[]).length)) as field (field.key)}<div
           class={field.type === "textarea" ? "field-wide" : ""}
         >
           <dt>{field.label}</dt>

@@ -4,20 +4,22 @@
   import { scopedBrowserKey } from "@/shared/browser-scope";
   import { Button, Badge } from "@/components/ui";
   import { hasPermission } from "@/platform/access";
+  import { workspaceHome } from "@/shared/workspace-home";
   export let moduleId = "makeup";
   const store = useWorkspace();
   let completed: string[] = [];
   $: user = $store.workspace.user;
   $: subject = { id: user.id, grants: user.grants || [] };
-  $: role = user.grants?.some((g) => g.role === "intendance")
-    ? "intendance"
-    : user.grants?.some((g) => g.role === "personnel")
-      ? "personnel"
-      : user.grants?.every((g) => g.role === "guest")
-        ? "guest"
-        : hasPermission(subject, "tenant.configure", {})
-          ? "admin"
-          : "trade";
+  $: role =
+    workspaceHome($store.workspace) === "intendance"
+      ? "intendance"
+      : workspaceHome($store.workspace) === "personnel"
+        ? "personnel"
+        : user.grants?.every((g) => g.role === "guest")
+          ? "guest"
+          : hasPermission(subject, "tenant.configure", {})
+            ? "admin"
+            : "trade";
   $: tasks =
     role === "admin"
       ? [

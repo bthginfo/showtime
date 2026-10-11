@@ -100,7 +100,7 @@
   $: isMobile = $isMobileStore;
   const desktopViewStore = useStoredValue<string>(
     `digitalmask-task-view:${workspace.user.id}:desktop`,
-    "board",
+    "list",
   );
   const mobileViewStore = useStoredValue<string>(
     `digitalmask-task-view:${workspace.user.id}:mobile`,
@@ -224,7 +224,7 @@
 </script>
 
 <section class={styles.taskWorkspace}>
-  <PageHeader compact eyebrow="GEMEINSAM VORAN" title={project ? "Aufgaben & Sprints" : "Teamboard"}
+  <PageHeader compact title={project ? "Aufgaben & Sprints" : "Teamboard"}
     ><svelte:fragment slot="secondaryActions">
       <ExportButton onClick={() => setExporting(true)}></ExportButton>
       {#if project}<Button onClick={() => setEditor({ kind: "sprints" })}>Sprint planen</Button

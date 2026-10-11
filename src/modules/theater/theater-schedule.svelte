@@ -10,6 +10,7 @@
   import { theaterInstant, theaterDateTime } from "@/shared/theater-time";
   import BatchPlanning from "./batch-planning.svelte";
   import { tradeChoiceLabel } from "@/shared/trade-labels";
+  import SelectionList from "@/components/selection-list.svelte";
   export let planning: Planning;
   export let run: TheaterRun;
   export let busy = false;
@@ -21,6 +22,7 @@
   let editing: Performance | null = null;
   let open = false;
   let chosenProduction = "";
+  let participantIds: string[] = [];
   let phaseProduction = "";
   $: if (!workspace.records.productions.some((p) => p.id === phaseProduction))
     phaseProduction = workspace.records.productions[0]?.id || "";
@@ -66,6 +68,9 @@
     editing = show || null;
     chosenProduction =
       show?.productionId || productionId || workspace.records.productions[0]?.id || "";
+    const participants = workspace.records.events.find((event) => event.id === show?.eventId)?.data
+      .participantIds;
+    participantIds = Array.isArray(participants) ? participants.map(String) : [workspace.user.id];
     open = true;
   }
   $: calendar = editing
@@ -75,7 +80,6 @@
     theaterLabel(value, planning.timezone, withTime);
 </script>
 
-<BatchPlanning {planning} {productionId} {onChanged} />
 <section class="surface">
   <div class="section-heading">
     <h2>Vorstellungen</h2>
@@ -102,6 +106,10 @@
                   onClick={() => edit(show)}>Bearbeiten / absagen</Button
                 >{/if}</td
             ></tr
+          >{:else}<tr
+            ><td colspan="4"
+              ><p class="muted">Noch keine Vorstellungen im gewählten Zeitraum.</p></td
+            ></tr
           >{/each}</tbody
       >
     </table>
@@ -110,130 +118,148 @@
       >Weitere Vorstellungen laden</Button
     >{/if}
 </section>
-<section class="surface">
-  <h2>Planversionen</h2>
-  <p>
-    Eine Planversion umfasst Vorstellungen, Raumbelegungen und persönliche Dienste im gewählten
-    Zeitraum. Neue Änderungen erfordern einen aktuellen Entwurf.
-  </p>
-  {#if allowed("schedule.manage", "", "")}<Button
-      disabled={busy}
-      onClick={() =>
-        void run("schedule", { action: "schedule-draft", data: planning.window }).catch(() => {})}
-      >Aktuellen Plan als Entwurf sichern</Button
-    >{/if}{#each planning.scheduleVersions.sort((a, b) => b.version - a.version) as version (version.id)}<p
-    >
-      Version {version.version} · {version.state} · {dateLabel(
-        version.createdAt,
-        true,
-      )}{#if version.state === "draft" && allowed("schedule.manage", "", "")}<Button
-          disabled={busy}
-          onClick={() =>
-            void run("schedule", { action: "schedule-approve", id: version.id }).catch(() => {})}
-          >Prüfung abschließen</Button
-        >{/if}{#if version.state === "approved" && allowed("schedule.publish", "", "")}<Button
-          variant="primary"
-          disabled={busy}
-          onClick={() =>
-            void run("schedule", { action: "schedule-publish", id: version.id }).catch(() => {})}
-          >Veröffentlichen</Button
+<BatchPlanning {planning} {productionId} {onChanged} />
+<details class="surface task-disclosure">
+  <summary
+    >Plan prüfen & veröffentlichen<span class="small muted"
+      >Entwürfe, Freigaben und Planversionen</span
+    ></summary
+  >
+  <div class="disclosure-body">
+    <p>
+      Eine Planversion umfasst Vorstellungen, Raumbelegungen und persönliche Dienste im gewählten
+      Zeitraum. Neue Änderungen erfordern einen aktuellen Entwurf.
+    </p>
+    {#if allowed("schedule.manage", "", "")}<Button
+        disabled={busy}
+        onClick={() =>
+          void run("schedule", { action: "schedule-draft", data: planning.window }).catch(() => {})}
+        >Aktuellen Plan als Entwurf sichern</Button
+      >{/if}{#each planning.scheduleVersions.sort((a, b) => b.version - a.version) as version (version.id)}<p
+      >
+        Version {version.version} · {version.state} · {dateLabel(
+          version.createdAt,
+          true,
+        )}{#if version.state === "draft" && allowed("schedule.manage", "", "")}<Button
+            disabled={busy}
+            onClick={() =>
+              void run("schedule", { action: "schedule-approve", id: version.id }).catch(() => {})}
+            >Prüfung abschließen</Button
+          >{/if}{#if version.state === "approved" && allowed("schedule.publish", "", "")}<Button
+            variant="primary"
+            disabled={busy}
+            onClick={() =>
+              void run("schedule", { action: "schedule-publish", id: version.id }).catch(() => {})}
+            >Veröffentlichen</Button
+          >{/if}
+      </p>{/each}{#if planning.pages.scheduleVersions}<Button
+        disabled={busy}
+        onClick={() => void more("scheduleVersions")}>Weitere Versionen laden</Button
+      >{/if}
+  </div>
+</details>
+{#if allowed("production.manage")}<details class="surface task-disclosure">
+    <summary>Werke & Spielzeiten verwalten</summary>
+    <div class="disclosure-body">
+      <form class="form-grid" on:submit|preventDefault={(e) => void submit(e, "work")}>
+        <label>Werk<input name="title" required maxlength="200" /></label><label
+          >Autor / Autorin<input name="author" maxlength="150" /></label
+        ><button class="button" disabled={busy}>Werk hinzufügen</button>
+      </form>
+      <ul>
+        {#each planning.works as work (work.id)}<li>
+            {work.title}{work.author ? " · " + work.author : ""}
+          </li>{/each}
+      </ul>
+      {#if planning.pages.works}<Button onClick={() => void more("works")}
+          >Weitere Werke laden</Button
         >{/if}
-    </p>{/each}{#if planning.pages.scheduleVersions}<Button
-      disabled={busy}
-      onClick={() => void more("scheduleVersions")}>Weitere Versionen laden</Button
-    >{/if}
-</section>
-{#if allowed("production.manage")}<section class="surface">
-    <h2>Werke und Spielzeiten</h2>
-    <form class="form-grid" on:submit|preventDefault={(e) => void submit(e, "work")}>
-      <label>Werk<input name="title" required maxlength="200" /></label><label
-        >Autor / Autorin<input name="author" maxlength="150" /></label
-      ><button class="button" disabled={busy}>Werk hinzufügen</button>
-    </form>
-    <ul>
-      {#each planning.works as work (work.id)}<li>
-          {work.title}{work.author ? " · " + work.author : ""}
-        </li>{/each}
-    </ul>
-    {#if planning.pages.works}<Button onClick={() => void more("works")}>Weitere Werke laden</Button
-      >{/if}
-    <form class="form-grid" on:submit|preventDefault={(e) => void submit(e, "season")}>
-      <label>Spielzeit<input name="label" placeholder="2026/2027" required /></label><label
-        >Beginn<input name="start" type="date" required /></label
-      ><label>Ende<input name="end" type="date" required /></label><button
-        class="button"
-        disabled={busy}>Spielzeit hinzufügen</button
+      <form class="form-grid" on:submit|preventDefault={(e) => void submit(e, "season")}>
+        <label>Spielzeit<input name="label" placeholder="2026/2027" required /></label><label
+          >Beginn<input name="start" type="date" required /></label
+        ><label>Ende<input name="end" type="date" required /></label><button
+          class="button"
+          disabled={busy}>Spielzeit hinzufügen</button
+        >
+      </form>
+      <ul>
+        {#each planning.seasons as season (season.id)}<li>
+            {season.label} · {dateLabel(season.startAt)} – {dateLabel(season.endAt)}
+          </li>{/each}
+      </ul>
+      {#if planning.pages.seasons}<Button onClick={() => void more("seasons")}
+          >Weitere Spielzeiten laden</Button
+        >{/if}
+    </div>
+  </details>
+  <details class="surface task-disclosure">
+    <summary>Produktionsphase & Zuordnung ändern</summary>
+    <div class="disclosure-body">
+      <form
+        class="form-grid"
+        on:submit|preventDefault={(e) => void submit(e, "production-metadata")}
       >
-    </form>
-    <ul>
-      {#each planning.seasons as season (season.id)}<li>
-          {season.label} · {dateLabel(season.startAt)} – {dateLabel(season.endAt)}
-        </li>{/each}
-    </ul>
-    {#if planning.pages.seasons}<Button onClick={() => void more("seasons")}
-        >Weitere Spielzeiten laden</Button
-      >{/if}
-  </section>
-  <section class="surface">
-    <h2>Produktionsphase</h2>
-    <form class="form-grid" on:submit|preventDefault={(e) => void submit(e, "production-metadata")}>
-      <label
-        >Produktion<select name="recordId" bind:value={phaseProduction} required
-          >{#each workspace.records.productions as p (p.id)}<option value={p.id}
-              >{String(p.data.title)}</option
-            >{/each}</select
-        ></label
-      ><label
-        >Werk<select name="workId" value={phaseMetadata?.workId || ""}
-          ><option value="">Ohne Zuordnung</option>{#each planning.works as work (work.id)}<option
-              value={work.id}>{work.title}</option
-            >{/each}</select
-        ></label
-      ><label
-        >Spielzeit<select name="seasonId" value={phaseMetadata?.seasonId || ""}
-          ><option value="">Ohne Zuordnung</option
-          >{#each planning.seasons as season (season.id)}<option value={season.id}
-              >{season.label}</option
-            >{/each}</select
-        ></label
-      ><label
-        >Phase<select name="stage" value={phaseMetadata?.stage || "concept"}
-          >{#each Object.entries(stageLabels) as [key, label]}<option value={key}>{label}</option
-            >{/each}</select
-        ></label
-      ><button class="button" disabled={busy}>Phase und Zuordnung speichern</button>
-    </form>
-    <ul>
-      {#each planning.productionMetadata as metadata (metadata.id)}<li>
-          {String(
-            workspace.records.productions.find((p) => p.id === metadata.recordId)?.data.title ||
-              "Produktion",
-          )} · {stageLabels[metadata.stage]}
-        </li>{/each}
-    </ul>
-  </section>{/if}
-{#if allowed("schedule.manage")}<section class="surface">
-    <h2>Vorstellungsserien</h2>
-    <form class="form-grid" on:submit|preventDefault={(e) => void submit(e, "run")}>
-      <label
-        >Produktion<select name="productionId" required
-          >{#each workspace.records.productions as p (p.id)}<option value={p.id}
-              >{String(p.data.title)}</option
-            >{/each}</select
-        ></label
-      ><label>Serie<input name="label" placeholder="Premierenserie" required /></label><label
-        >Von<input type="date" name="start" required /></label
-      ><label>Bis<input type="date" name="end" required /></label><button
-        class="button"
-        disabled={busy}>Serie anlegen</button
-      >
-    </form>
-    <ul>
-      {#each planning.runs as series (series.id)}<li>{series.label}</li>{/each}
-    </ul>
-    {#if planning.pages.runs}<Button onClick={() => void more("runs")}>Weitere Serien laden</Button
-      >{/if}
-  </section>{/if}
+        <label
+          >Produktion<select name="recordId" bind:value={phaseProduction} required
+            >{#each workspace.records.productions as p (p.id)}<option value={p.id}
+                >{String(p.data.title)}</option
+              >{/each}</select
+          ></label
+        ><label
+          >Werk<select name="workId" value={phaseMetadata?.workId || ""}
+            ><option value="">Ohne Zuordnung</option>{#each planning.works as work (work.id)}<option
+                value={work.id}>{work.title}</option
+              >{/each}</select
+          ></label
+        ><label
+          >Spielzeit<select name="seasonId" value={phaseMetadata?.seasonId || ""}
+            ><option value="">Ohne Zuordnung</option
+            >{#each planning.seasons as season (season.id)}<option value={season.id}
+                >{season.label}</option
+              >{/each}</select
+          ></label
+        ><label
+          >Phase<select name="stage" value={phaseMetadata?.stage || "concept"}
+            >{#each Object.entries(stageLabels) as [key, label]}<option value={key}>{label}</option
+              >{/each}</select
+          ></label
+        ><button class="button" disabled={busy}>Phase und Zuordnung speichern</button>
+      </form>
+      <ul>
+        {#each planning.productionMetadata as metadata (metadata.id)}<li>
+            {String(
+              workspace.records.productions.find((p) => p.id === metadata.recordId)?.data.title ||
+                "Produktion",
+            )} · {stageLabels[metadata.stage]}
+          </li>{/each}
+      </ul>
+    </div>
+  </details>{/if}
+{#if allowed("schedule.manage")}<details class="surface task-disclosure">
+    <summary>Vorstellungsserien verwalten</summary>
+    <div class="disclosure-body">
+      <form class="form-grid" on:submit|preventDefault={(e) => void submit(e, "run")}>
+        <label
+          >Produktion<select name="productionId" required
+            >{#each workspace.records.productions as p (p.id)}<option value={p.id}
+                >{String(p.data.title)}</option
+              >{/each}</select
+          ></label
+        ><label>Serie<input name="label" placeholder="Premierenserie" required /></label><label
+          >Von<input type="date" name="start" required /></label
+        ><label>Bis<input type="date" name="end" required /></label><button
+          class="button"
+          disabled={busy}>Serie anlegen</button
+        >
+      </form>
+      <ul>
+        {#each planning.runs as series (series.id)}<li>{series.label}</li>{/each}
+      </ul>
+      {#if planning.pages.runs}<Button onClick={() => void more("runs")}
+          >Weitere Serien laden</Button
+        >{/if}
+    </div>
+  </details>{/if}
 {#if open}<Modal
     title={editing ? "Vorstellung bearbeiten" : "Vorstellung anlegen"}
     onClose={() => {
@@ -305,19 +331,16 @@
           ><option value="cancelled">Abgesagt</option></select
         ></label
       >
-      <fieldset class="form-multi full">
-        <legend>Beteiligte Teammitglieder</legend
-        >{#each workspace.members as member (member.id)}<label class="check-label"
-            ><input
-              type="checkbox"
-              name="participantIds"
-              value={member.id}
-              checked={Array.isArray(calendar?.data.participantIds)
-                ? calendar.data.participantIds.includes(member.id)
-                : member.id === workspace.user.id}
-            />{member.name}</label
-          >{/each}
-      </fieldset>
+      <SelectionList
+        label="Beteiligte Teammitglieder"
+        name="participantIds"
+        options={workspace.members
+          .filter((member) => member.status === "active")
+          .map((member) => ({ id: member.id, label: member.name }))}
+        selected={participantIds}
+        onChange={(ids) => (participantIds = ids)}
+        disabled={busy}
+      />
       <p class="small muted full">
         Besetzungen werden aus der zentralen Produktionsbesetzung übernommen. Änderungen werden für
         die zuständigen Gewerke vorgemerkt.

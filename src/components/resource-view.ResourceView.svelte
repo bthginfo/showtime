@@ -16,7 +16,7 @@
   import { api, hours, ids, num, value } from "@/shared/client-api";
   import { imageAccept, prepareUpload } from "@/shared/client-files";
   import { HistoryPanel } from "./history-panel";
-  import { fields, labels, statusLabels } from "./resource-fields";
+  import { fields, workspaceResourceLabels, statusLabels } from "./resource-fields";
   import { useWorkspace } from "./workspace-context";
   import { Badge, Button, Empty, ErrorMessage, ExportButton, Modal, PageHeader } from "./ui";
   import browseStyles from "./workspace-browse.module.css";
@@ -175,10 +175,11 @@
     "materials",
     "handovers",
   ].includes(kind);
+  $: entryLabels = workspaceResourceLabels(kind, workspace.currentModuleId);
 </script>
 
 <section class={browseStyles.resourceBrowse}>
-  <PageHeader compact eyebrow="DEIN GEMEINSAMER ARBEITSRAUM" title={title || labels[kind][0]}
+  <PageHeader compact title={title || entryLabels[0]}
     ><svelte:fragment slot="secondaryActions"
       >{#if headerActions || exportable || (admin && (lockedProductionId === undefined || kind === "materials" || kind === "handovers"))}
         <slot name="headerActions" />
@@ -194,15 +195,15 @@
     >
     {#if allowedCreate}<Button variant="primary" onClick={() => setEditor(true)}>
         <Plus size={16}></Plus>
-        {labels[kind][1]} anlegen
+        {entryLabels[1]} anlegen
       </Button>{/if}
   </PageHeader>
   <slot />
   <div class="toolbar">
     <input
       class="search-input"
-      aria-label={`${labels[kind][0]} durchsuchen`}
-      placeholder={`${labels[kind][0]} durchsuchen …`}
+      aria-label={`${entryLabels[0]} durchsuchen`}
+      placeholder={`${entryLabels[0]} durchsuchen …`}
       value={search}
       on:input={(e) => setSearch(e.currentTarget.value)}
     />
@@ -255,7 +256,7 @@
                     loading="lazy"
                   />{/if}{:else}<div class="editorial-placeholder">
                   <span>{displayName.slice(0, 2).toUpperCase()}</span>
-                  <span class="small">{labels[kind][1]}</span>
+                  <span class="small">{entryLabels[1]}</span>
                 </div>{/if}
               <div class="editorial-body">
                 <p class="eyebrow">
@@ -384,14 +385,14 @@
       </div>{/if}{:else}<Empty
       title={search || (kind === "actors" && filter)
         ? "Keine passenden Einträge"
-        : `Hier beginnen eure ${labels[kind][0]}.`}
+        : `Hier beginnen eure ${entryLabels[0]}.`}
       description={search
         ? "Versuche einen anderen Suchbegriff oder passe die Filter an."
         : kind === "actors" && filter
           ? "Für diese Auswahl sind keine Einträge vorhanden. Wähle eine andere Spielzeit oder lege einen Eintrag an."
           : description ||
             "Lege den ersten Eintrag an. Alle freigegebenen Informationen sind dann für euer Team an einem Ort erreichbar."}
-      action={allowedCreate ? `${labels[kind][1]} anlegen` : undefined}
+      action={allowedCreate ? `${entryLabels[1]} anlegen` : undefined}
       onAction={() => setEditor(true)}
     ></Empty>{/if}
   {#if categoriesOpen}<CategoryManager

@@ -261,7 +261,6 @@
           </Button>{/if}
       </div>
     </header>{:else}<PageHeader
-      eyebrow="DEIN NACHWEIS IM THEATER"
       title="Anwesenheit im Theater"
       compact
       ><svelte:fragment slot="secondaryActions">{@render render_secondaryActions()}</svelte:fragment

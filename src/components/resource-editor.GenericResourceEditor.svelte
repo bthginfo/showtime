@@ -11,6 +11,8 @@
   } from "@/shared/contracts";
   import { ids, num, value } from "@/shared/client-api";
   import { fields, labels, type Field } from "./resource-fields";
+  import SelectionList from "./selection-list.svelte";
+  import { primaryResourceFields } from "@/shared/resource-form-presentation";
   import { useWorkspace } from "./workspace-context";
   import { Button, ErrorMessage, Modal } from "./ui";
   import { ProductionPeopleFields } from "./production-people";
@@ -243,6 +245,8 @@
       : undefined);
 
   $: configuredFields = fields[kind] || [];
+  $: primaryFields = primaryResourceFields(configuredFields);
+  $: additionalFields = configuredFields.filter((field) => !primaryFields.includes(field));
   $: selectedTemplate = workspace.records.templates.find(
     (template) => template.id === data.templateId,
   );
@@ -329,26 +333,13 @@
                   Eine Spielzeit pro Eintrag, z. B. 2026/2027. Ohne Einträge erscheint die Person
                   nur unter „Alle Spielzeiten“.
                 </p>
-              </div>{:else}{@render local_list_0()}{/if}{:else}{#if field.type === "multi"}<fieldset
-                class="form-multi"
-              >
-                <legend>{field.label}</legend>
-                {#if !options.length}<p class="muted small">Noch keine Einträge verfügbar.</p>{/if}
-                {#each options as [id, label] (id)}<label class="check-label">
-                    <input
-                      type="checkbox"
-                      checked={ids(data, field.key).includes(id)}
-                      on:input={(event) =>
-                        change(
-                          field.key,
-                          event.currentTarget.checked
-                            ? [...ids(data, field.key), id]
-                            : ids(data, field.key).filter((x) => x !== id),
-                        )}
-                    />
-                    {label}
-                  </label>{/each}
-              </fieldset>{:else}{#if field.type === "checkbox"}<label class="check-label">
+              </div>{:else}{@render local_list_0()}{/if}{:else}{#if field.type === "multi"}<SelectionList
+                label={field.label}
+                options={options.map(([id, label]) => ({ id, label }))}
+                selected={ids(data, field.key)}
+                onChange={(selected) => change(field.key, selected)}
+                disabled={busy}
+              />{:else}{#if field.type === "checkbox"}<label class="check-label">
                   <input
                     type="checkbox"
                     checked={!!data[field.key]}
@@ -406,7 +397,17 @@
   <Modal title={`${labels[kind][1]} ${record ? "bearbeiten" : "anlegen"}`} {onClose} wide>
     <form on:submit={submit}>
       <div class="form-grid">
-        {#each configuredFields as item}{@render render_render(item)}{/each}
+        {#each primaryFields as item}{@render render_render(item)}{/each}
+        {#if additionalFields.length}<details class="form-disclosure full">
+            <summary
+              >Weitere Angaben <span class="small muted"
+                >{additionalFields.length} zusätzliche Felder</span
+              ></summary
+            >
+            <div class="form-grid">
+              {#each additionalFields as item}{@render render_render(item)}{/each}
+            </div>
+          </details>{/if}
         {#if kind === "productions"}<ProductionPeopleFields
             contacts={contactsValue(data.contacts)}
             memberIds={ids(data, "memberIds")}

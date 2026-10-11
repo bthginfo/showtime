@@ -406,7 +406,7 @@
     >
     <fieldset class="form-multi full">
       <legend>Erforderliche Gewerke vor Generalprobe und Spielbetrieb</legend
-      >{#each configuration.modules.filter((m) => m.enabled) as module (module.moduleId)}<label
+      >{#each configuration.modules.filter((m) => m.enabled && moduleById(m.moduleId)?.features.some((feature) => feature.id === "readiness")) as module (module.moduleId)}<label
           class="check-label"
           ><input
             type="checkbox"

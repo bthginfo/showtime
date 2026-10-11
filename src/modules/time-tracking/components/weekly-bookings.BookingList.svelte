@@ -103,8 +103,9 @@
             >
               {dateLabel(value(record.data, "start"), true)} –{" "}
               {dateLabel(value(record.data, "end"), true)}
-              {num(record.data, "pauseSeconds") > 0 &&
-                ` · ${Math.round(num(record.data, "pauseSeconds") / 60)} min Pause`}
+              {#if num(record.data, "pauseSeconds") > 0}
+                · {Math.round(num(record.data, "pauseSeconds") / 60)} min Pause
+              {/if}
             </span>{/if}
           {#if seconds !== num(record.data, "durationSeconds")}<span class="small muted">
               Anteil im Zeitraum · gesamt {hours(num(record.data, "durationSeconds"))} h

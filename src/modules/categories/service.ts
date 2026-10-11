@@ -105,7 +105,11 @@ export async function validateCategoryReferences(
           .filter((section) =>
             section.entries.some((entry) => entry.text.trim() || entry.label?.trim()),
           )
-          .map((section) => section.key);
+          .map((section) => section.key)
+          // A general document always has one built-in content section; custom categories remain scoped.
+          .filter(
+            (key) => !(kind === "looks" && data.documentMode === "general" && key === "notes"),
+          );
   if (!keys.length) return;
   await lock(context, scope, tx);
   const categories = await tx

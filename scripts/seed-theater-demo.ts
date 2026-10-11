@@ -704,16 +704,17 @@ try {
       tradeCount++;
     }
     // A second production gives the readiness view a complete, independent example.
-    await step(`ready:second:${module.id}`, context, tables.tradeItems, () =>
-      saveTradeItem(context, {
-        moduleId: module.id,
-        type: "readiness",
-        title: `DEMO · Freigabe Sommernacht · ${module.department}`,
-        status: "ready",
-        productionId: productions[1],
-        data: { ready: true, notes: "DEMO · Abnahme abgeschlossen." },
-      }),
-    );
+    if (module.features.some((feature) => feature.id === "readiness"))
+      await step(`ready:second:${module.id}`, context, tables.tradeItems, () =>
+        saveTradeItem(context, {
+          moduleId: module.id,
+          type: "readiness",
+          title: `DEMO · Freigabe Sommernacht · ${module.department}`,
+          status: "ready",
+          productionId: productions[1],
+          data: { ready: true, notes: "DEMO · Abnahme abgeschlossen." },
+        }),
+      );
     console.log(
       JSON.stringify({
         stage,
@@ -893,7 +894,10 @@ try {
     trades: moduleRegistry.length,
     productions: productions.length,
     featureEntries: tradeCount,
-    readinessExamples: moduleRegistry.length * 2,
+    readinessExamples:
+      moduleRegistry.filter((module) =>
+        module.features.some((feature) => feature.id === "readiness"),
+      ).length * 2,
     ownTimeEntries: 6,
     channels: 3,
     nativeDemoDocuments: 1,

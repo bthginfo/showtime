@@ -14,7 +14,13 @@
     error = "";
   $: workspace = $store.workspace;
   $: reviews = items
-    .filter((item) => item.type === "collaboration" && collaborationOpen(item.status))
+    .filter(
+      (item) =>
+        item.type === "collaboration" &&
+        collaborationOpen(item.status) &&
+        (item.departmentId === workspace.department.id ||
+          item.data.recipientDepartmentId === workspace.department.id),
+    )
     .sort((a, b) =>
       String(a.dueAt || a.data.dueDate || "9999").localeCompare(
         String(b.dueAt || b.data.dueDate || "9999"),
@@ -37,7 +43,13 @@
       workspace.records.calendarCategories,
     );
     return workspace.members
-      .filter((member) => member.status === "active")
+      .filter(
+        (member) =>
+          member.status === "active" &&
+          (member.id === workspace.user.id ||
+            member.activeDepartmentIds?.includes(workspace.department.id) ||
+            member.departmentId === workspace.department.id),
+      )
       .map((member) => {
         const hours = planned.get(member.id) || 0;
         const tasks = workspace.records.tasks.filter(
