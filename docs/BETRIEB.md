@@ -82,10 +82,12 @@ Arbeitsregeln wirken erst nach ausdrücklicher Bestätigung des Theaters. Gemein
 
 ## Offline-Seite und Wiederverbindung
 
-Der bereitgestellte Service Worker liegt in `static/sw.js`. Seine Regressionstests müssen diese Datei prüfen; `public/` ist die historische Referenz und wird nicht für Showtime ausgeliefert. `showtime-shell-v7` erneuert den öffentlichen Offline-Cache. Authentifizierte Seiten und API-Antworten werden weiterhin nicht darin gespeichert.
+Der bereitgestellte Service Worker liegt in `static/sw.js`. Seine Regressionstests müssen diese Datei prüfen; `public/` ist die historische Referenz und wird nicht für Showtime ausgeliefert. `showtime-shell-v8` erneuert den öffentlichen Offline-Cache. Authentifizierte Seiten und API-Antworten werden weiterhin nicht darin gespeichert.
 
 Navigation verwendet einen verfügbaren Netzwerk-Preload oder einen frischen Abruf und wiederholt einen vorübergehend fehlgeschlagenen Abruf einmal. Nur ein anhaltender Netzwerkfehler öffnet die Offline-Seite; HTTP-Fehler werden nicht durch Offline-HTML verdeckt. Die Ersatzantwort ist nicht im HTTP-Cache speicherbar.
 
 Die Offline-Seite prüft den öffentlichen, nicht gecachten Marker `/connection.txt`. Bei wieder verfügbarer Verbindung kehrt sie zum ursprünglichen Arbeitsbereich zurück. Unfertige Eingaben verhindern den automatischen Wechsel; ein manueller Wechsel verlangt in diesem Fall eine Bestätigung. Pro Sitzung gibt es höchstens einen automatischen Rückkehrversuch, bis eine reguläre App-Seite geladen wurde. Damit entsteht keine Neuladeschleife. Anmeldung und Arbeitsraum aktualisieren den Service Worker über das gemeinsame Layout.
+
+Die Registrierung beginnt zusätzlich bereits im HTML-Template, unabhängig vom erfolgreichen Laden der App-Module. Unterbrochene öffentliche Downloads unter `/_app/immutable/` werden einmal wiederholt, ohne private Daten zu cachen. Eine sichtbare Startansicht bietet bei fehlgeschlagenem Modulabruf oder länger als zehn Sekunden leerem Arbeitsraum einen erneuten Abruf und Zugang zur Offline-Zeitvormerkung. Vorhandene Serverformulare werden dadurch nicht verdeckt. Diese Maßnahmen ersetzen keine Reparatur eines fehlerhaften TLS-Endpunkts im Hosting-Netz.
 
 Geräteentwürfe bleiben ausdrücklich unzugeordnet und verwenden aus Kompatibilitätsgründen ihren bisherigen lokalen Schlüssel. Unter „Zeit buchen“ können sie nach Anmeldung nur durch die bewusste Übernahme in das angezeigte Konto und Theater zu Kontoeinträgen werden. Kontogebundene Entwürfe behalten ihren Theater-/Personen-Namensraum. Ein veralteter Browserstand lässt sich mit „Verbindung erneut prüfen“ oder einem vollständigen Neuladen aktualisieren; dafür keine lokalen Entwürfe oder Browserdaten löschen.

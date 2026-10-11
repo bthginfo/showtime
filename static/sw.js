@@ -1,5 +1,5 @@
 /* Never cache authenticated HTML, API responses, uploads, or personal records. */
-const CACHE = "showtime-shell-v7";
+const CACHE = "showtime-shell-v8";
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
@@ -57,6 +57,11 @@ self.addEventListener("fetch", (event) => {
     return;
   if (event.request.mode === "navigate") {
     event.respondWith(navigationResponse(event));
+    return;
+  }
+  if (url.pathname.startsWith("/_app/immutable/")) {
+    // Public build assets only. A transient failure must not strand the app at a blank page.
+    event.respondWith(fetch(event.request).catch(() => fetch(event.request, { cache: "reload" })));
     return;
   }
   if (url.pathname === "/icon.svg" || url.pathname === "/offline.html")

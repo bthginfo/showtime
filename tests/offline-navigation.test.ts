@@ -20,7 +20,7 @@ function worker() {
   const skipWaiting = vi.fn(async () => undefined);
   const caches = {
     open,
-    keys: async () => ["showtime-shell-v6", "showtime-shell-v7", "other-app-cache"],
+    keys: async () => ["showtime-shell-v7", "showtime-shell-v8", "other-app-cache"],
     delete: remove,
   };
   class WorkerRequest extends Request {
@@ -115,7 +115,7 @@ describe("deployed service worker navigation", () => {
     expect(await offline!.text()).toBe("Showtime offline");
     expect(offline!.headers.get("Cache-Control")).toBe("no-store");
     expect(app.fetch).toHaveBeenCalledTimes(2);
-    expect(app.open).toHaveBeenCalledWith("showtime-shell-v7");
+    expect(app.open).toHaveBeenCalledWith("showtime-shell-v8");
   });
   it("does not substitute offline HTML for server failures, APIs, writes or other origins", async () => {
     const app = worker();
@@ -138,9 +138,26 @@ describe("deployed service worker navigation", () => {
     ]);
     expect(app.skipWaiting).toHaveBeenCalledTimes(1);
     await app.lifecycle("activate");
-    expect(app.remove.mock.calls).toEqual([["showtime-shell-v6"]]);
+    expect(app.remove.mock.calls).toEqual([["showtime-shell-v7"]]);
     expect(app.enable).toHaveBeenCalledTimes(1);
     expect(app.claim).toHaveBeenCalledTimes(1);
+  });
+  it("retries interrupted public module downloads without caching them or returning offline HTML", async () => {
+    const app = worker();
+    app.fetch
+      .mockRejectedValueOnce(new TypeError("TLS connection interrupted"))
+      .mockResolvedValueOnce(
+        new Response("export const app = true", {
+          headers: { "Content-Type": "application/javascript" },
+        }),
+      );
+    expect(
+      await (await app.request("/_app/immutable/entry/app.fixture.js", { mode: "cors" }))!.text(),
+    ).toContain("export const app");
+    expect(app.fetch).toHaveBeenCalledTimes(2);
+    expect(app.fetch.mock.calls[1][1]).toEqual({ cache: "reload" });
+    expect(app.open).not.toHaveBeenCalled();
+    expect(app.request("/api/files/private", { mode: "cors" })).toBeUndefined();
   });
 });
 
@@ -284,5 +301,96 @@ describe("offline fallback recovery", () => {
     expect(preferenceKey("digitalmask-time-drafts:person")).not.toBe(first);
     expect(preferenceKey("digitalmask-theme")).toBe("showtime-theme");
     setBrowserScope("", "");
+  });
+});
+
+function bootPage(rendered = false) {
+  const handlers = new Map<string, (event?: unknown) => void>();
+  const nodes = new Map<
+    string,
+    {
+      hidden: boolean;
+      textContent: string;
+      addEventListener: (name: string, fn: () => void) => void;
+    }
+  >(
+    ["showtime-boot", "boot-title", "boot-message", "boot-actions", "boot-retry"].map((id) => [
+      id,
+      {
+        hidden: true,
+        textContent: "",
+        addEventListener: (name, fn) => handlers.set(id + ":" + name, fn),
+      },
+    ]),
+  );
+  const app = { querySelector: () => (rendered ? { textContent: "Anmeldeformular" } : null) };
+  let observer: () => void = () => undefined;
+  let timeout: () => void = () => undefined;
+  const reload = vi.fn();
+  const register = vi.fn(async () => undefined);
+  const source = readFileSync("src/app.html", "utf8").match(
+    /<script id="showtime-boot-script">([\s\S]*?)<\/script>/,
+  )![1];
+  runInNewContext(source, {
+    navigator: { serviceWorker: { register } },
+    document: {
+      getElementById: (id: string) => (id === "showtime-app" ? app : nodes.get(id)),
+      addEventListener: (name: string, fn: () => void) => handlers.set(name, fn),
+    },
+    window: {
+      addEventListener: (name: string, fn: (event: unknown) => void) => handlers.set(name, fn),
+    },
+    MutationObserver: class {
+      constructor(fn: () => void) {
+        observer = fn;
+      }
+      observe() {}
+    },
+    setTimeout: (fn: () => void) => {
+      timeout = fn;
+      return 1;
+    },
+    clearTimeout: vi.fn(),
+    location: { reload },
+  });
+  handlers.get("DOMContentLoaded")!();
+  return {
+    nodes,
+    handlers,
+    reload,
+    register,
+    timeout,
+    render: () => {
+      rendered = true;
+      observer();
+    },
+  };
+}
+
+describe("application bootstrap recovery", () => {
+  it("starts worker registration without a loaded application and shows a useful loading state", () => {
+    const page = bootPage();
+    expect(page.register).toHaveBeenCalledWith("/sw.js", { updateViaCache: "none" });
+    expect(page.nodes.get("showtime-boot")!.hidden).toBe(false);
+  });
+  it("offers a real reload when a module import fails instead of leaving an empty page", () => {
+    const page = bootPage();
+    page.handlers.get("unhandledrejection")!({
+      reason: new TypeError("Failed to fetch dynamically imported module"),
+    });
+    expect(page.nodes.get("boot-title")!.textContent).toContain("konnte nicht geladen");
+    expect(page.nodes.get("boot-actions")!.hidden).toBe(false);
+    page.handlers.get("boot-retry:click")!();
+    expect(page.reload).toHaveBeenCalledTimes(1);
+    page.render();
+    expect(page.nodes.get("showtime-boot")!.hidden).toBe(true);
+  });
+  it("also recovers a stalled empty bootstrap and preserves an existing server login form", () => {
+    const stalled = bootPage();
+    stalled.timeout();
+    expect(stalled.nodes.get("boot-actions")!.hidden).toBe(false);
+    const login = bootPage(true);
+    login.timeout();
+    expect(login.nodes.get("showtime-boot")!.hidden).toBe(true);
   });
 });
