@@ -25,6 +25,17 @@ Der verbindliche Erstumfang und seine Umsetzung stehen in [APPROVED-PLAN.md](APP
 - [x] Eigener Leitfaden und pausierbarer geführter Einstieg für alle zwanzig Gewerke.
 - [x] DigitalMask-Gestaltungsstandard dokumentiert, mobile neue Arbeitsflächen im Browser geprüft.
 
+## Fachtest nach Abschluss der Umsetzung
+
+- [x] Rollen-/Gewerkprüfung begonnen, nachdem die offenen Umsetzungsaufgaben veröffentlicht waren; Ergebnisse in [ROLLEN-GEWERKE-TEST.md](ROLLEN-GEWERKE-TEST.md).
+- [x] Kernfunktion in allen zwanzig Gewerken über die echte Entwicklungs-API angelegt, bearbeitet und gegen veraltete Änderungen geprüft.
+- [x] Nichtverfügbarkeit an der lokalen Mitternachtsgrenze korrigiert, einschließlich exklusivem Dienstende.
+- [x] Zusammenhängende Dienste für die Höchstdauer pro beteiligter Person zusammenführen; drei Fragmente und getrennte Personen durch echte API-Tests abgesichert.
+- [x] Mobile Navigation verwendet die wirksamen Rollenrechte des Seitenmenüs.
+- [x] Rückmeldung Maske → Kostüm über den echten Produktions-Queue-Consumer bestätigt.
+
+Die im Fachtest ermittelten weiteren P1/P2/P3-Ausbaupunkte sind **offen** und im Bericht je Rolle und Gewerk beschrieben. Sie sind keine als erledigt gekennzeichneten Funktionen. Dazu gehören insbesondere durchgehende Fachreferenzen, formale Fachfreigaben, KBB-Abstimmungsrechte und rollenbezogene Startseiten.
+
 ## Spätere Erweiterungen außerhalb der Erstfreigabe
 
 - Anbieterabhängige Schnittstellen für Ticketing, CAD, Buchhaltung, Lohn und Showtechnik.

@@ -380,7 +380,7 @@ $: active = nav.find((x) => x.id === activeModule)!;
     ["time", "Zeit", Clock3],
     ["chat", "Chat", MessageSquare],
     ["more", "Mehr", Menu],
-] as [key, label, Icon] (String(key))}{@const Component = Icon as LucideIcon}<button class={activeModule === key ||
+].filter(([key]) => key === "more" || nav.some(item => item.id === key)) as [key, label, Icon] (String(key))}{@const Component = Icon as LucideIcon}<button class={activeModule === key ||
     (key === "more" &&
         !["today", "calendar", "productions", "time", "chat"].includes(activeModule))
     ? "active"

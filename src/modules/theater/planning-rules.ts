@@ -7,6 +7,7 @@ import { listValue } from "@/shared/contracts";
 import { occurrences } from "@/modules/calendar/occurrences";
 import { calendarCategoryBlocksTime } from "@/shared/calendar-categories";
 import { serialize } from "@/modules/records/repository";
+import { planningDateWindow, workRuleViolation } from "@/shared/theater-planning";
 type Interval = { start: Date; end: Date };
 /** Confirmed local theater rules only. This is planning validation, never payroll calculation. */
 export function checkWorkRules(
@@ -14,24 +15,14 @@ export function checkWorkRules(
   existing: Interval[],
   rules: Record<string, unknown>,
 ) {
-  if (rules.confirmedByTheater !== true) return;
-  const duty = Number(rules.maxDutyHours),
-    rest = Number(rules.minimumRestHours);
-  if (Number.isFinite(duty) && (proposed.end.getTime() - proposed.start.getTime()) / 3600000 > duty)
+  const violation = workRuleViolation(proposed, existing, rules);
+  if (violation === "maximum-duty")
     throw new HttpError(
       409,
       "Der Dienst überschreitet die vom Theater bestätigte maximale Dienstdauer.",
     );
-  for (const interval of existing) {
-    const gap =
-      interval.end <= proposed.start
-        ? proposed.start.getTime() - interval.end.getTime()
-        : interval.start >= proposed.end
-          ? interval.start.getTime() - proposed.end.getTime()
-          : null;
-    if (gap !== null && gap > 0 && gap < rest * 3600000)
-      throw new HttpError(409, "Die vom Theater bestätigte Ruhezeit wird unterschritten.");
-  }
+  if (violation === "minimum-rest")
+    throw new HttpError(409, "Die vom Theater bestätigte Ruhezeit wird unterschritten.");
 }
 export async function assertPlanning(
   context: Context,
@@ -119,6 +110,10 @@ export async function assertPlanning(
         sql`(${records.startAt}<${end.toISOString()} and ${records.endAt}>${start.toISOString()} or coalesce(${records.data}->>'recurrence','none')<>'none')`,
       ),
     );
+  const personIntervals = new Map<string, Interval[]>([
+    ...participantIds.map((id) => [`member:${id}`, []] as [string, Interval[]]),
+    ...actorIds.map((id) => [`actor:${id}`, []] as [string, Interval[]]),
+  ]);
   for (const candidate of candidates) {
     if (
       candidate.data.cancelled === true ||
@@ -147,9 +142,14 @@ export async function assertPlanning(
         409,
         "Eine beteiligte Person oder Besetzung ist in diesem Zeitraum bereits disponiert oder abwesend.",
       );
-    checkWorkRules(interval, existing, rules);
+    for (const id of participantIds)
+      if (people.includes(id)) personIntervals.get(`member:${id}`)!.push(...existing);
+    for (const id of actorIds)
+      if (cast.includes(id)) personIntervals.get(`actor:${id}`)!.push(...existing);
   }
-  checkWorkRules(interval, [], rules);
+  if (personIntervals.size)
+    for (const existing of personIntervals.values()) checkWorkRules(interval, existing, rules);
+  else checkWorkRules(interval, [], rules);
   if (
     rules.confirmedByTheater === true &&
     typeof rules.breakAfterHours === "number" &&
@@ -167,12 +167,13 @@ export async function assertPlanning(
         sql`${tradeItems.data}->>'availability'='unavailable'`,
       ),
     );
+  const localDates = planningDateWindow(interval, settings?.timezone || "Europe/Berlin");
   if (
     availability.some(
       (a) =>
         participantIds.includes(a.createdBy) &&
-        String(a.data.start) <= data.end.slice(0, 10) &&
-        String(a.data.end) >= data.start.slice(0, 10),
+        String(a.data.start) <= localDates.to &&
+        String(a.data.end) >= localDates.from,
     )
   )
     throw new HttpError(
