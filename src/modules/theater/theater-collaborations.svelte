@@ -27,7 +27,8 @@
     type CollaborationKind,
   } from "@/shared/collaboration";
   import { tradeGuides } from "@/shared/trade-guides";
-  import { tradeChoiceLabel } from "@/shared/trade-labels";
+  import { tradeDisplay } from "@/shared/trade-display";
+  import type { Field } from "./registry";
   import type { Planning, TradeItem } from "./types";
   import type { DomainRecord } from "@/shared/contracts";
   export let planning: Planning;
@@ -450,42 +451,25 @@
             .sourceSnapshot as {
             title: string;
             version: number;
-            fields: { key: string; label: string; type: string; value: unknown }[];
+            fields: (Pick<Field, "key" | "label" | "type"> & { value: unknown })[];
           }}
           <Section title={`Fachstand: ${snapshot.title}`} meta={`Fassung ${snapshot.version}`}>
-            <dl class="detail-grid">
-              {#each snapshot.fields as field (field.key)}{#if field.value !== null && field.value !== ""}
-                  <div>
-                    <dt>
-                      {field.key === "amountCents"
-                        ? field.label.replace("(Cent)", "(€)")
-                        : field.label}
-                    </dt>
-                    <dd>
-                      {field.type === "checkbox"
-                        ? field.value
-                          ? "Ja"
-                          : "Nein"
-                        : field.key === "amountCents"
-                          ? new Intl.NumberFormat("de-DE", {
-                              style: "currency",
-                              currency: "EUR",
-                            }).format(Number(field.value) / 100)
-                          : field.type === "select"
-                            ? tradeChoiceLabel(String(field.value))
-                            : Array.isArray(field.value)
-                              ? field.value
-                                  .map(
-                                    (id) =>
-                                      workspace.members.find((member) => member.id === id)?.name ||
-                                      id,
-                                  )
-                                  .join(", ")
-                              : String(field.value)}
-                    </dd>
-                  </div>
-                {/if}{/each}
-            </dl>
+            <div class="panel-content">
+              <dl class="detail-grid">
+                {#each snapshot.fields as field (field.key)}{#if field.value !== null && field.value !== ""}
+                    <div>
+                      <dt>
+                        {field.key === "amountCents"
+                          ? field.label.replace("(Cent)", "(€)")
+                          : field.label}
+                      </dt>
+                      <dd>
+                        {tradeDisplay(field.value, field, workspace, planning)}
+                      </dd>
+                    </div>
+                  {/if}{/each}
+              </dl>
+            </div>
           </Section>
         {/if}
         <p class="preserve-lines">{String(detail.entry.data.brief)}</p>

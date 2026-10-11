@@ -91,23 +91,26 @@
         title="Teamaufgaben & kommende Dienste"
         meta="Geladene Termine der nächsten sieben Tage"
       >
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Person</th><th>Offene Aufgaben</th><th>Geplante Stunden</th></tr></thead
-            ><tbody
-              >{#each team as member (member.id)}<tr
-                  ><td>{member.name}</td><td>{member.tasks}</td><td
-                    >{member.hours.toLocaleString("de-DE")}</td
-                  ></tr
-                >{/each}</tbody
-            >
-          </table>
+        <div class="panel-content">
+          <div class="table-wrap">
+            <table>
+              <thead
+                ><tr><th>Person</th><th>Offene Aufgaben</th><th>Geplante Stunden</th></tr></thead
+              ><tbody
+                >{#each team as member (member.id)}<tr
+                    ><td>{member.name}</td><td>{member.tasks}</td><td
+                      >{member.hours.toLocaleString("de-DE")}</td
+                    ></tr
+                  >{/each}</tbody
+              >
+            </table>
+          </div>
+          <p class="small muted">
+            Die Anzeige umfasst deine zugänglichen, geladenen Aufgaben und Termine. Bestätigte
+            Dienstregeln werden bei jeder Planung geprüft.
+          </p>
+          <Button onClick={() => navigate("calendar")}>Teamplanung öffnen</Button>
         </div>
-        <p class="small muted">
-          Die Anzeige umfasst deine zugänglichen, geladenen Aufgaben und Termine. Bestätigte
-          Dienstregeln werden bei jeder Planung geprüft.
-        </p>
-        <Button onClick={() => navigate("calendar")}>Teamplanung öffnen</Button>
       </Section>{/if}
   </div>{/if}
 

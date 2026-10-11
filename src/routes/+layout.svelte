@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import "../styles/globals.css";
+  import "../modules/theater/theater-operations.css";
+  import "../modules/theater/theater-overview.css";
   import "../modules/documents/documents.css";
   onMount(() => {
     try {

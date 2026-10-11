@@ -16,13 +16,12 @@
   import TheaterSchedule from "./theater-schedule.svelte";
   import TheaterAdministration from "./theater-administration.svelte";
   import TheaterCollaborations from "./theater-collaborations.svelte";
+  import { tradeDisplay } from "@/shared/trade-display";
   import TheaterOverview from "./theater-overview.svelte";
   import TradeGuide from "@/modules/help/components/trade-guide.svelte";
-  import { tradeChoiceLabel } from "@/shared/trade-labels";
   import TradeDetail from "./trade-detail.svelte";
   import ReadinessPanel from "./readiness-panel.svelte";
   import TheaterIntegrations from "./theater-integrations.svelte";
-  import "./theater-operations.css";
   export let initialView = "trade";
   export let productionId = "";
   export let requestId = "";
@@ -292,45 +291,7 @@
     const field = featureFor(item)?.fields.find((f) => f.key === key),
       value = item.data[key];
     if (field?.managed && !item.approvalVerified) return "Freigabe noch erforderlich";
-    if (field?.type === "member")
-      return workspace.members.find((m) => m.id === value)?.name || "Teammitglied";
-    if (field?.type === "trade")
-      return (
-        planning?.items.find((i) => i.id === value)?.title ||
-        "Referenz außerhalb der geladenen Seite"
-      );
-    if (field?.type === "trades")
-      return (Array.isArray(value) ? value : [])
-        .map((id) => planning?.items.find((i) => i.id === id)?.title || "Fachstand")
-        .join(", ");
-    if (field?.type === "checkbox") return value ? "Ja" : "Nein";
-    if (field?.type === "date") return dateLabel(String(value));
-    if (field?.type === "datetime") return dateLabel(String(value), true);
-    if (field?.key === "amountCents")
-      return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(
-        Number(value) / 100,
-      );
-    if (field?.type === "performance") {
-      const performance = planning?.performances.find((performance) => performance.id === value);
-      return performance
-        ? dateLabel(performance.curtainAt, true)
-        : "Vorstellung außerhalb des geladenen Zeitraums";
-    }
-    if (field?.type === "members")
-      return (Array.isArray(value) ? value : [])
-        .map((id) => workspace.members.find((m) => m.id === id)?.name || id)
-        .join(", ");
-    if (field?.type === "resource")
-      return planning?.resources.find((r) => r.id === value)?.name || String(value);
-    if (field?.type === "department")
-      return planning?.departments.find((d) => d.id === value)?.name || "Gesamtes Theater";
-    if (field?.type === "budget")
-      return planning?.funding.find((b) => b.id === value)?.title || "Budgetrahmen";
-    if (field?.type === "record" && field.source) {
-      const row = workspace.records[field.source].find((r) => r.id === value);
-      return String(row?.data.title || row?.data.name || value);
-    }
-    return field?.type === "select" ? tradeChoiceLabel(String(value)) : String(value);
+    return field && planning ? tradeDisplay(value, field, workspace, planning) : String(value);
   }
   const dateLabel = (value: string, withTime = false) =>
     theaterLabel(value, planning?.timezone || "Europe/Berlin", withTime);
@@ -625,9 +586,13 @@
               >{/if}<option value="done">Erledigt</option><option value="blocked">Blockiert</option
             ></select
           ></label
-        ><ErrorMessage message={error} /><button class="button primary" disabled={busy}
-          >Speichern</button
-        >
+        >{#if error}<div class="full"><ErrorMessage message={error} /></div>{/if}
+        <div class="dialog-footer full">
+          <Button disabled={busy} onClick={() => (editing = false)}>Abbrechen</Button><button
+            class="button primary"
+            disabled={busy}>Speichern</button
+          >
+        </div>
       </form></Modal
     >{/if}
   {#if detailItem && planning}<TradeDetail

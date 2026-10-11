@@ -83,25 +83,29 @@
         >Vorstellung anlegen</Button
       >{/if}
   </div>
-  <table>
-    <thead><tr><th>Produktion</th><th>Beginn</th><th>Status</th><th></th></tr></thead><tbody
-      >{#each planning.performances as show (show.id)}<tr
-          ><td
-            >{String(
-              workspace.records.productions.find((p) => p.id === show.productionId)?.data.title ||
-                "Produktion",
-            )}</td
-          ><td>{dateLabel(show.curtainAt, true)}</td><td
-            ><Badge>{tradeChoiceLabel(show.status)}</Badge></td
-          ><td
-            >{#if allowed("schedule.manage", show.productionId)}<Button
-                disabled={busy}
-                onClick={() => edit(show)}>Bearbeiten / absagen</Button
-              >{/if}</td
-          ></tr
-        >{/each}</tbody
-    >
-  </table>
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex (Keyboard focus enables arrow-key scrolling of this named table region.) -->
+  <div class="table-wrap" tabindex="0" role="region" aria-label="Vorstellungen: Tabelle">
+    <table>
+      <thead><tr><th>Produktion</th><th>Beginn</th><th>Status</th><th>Aktionen</th></tr></thead
+      ><tbody
+        >{#each planning.performances as show (show.id)}<tr
+            ><td
+              >{String(
+                workspace.records.productions.find((p) => p.id === show.productionId)?.data.title ||
+                  "Produktion",
+              )}</td
+            ><td>{dateLabel(show.curtainAt, true)}</td><td
+              ><Badge>{tradeChoiceLabel(show.status)}</Badge></td
+            ><td
+              >{#if allowed("schedule.manage", show.productionId)}<Button
+                  disabled={busy}
+                  onClick={() => edit(show)}>Bearbeiten / absagen</Button
+                >{/if}</td
+            ></tr
+          >{/each}</tbody
+      >
+    </table>
+  </div>
   {#if planning.pages.performances}<Button disabled={busy} onClick={() => void more("performances")}
       >Weitere Vorstellungen laden</Button
     >{/if}
@@ -318,6 +322,11 @@
         Besetzungen werden aus der zentralen Produktionsbesetzung übernommen. Änderungen werden für
         die zuständigen Gewerke vorgemerkt.
       </p>
-      <button class="button primary" disabled={busy}>Speichern</button>
+      <div class="dialog-footer full">
+        <Button disabled={busy} onClick={() => (open = false)}>Abbrechen</Button><button
+          class="button primary"
+          disabled={busy}>Speichern</button
+        >
+      </div>
     </form></Modal
   >{/if}

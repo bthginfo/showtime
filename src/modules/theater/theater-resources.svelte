@@ -146,29 +146,34 @@
 <section class="surface">
   <h2>Belegungen</h2>
   <p class="small muted">Auf- und Abbauzeiten sind in den reservierten Zeiträumen enthalten.</p>
-  <table>
-    <thead><tr><th>Ressource</th><th>Zeitraum</th><th>Menge</th><th></th></tr></thead><tbody
-      >{#each planning.bookings as booking (booking.id)}<tr
-          ><td
-            >{planning.resources.find((r) => r.id === booking.resourceId)?.name || "Ressource"}</td
-          ><td>{dateLabel(booking.startAt, true)} – {dateLabel(booking.endAt, true)}</td><td
-            >{booking.quantity}</td
-          ><td
-            >{#if booking.activityId}<a href={"/?module=calendar&record=" + booking.activityId}
-                >Zugehörigen Termin öffnen</a
-              >{:else if booking.createdBy === workspace.user.id || allowed("inventory.manage")}<Button
-                disabled={busy}
-                onClick={() =>
-                  void run("schedule", {
-                    action: "cancel-booking",
-                    id: booking.id,
-                    expectedVersion: booking.version,
-                  }).catch(() => {})}>Freigeben</Button
-              >{/if}</td
-          ></tr
-        >{/each}</tbody
-    >
-  </table>
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex (Keyboard focus enables arrow-key scrolling of this named table region.) -->
+  <div class="table-wrap" tabindex="0" role="region" aria-label="Belegungen: Tabelle">
+    <table>
+      <thead><tr><th>Ressource</th><th>Zeitraum</th><th>Menge</th><th>Aktionen</th></tr></thead
+      ><tbody
+        >{#each planning.bookings as booking (booking.id)}<tr
+            ><td
+              >{planning.resources.find((r) => r.id === booking.resourceId)?.name ||
+                "Ressource"}</td
+            ><td>{dateLabel(booking.startAt, true)} – {dateLabel(booking.endAt, true)}</td><td
+              >{booking.quantity}</td
+            ><td
+              >{#if booking.activityId}<a href={"/?module=calendar&record=" + booking.activityId}
+                  >Zugehörigen Termin öffnen</a
+                >{:else if booking.createdBy === workspace.user.id || allowed("inventory.manage")}<Button
+                  disabled={busy}
+                  onClick={() =>
+                    void run("schedule", {
+                      action: "cancel-booking",
+                      id: booking.id,
+                      expectedVersion: booking.version,
+                    }).catch(() => {})}>Freigeben</Button
+                >{/if}</td
+            ></tr
+          >{/each}</tbody
+      >
+    </table>
+  </div>
   {#if planning.pages.bookings}<Button disabled={busy} onClick={() => void more("bookings")}
       >Weitere Belegungen laden</Button
     >{/if}
@@ -218,6 +223,12 @@
               >Gesamtes Theater</option
             ></select
           ></label
-        >{/if}<button class="button primary" disabled={busy}>Speichern</button>
+        >{/if}
+      <div class="dialog-footer full">
+        <Button disabled={busy} onClick={() => (open = false)}>Abbrechen</Button><button
+          class="button primary"
+          disabled={busy}>Speichern</button
+        >
+      </div>
     </form></Modal
   >{/if}

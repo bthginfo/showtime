@@ -6,7 +6,6 @@
   import { scopedBrowserKey } from "@/shared/browser-scope";
   import { tradeGuides } from "@/shared/trade-guides";
   import PracticeGuide from "./practice-guide.svelte";
-  import "@/modules/theater/theater-operations.css";
   export let moduleId = "makeup";
   export let compact = false;
   export let showPrompt = true;

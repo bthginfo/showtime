@@ -22,7 +22,6 @@
   import { RecordDetail } from "../resource-view";
   import { TimerPanel } from "./time";
   import TheaterOverview from "@/modules/theater/theater-overview.svelte";
-  import "@/modules/theater/theater-operations.css";
   import { expandEvents } from "./calendar";
   import { statusLabels } from "../resource-fields";
   import { initialPeriod, recordMatchesPeriod } from "@/shared/period-filter";
@@ -174,11 +173,10 @@
   $: greet = hour < 11 ? "Guten Morgen" : hour < 18 ? "Guten Tag" : "Guten Abend";
 </script>
 
-{#if isIntendance}<PageHeader title="Intendanz"
-    ><Button onClick={() => navigate("/?module=help&guide=intendance")}
-      >Hilfe zur Hausübersicht</Button
-    ></PageHeader
-  ><TheaterOverview
+{#if isIntendance}<TheaterOverview
+    pageTitle="Intendanz"
+    onHelp={() => navigate("/?module=help&guide=intendance")}
+    onNavigate={navigate}
     onProduction={(id) =>
       navigate(`/?module=theater&view=readiness&productionId=${encodeURIComponent(id)}`)}
   />{:else if homeRole}<RoleHome role={homeRole} {navigate} />{:else}

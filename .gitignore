@@ -9,6 +9,7 @@ coverage/
 artifacts/
 *.tsbuildinfo
 .local/
+.impeccable/review/
 .frontend-lint.json
 
 .svelte-kit/

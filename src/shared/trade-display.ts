@@ -24,9 +24,15 @@ export function tradeDisplay(
     return workspace.members.find((m) => m.id === value)?.name || "Zugeordnete Person";
   if (field.type === "resource")
     return planning.resources.find((r) => r.id === value)?.name || "Zugeordnete Ressource";
+  if (field.type === "department")
+    return planning.departments.find((d) => d.id === value)?.name || "Zugeordnetes Gewerk";
+  if (field.type === "budget")
+    return planning.funding.find((b) => b.id === value)?.title || "Zugeordneter Budgetrahmen";
   if (field.type === "record") {
     const row = [
-      ...(workspace.records[field.source || "actors"] || []),
+      ...(field.source
+        ? workspace.records[field.source] || []
+        : Object.values(workspace.records).flat()),
       ...(planning.tradeFiles || []),
     ].find((r) => r.id === value);
     return String(row?.data.name || row?.data.title || row?.data.fullName || "Verknüpfter Eintrag");

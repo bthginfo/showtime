@@ -488,16 +488,19 @@
 </details>
 <details class="surface admin-diagnostics">
   <summary>Änderungsprotokoll ({configuration.audit.length})</summary>
-  <table>
-    <thead><tr><th>Zeit</th><th>Person</th><th>Aktion</th></tr></thead><tbody
-      >{#each configuration.audit as entry (entry.id)}<tr
-          ><td>{dateLabel(entry.createdAt, true)}</td><td
-            >{configuration.members.find((m) => m.userId === entry.userId)?.name ||
-              entry.userId}</td
-          ><td>{entry.action}</td></tr
-        >{/each}</tbody
-    >
-  </table>
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex (Keyboard focus enables arrow-key scrolling of this named table region.) -->
+  <div class="table-wrap" tabindex="0" role="region" aria-label="Änderungsprotokoll: Tabelle">
+    <table>
+      <thead><tr><th>Zeit</th><th>Person</th><th>Aktion</th></tr></thead><tbody
+        >{#each configuration.audit as entry (entry.id)}<tr
+            ><td>{dateLabel(entry.createdAt, true)}</td><td
+              >{configuration.members.find((m) => m.userId === entry.userId)?.name ||
+                entry.userId}</td
+            ><td>{entry.action}</td></tr
+          >{/each}</tbody
+      >
+    </table>
+  </div>
 </details>
 
 <style>

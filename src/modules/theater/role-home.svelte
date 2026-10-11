@@ -33,10 +33,12 @@
       <Button onClick={() => navigate("exports")}>Nachweise exportieren</Button>
     </div>
     <Section title="Dein Team" meta={`${active.length} aktive Zugänge`}>
-      <p>
-        Wähle in den Teamzeiten die Person und den Zeitraum. Dort kannst du Buchungen prüfen und
-        zulässige Korrekturen vornehmen.
-      </p>
+      <div class="panel-content">
+        <p>
+          Wähle in den Teamzeiten die Person und den Zeitraum. Dort kannst du Buchungen prüfen und
+          zulässige Korrekturen vornehmen.
+        </p>
+      </div>
     </Section>
     <Section title="Kommende Abwesenheiten" meta={`${futureAbsences.length} im geladenen Zeitraum`}>
       {#if futureAbsences.length}<div class="list">
@@ -70,13 +72,17 @@
       ><Button onClick={() => navigate("settings")}><Users size={16} />Zugänge verwalten</Button>
     </div>
     <Section title="Einrichtung in drei Schritten">
-      <ol>
-        <li>Aktive Gewerke und gemeinsame Ressourcen festlegen.</li>
-        <li>Personen einladen und Rollen mit passendem Gewerk- oder Produktionsbezug zuweisen.</li>
-        <li>
-          Dienstregeln und Bereitschaft gemeinsam mit den verantwortlichen Leitungen bestätigen.
-        </li>
-      </ol>
+      <div class="panel-content">
+        <ol>
+          <li>Aktive Gewerke und gemeinsame Ressourcen festlegen.</li>
+          <li>
+            Personen einladen und Rollen mit passendem Gewerk- oder Produktionsbezug zuweisen.
+          </li>
+          <li>
+            Dienstregeln und Bereitschaft gemeinsam mit den verantwortlichen Leitungen bestätigen.
+          </li>
+        </ol>
+      </div>
     </Section>
   {/if}
 </div>
