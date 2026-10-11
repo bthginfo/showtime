@@ -375,7 +375,7 @@
         <strong>{inbox.length} unzugeordnete Geräteentwürfe</strong>
         <p class="small">
           Diese Offlinebuchungen gehören noch zu keinem Account. Übernimm nur deine eigenen
-          Tätigkeiten als {workspace.user.name}.
+          Tätigkeiten als {workspace.user.name} im Theater {workspace.organization.name}.
         </p>
       </div>
       <Button

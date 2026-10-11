@@ -12,16 +12,16 @@ function worker() {
     focus = vi.fn(),
     open = vi.fn();
   const self = {
-    location: { origin: "https://digitalmask.vercel.app" },
+    location: { origin: "https://showtime-ingolstadt.vercel.app" },
     navigator: { setAppBadge: badge, clearAppBadge: clear },
     addEventListener: (name: string, fn: (event: unknown) => void) => listeners.set(name, fn),
     registration: { showNotification: show, getNotifications: async () => [] },
     clients: {
-      matchAll: async () => [{ url: "https://digitalmask.vercel.app/", navigate, focus }],
+      matchAll: async () => [{ url: "https://showtime-ingolstadt.vercel.app/", navigate, focus }],
       openWindow: open,
     },
   };
-  runInNewContext(readFileSync("public/sw.js", "utf8"), {
+  runInNewContext(readFileSync("static/sw.js", "utf8"), {
     self,
     indexedDB: new IDBFactory(),
     URL,
@@ -52,7 +52,7 @@ describe("installed-app push worker", () => {
     await app.dispatch("push", {
       data: {
         json: () => ({
-          title: "DigitalMask",
+          title: "Showtime",
           body: "Neue Nachricht",
           ownerId: "theatre:person",
           unreadCount: 2,
@@ -69,7 +69,7 @@ describe("installed-app push worker", () => {
       notification: { data: options.data, close: vi.fn() },
     });
     expect(app.navigate).toHaveBeenCalledWith(
-      "https://digitalmask.vercel.app/?module=chat&conversationId=private",
+      "https://showtime-ingolstadt.vercel.app/?module=chat&conversationId=private",
     );
     expect(app.focus).toHaveBeenCalled();
   });
@@ -101,8 +101,11 @@ describe("installed-app push worker", () => {
       ports: [],
     });
     await app.dispatch("notificationclick", {
-      notification: { data: { ownerId: "theatre:person", url: "https://evil.invalid" }, close: vi.fn() },
+      notification: {
+        data: { ownerId: "theatre:person", url: "https://evil.invalid" },
+        close: vi.fn(),
+      },
     });
-    expect(app.navigate).toHaveBeenCalledWith("https://digitalmask.vercel.app/");
+    expect(app.navigate).toHaveBeenCalledWith("https://showtime-ingolstadt.vercel.app/");
   });
 });

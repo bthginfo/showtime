@@ -1,19 +1,52 @@
 /* Never cache authenticated HTML, API responses, uploads, or personal records. */
-const CACHE = "showtime-shell-v6";
+const CACHE = "showtime-shell-v7";
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(["/icon.svg", "/offline.html"])));
-  self.skipWaiting();
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE);
+      await cache.addAll(
+        ["/icon.svg", "/offline.html"].map((url) => new Request(url, { cache: "reload" })),
+      );
+      await self.skipWaiting();
+    })(),
+  );
 });
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))),
-      ),
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((key) => key.startsWith("showtime-shell-") && key !== CACHE)
+          .map((key) => caches.delete(key)),
+      );
+      // Start the page request while a stopped worker is waking up.
+      await self.registration.navigationPreload?.enable().catch(() => undefined);
+      await self.clients.claim();
+    })(),
   );
-  self.clients.claim();
 });
+async function navigationResponse(event) {
+  try {
+    const preloaded = await event.preloadResponse;
+    if (preloaded) return preloaded;
+  } catch {
+    // A failed preload does not establish that the device is still offline.
+  }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await fetch(event.request, { cache: "no-store" });
+    } catch {
+      // Recover a transient connection failure before replacing the application.
+    }
+  }
+  const cache = await caches.open(CACHE);
+  const offline = await cache.match("/offline.html");
+  if (!offline) return Response.error();
+  const headers = new Headers(offline.headers);
+  headers.set("Cache-Control", "no-store");
+  return new Response(offline.body, { status: 200, headers });
+}
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (
@@ -23,11 +56,15 @@ self.addEventListener("fetch", (event) => {
   )
     return;
   if (event.request.mode === "navigate") {
-    event.respondWith(fetch(event.request).catch(() => caches.match("/offline.html")));
+    event.respondWith(navigationResponse(event));
     return;
   }
   if (url.pathname === "/icon.svg" || url.pathname === "/offline.html")
-    event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request)));
+    event.respondWith(
+      caches
+        .open(CACHE)
+        .then(async (cache) => (await cache.match(event.request)) || fetch(event.request)),
+    );
 });
 
 // Device consent metadata only; no authenticated pages, message bodies or personal records.
@@ -108,16 +145,13 @@ self.addEventListener("push", (event) => {
         await deviceState({ ownerId: state.ownerId, count, timestamp: payload.timestamp });
         await setBadge(count);
       }
-      await self.registration.showNotification(
-        String(payload.title || "Showtime").slice(0, 120),
-        {
-          body: String(payload.body || "Du hast eine neue Mitteilung.").slice(0, 240),
-          icon: "/icon-192.png",
-          badge: "/icon-192.png",
-          tag: String(payload.tag || "showtime"),
-          data: { url: safeTarget(payload.url), ownerId: payload.ownerId },
-        },
-      );
+      await self.registration.showNotification(String(payload.title || "Showtime").slice(0, 120), {
+        body: String(payload.body || "Du hast eine neue Mitteilung.").slice(0, 240),
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        tag: String(payload.tag || "showtime"),
+        data: { url: safeTarget(payload.url), ownerId: payload.ownerId },
+      });
     })(),
   );
 });

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#16735c" />
-    <title>DigitalMask · Offline buchen</title>
+    <title>Showtime · Verbindung unterbrochen</title>
     <style>
       :root {
         color-scheme: light;
@@ -32,7 +32,7 @@
         background: var(--bg);
         color: var(--text);
         font:
-          15px "Segoe UI",
+          16px "Segoe UI",
           sans-serif;
         line-height: 1.6;
       }
@@ -61,7 +61,7 @@
       }
       p {
         color: var(--muted);
-        font-size: 13px;
+        font-size: 14px;
       }
       form {
         padding: 22px;
@@ -78,7 +78,7 @@
       }
       input,
       select {
-        font: 16px inherit;
+        font: inherit;
         width: 100%;
         min-height: 46px;
         padding: 11px;
@@ -89,7 +89,8 @@
         margin-top: 7px;
       }
       button {
-        font: 13px inherit;
+        font: inherit;
+        font-size: 14px;
         font-weight: 600;
         min-height: 46px;
         padding: 12px 18px;
@@ -114,6 +115,7 @@
       }
       .row > label {
         flex: 1;
+        min-width: 0;
       }
       #message {
         font-size: 13px;
@@ -132,14 +134,48 @@
         outline-offset: 3px;
       }
       .small {
-        font-size: 11px;
+        font-size: 12px;
+      }
+      .connection {
+        padding-block: 16px;
+        border-block: 1px solid var(--border);
+        margin-block: 24px;
+      }
+      .connection p {
+        margin: 0 0 12px;
+      }
+      button:hover {
+        border-color: var(--accent);
+      }
+      button:disabled {
+        cursor: wait;
+        opacity: 0.7;
+      }
+      ::selection {
+        background: var(--accent);
+        color: var(--surface);
+      }
+      @media (max-width: 400px) {
+        main {
+          padding-inline: 20px;
+        }
+        form {
+          padding: 18px;
+        }
       }
     </style>
   </head>
   <body>
     <main>
-      <div class="brand"><img src="/icon.svg" alt="" />digitalmask</div>
-      <h1>Deine Zeit.<br />Auch ohne Verbindung.</h1>
+      <div class="brand"><img src="/icon.svg" alt="" />showtime</div>
+      <h1>Verbindung unterbrochen.</h1>
+      <div class="connection">
+        <p id="connection-status" role="status">
+          Showtime konnte gerade nicht geladen werden. Wir prüfen die Verbindung erneut.
+        </p>
+        <button id="retry" type="button">Verbindung erneut prüfen</button>
+      </div>
+      <h2>Deine Zeit bleibt festgehalten.</h2>
       <p>
         Speichere eine Tätigkeit als Geräteentwurf. Der Entwurf gehört noch zu keinem Konto. Wenn du
         wieder online bist, kannst du ihn im Bereich „Zeit buchen“ ausdrücklich in deinen Account
@@ -177,8 +213,7 @@
       </form>
       <p id="count" class="small"></p>
       <footer>
-        <button id="retry">Verbindung erneut prüfen</button
-        ><button id="discard">Geräteentwürfe verwerfen</button>
+        <button id="discard" type="button">Geräteentwürfe verwerfen</button>
       </footer>
       <p class="small">
         Die Entwürfe bleiben in diesem Browser. Produktionszuordnungen ergänzt du nach dem Anmelden.
@@ -186,10 +221,86 @@
     </main>
     <script>
       (function () {
+        // Keep existing unassigned device drafts readable after the Showtime update.
         const key = "digitalmask-offline-inbox";
         const form = document.getElementById("booking");
+        const retry = document.getElementById("retry");
+        const connection = document.getElementById("connection-status");
+        let checking = false;
+        let leaving = false;
+        let timer;
+        let connected = false;
+        const target =
+          location.pathname === "/offline.html"
+            ? "/"
+            : location.pathname + location.search + location.hash;
+        function hasInput() {
+          return Boolean(form.elements.title.value.trim() || form.elements.minutes.value);
+        }
+        function returnToApp(manual = true) {
+          if (!manual) {
+            // One automatic attempt until a real app page loads; never form a reload loop.
+            try {
+              if (sessionStorage.getItem("showtime-offline-return") === "1") return;
+              sessionStorage.setItem("showtime-offline-return", "1");
+            } catch {
+              return;
+            }
+          }
+          if (
+            hasInput() &&
+            !confirm(
+              "Dein Geräteentwurf ist noch nicht gespeichert. Trotzdem zu Showtime wechseln?",
+            )
+          )
+            return;
+          leaving = true;
+          clearTimeout(timer);
+          location.replace(target);
+        }
+        async function checkConnection(manual = false) {
+          if (checking || leaving) return;
+          if (manual && connected) {
+            returnToApp();
+            return;
+          }
+          checking = true;
+          clearTimeout(timer);
+          retry.disabled = true;
+          retry.textContent = "Verbindung wird geprüft …";
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 6000);
+          try {
+            const response = await fetch("/connection.txt", {
+              cache: "no-store",
+              credentials: "omit",
+              signal: controller.signal,
+            });
+            connected = response.ok && (await response.text()).trim() === "showtime-online-v1";
+          } catch {
+            connected = false;
+          } finally {
+            clearTimeout(timeout);
+            checking = false;
+            retry.disabled = false;
+          }
+          if (connected) {
+            connection.textContent =
+              "Die Verbindung ist wieder da. Deine gespeicherten Geräteentwürfe bleiben erhalten.";
+            retry.textContent = "Zurück zu Showtime";
+            if (manual || (location.pathname !== "/offline.html" && !hasInput()))
+              returnToApp(manual);
+          } else {
+            connection.textContent =
+              "Showtime ist weiterhin nicht erreichbar. Prüfe deine Verbindung oder versuche es erneut. Geräteentwürfe kannst du hier weiter speichern.";
+            retry.textContent = "Verbindung erneut prüfen";
+            timer = setTimeout(() => {
+              if (!document.hidden) void checkConnection();
+            }, 15000);
+          }
+        }
         try {
-          const theme = localStorage.getItem("digitalmask-theme") || "system";
+          const theme = localStorage.getItem("showtime-theme") || "system";
           document.documentElement.setAttribute(
             "data-theme",
             theme === "system"
@@ -252,8 +363,18 @@
               error.message || "Der Browser konnte den Entwurf nicht speichern.";
           }
         });
-        document.getElementById("retry").addEventListener("click", function () {
-          location.reload();
+        retry.addEventListener("click", () => void checkConnection(true));
+        window.addEventListener("online", () => void checkConnection());
+        window.addEventListener("offline", () => {
+          connected = false;
+          void checkConnection();
+        });
+        document.addEventListener("visibilitychange", () => {
+          if (!document.hidden) void checkConnection();
+        });
+        window.addEventListener("pagehide", () => {
+          leaving = true;
+          clearTimeout(timer);
         });
         document.getElementById("discard").addEventListener("click", function () {
           if (confirm("Alle unzugeordneten Geräteentwürfe verwerfen?")) {
@@ -263,6 +384,7 @@
           }
         });
         count();
+        void checkConnection();
       })();
     </script>
   </body>
