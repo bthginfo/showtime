@@ -101,8 +101,12 @@
     ["resources", "Ressourcen"],
     ["schedule", "Spielplan"],
     ["readiness", "Bereitschaft"],
-    ["integrations", "Schnittstellen"],
-    ["administration", "Theater & Zugänge"],
+    ...(allowed("tenant.configure")
+      ? [
+          ["integrations", "Schnittstellen"],
+          ["administration", "Theater & Zugänge"],
+        ]
+      : []),
   ];
   const itemStatus: Record<string, string> = {
     draft: "Entwurf",

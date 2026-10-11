@@ -78,11 +78,21 @@ Die Abschlussprüfung verwendet Chromium mit **1.440 × 1.000** und **390 × 844
 
 Die Bildschirmfotos und technischen Einzelreports liegen privat unter `.local`; sie enthalten synthetische Testdaten. Eine pixelweise Gleichheit aller neuen Ansichten mit DigitalMask ist keine sinnvolle Abnahmebehauptung: Die ursprünglichen Referenzansichten bleiben in der bestehenden Vergleichsmatrix dokumentiert, während neue Fachfunktionen dem gleichen Standard folgen.
 
+## Veröffentlichung und Live-Prüfung
+
+Der Fachausbau wurde mit Anwendungscode `375b04ce7a3d4623f007ebba9be248b03c9a5890` auf `main` veröffentlicht. [GitHub CI](https://github.com/bthginfo/showtime/actions/runs/38146438436) bestand vollständig. Produktion `dpl_87c3FBR2rp5xtvPGH7x7U2KGyc3X` und geschützte Preview `dpl_8ALcbBjtJbA49xLDDBs3SHHjntXz` wurden aus demselben Commit erfolgreich gebaut. Der Produktionsalias ist [Showtime Ingolstadt](https://showtime-ingolstadt.vercel.app).
+
+**19 Live-Prüfungen in Produktion** bestätigten Anmeldung, 21 aktive Gewerke, den Ausstattung-Demozugang mit geprüftem Modellstand, öffentlichen OpenAPI-Vertrag, persistenten nativen Dokumentstand, private Originaldatei, tatsächliche DOCX-/PDF-Exporte, verweigerten Zugriff aus einem anderen Theater, scoped API, Wiederholschutz, abgewiesenen geänderten Inhalt und Widerruf. Die echte Vercel-Queue erzeugte alle 21 Arbeitsräume einer neuen synthetischen Produktion; der Prüfer führte den Consumer nicht selbst aus. **Acht zusätzliche Prüfungen auf der geschützten Preview** bestätigten ihre getrennte Identität, OpenAPI, private Datei/Exporte, API-Widerruf und ebenfalls alle 21 echten Queue-Arbeitsräume. Deployment Protection blieb aktiv; der Test verwendete ein kurzlebiges Token des eigenen Vercel-Projekts.
+
+Die synthetischen Testproduktionen und Dokumentkanäle wurden archiviert, die Testaufgabe abgeschlossen und alle Test-API-Zugänge widerrufen. Bestehende Geschäftsdaten wurden durch die Cloud-Prüfung nicht geändert. Eine neue verschlüsselte Produktionssicherung enthält 106 anhand ihres Inhalts geprüfte private Dateien.
+
+Im tatsächlichen Live-Browser wurden Gastnavigation, Personalstart mit erreichbaren Teamzeiten und das Intendanz-Dashboard geprüft. Verwaltungs-/Schnittstellenreiter werden zusätzlich auf `tenant.configure` begrenzt, damit Gewerke und Intendanz dort keine unzugänglichen Hauptaktionen sehen. Der anschließende kleine UI-Nachtrag verändert keine Backend-, Datenbank- oder API-Verträge.
+
 ## Praktische Grenzen
 
 Stadttheater Ingolstadt enthält die zusätzliche Produktion **DEMO · Fachabläufe 2026/27** mit **106 verknüpften Beispieleinträgen** in allen 21 Gewerken. Ein neuer Ausstattung-Zugang ergänzt die bestehenden Demo-Konten; bestehende Passwörter bleiben erhalten. Die private lokale Zugangsdatei enthält jetzt 32 Demo-Konten einschließlich des reinen Plattform-Demozugangs. Die neue verschlüsselte Produktionssicherung und deren Schlüssel bleiben außerhalb des Repositorys.
 
-Der freigegebene Stand wird auf `bthginfo/showtime` und dem getrennten Vercel-Projekt veröffentlicht. Die Releaseprüfung verlangt GitHub CI, einen erfolgreichen Build desselben Git-Commits und einen Cloud-Rundlauf mit Anmeldung, echten Queue-Folgewirkungen, privaten Dateien/Exporten sowie einer tatsächlichen Browseransicht. Die ignorierten Releasebelege halten Deployment-ID und Commit fest; diese Datei enthält keine Secrets oder privaten API-Antworten.
+Der freigegebene Stand liegt auf `bthginfo/showtime` und dem getrennten Vercel-Projekt. Die ignorierten Releasebelege halten Deployment-ID und Commit fest; diese Datei enthält keine Secrets oder privaten API-Antworten.
 
 Die implementierten Ausbaupunkte sind überprüfbar; **absolute Fehlerfreiheit oder „100 Prozent“ Theaterbetriebsabdeckung wird nicht zugesagt**. Tests mit realen Beschäftigten, physischen Touchgeräten und einem vollständigen Screenreader-Durchlauf sind eine organisatorische Abnahme. Tatsächliche Arbeits-/Tarifprofile müssen vom Theater bestätigt werden. Herstellerspezifische Verbindungen benötigen die später gewählten Produkte und deren Zugangsdaten. SaaS-Abrechnung war kein Teil dieser Fachausbauliste.
 
