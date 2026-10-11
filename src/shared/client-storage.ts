@@ -9,5 +9,9 @@ export function useStoredValue<T=string>(key:string,fallback:T):FunctionalStore<
  return {...store,set(next){store.update(current=>{const value=typeof next==='function'?(next as (current:T)=>T)(current):next;try{localStorage.setItem(physical,String(value));queueMicrotask(()=>window.dispatchEvent(new Event('digitalmask-storage')));}catch{}return value;});}};
 }
 export function subscribeConnectivity(callback:()=>void){window.addEventListener('online',callback);window.addEventListener('offline',callback);return()=>{window.removeEventListener('online',callback);window.removeEventListener('offline',callback);};}
-export function subscribeLocation(callback:()=>void){window.addEventListener('popstate',callback);return()=>window.removeEventListener('popstate',callback);}
+export function subscribeLocation(callback:()=>void){
+ window.addEventListener('popstate',callback);
+ window.addEventListener('showtime-location',callback);
+ return()=>{window.removeEventListener('popstate',callback);window.removeEventListener('showtime-location',callback);};
+}
 export function subscribeMobile(callback:()=>void){const media=window.matchMedia('(max-width: 760px)');media.addEventListener('change',callback);return()=>media.removeEventListener('change',callback);}

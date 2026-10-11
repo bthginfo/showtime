@@ -1,4 +1,5 @@
 <script lang="ts">
+import { afterNavigate } from '$app/navigation';
 import MoreRecords from "./more-records.svelte";
 import {clearPrivateBrowserData} from "@/shared/private-browser-data";import { initialState } from '@/shared/svelte-runtime';
 
@@ -40,6 +41,8 @@ import type { ReactNode, CSSProperties, Dispatch, SetStateAction, FormEvent, Cha
 import { nav as allNav, ExportsModule } from "./workspace-shell";
 import {visibleNavigation} from '@/shared/navigation-policy';
 const effects=createEffects();
+// Native SvelteKit links do not emit popstate. Notify all workspace query stores.
+afterNavigate(() => window.dispatchEvent(new Event('showtime-location')));
 const workspaceStore=useWorkspace();
 let { workspace, notice, notify, online, action } = $workspaceStore;
 $: ({ workspace, notice, notify, online, action } = $workspaceStore);
