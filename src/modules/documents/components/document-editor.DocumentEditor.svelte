@@ -193,12 +193,12 @@ $: StatusIcon = status === "saving" || status === "loading" ? Loader2 : status =
           <Download size={15}></Download> Original
         </a>
         <div class="document-footer-actions">
-          <Button disabled={working || !session || status === "forbidden"} onClick={() => void attempt(async () => {
+          {#if session?.canEdit}<Button disabled={working || !editable} onClick={() => void attempt(async () => {
     await client?.checkpoint();
 })}>
             <Save size={15}></Save>
             {working ? "Bitte warten …" : "Speichern"}
-          </Button>
+          </Button>{/if}
           <div class="document-download-group">
             <Button variant="primary" disabled={working || !session || status === "forbidden"} onClick={() => download(mainFormat)}>
               <Download size={16}></Download>

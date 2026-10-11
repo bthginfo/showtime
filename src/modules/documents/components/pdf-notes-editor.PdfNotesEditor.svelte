@@ -10,6 +10,7 @@ import { useDocumentRevision } from "../client/use-document-revision";
 import { createEffects, createId, externalStore, styleString, applyRef } from "@/shared/svelte-runtime";
 import type { ReactNode, CSSProperties, Dispatch, SetStateAction, FormEvent, ChangeEvent, KeyboardEvent, MouseEvent, DragEvent, ComponentProps, RefObject } from "@/shared/ui-types";
 import { replaceText } from "./pdf-notes-editor";
+import PdfPreview from "./pdf-preview.svelte";
 const effects=createEffects();
 type ViewProps = {
     doc: Y.Doc;
@@ -25,7 +26,7 @@ export let user: ViewProps["user"] = undefined as any;
 export let editable: ViewProps["editable"] = undefined as any;
 const documentRevisionStore=useDocumentRevision(doc);
 let notes: any = doc.getArray<Y.Map<unknown>>(PDF_NOTES);
-let tab: "file" | "notes" = initialState<"file" | "notes">("notes");
+let tab: "file" | "notes" = initialState<"file" | "notes">(editable ? "notes" : "file");
 const setTab = (next: "file" | "notes" | ((current: "file" | "notes") => "file" | "notes")) => { tab = typeof next === "function" ? (next as (current: "file" | "notes") => "file" | "notes")(tab) : next; };
 let page: number = 1;
 const setPage = (next: typeof page | ((current: typeof page) => typeof page)) => { page = typeof next === "function" ? (next as (current: typeof page) => typeof page)(page) : next; };
@@ -48,15 +49,15 @@ $: { void $documentRevisionStore; notes = doc.getArray<Y.Map<unknown>>(PDF_NOTES
 
 <div class={`shared-pdf-editor show-${tab}`}>
       <div class="pdf-mobile-tabs segmented">
-        <button class={tab === "file" ? "active" : ""} on:click={() => setTab("file")}>
+        <button class={tab === "file" ? "active" : ""} aria-pressed={tab === "file"} on:click={() => setTab("file")}>
           PDF ansehen
         </button>
-        <button class={tab === "notes" ? "active" : ""} on:click={() => setTab("notes")}>
+        <button class={tab === "notes" ? "active" : ""} aria-pressed={tab === "notes"} on:click={() => setTab("notes")}>
           Gemeinsame Notizen
         </button>
       </div>
       <div class="pdf-original-view">
-        <iframe title="Original-PDF" src={`/api/files/${fileId}#page=${page}`}></iframe>
+        <PdfPreview {fileId} bind:page />
         <a class="text-button" href={`/api/files/${fileId}`} target="_blank" rel="noreferrer">
           PDF in groß öffnen ↗
         </a>
@@ -68,7 +69,7 @@ $: { void $documentRevisionStore; notes = doc.getArray<Y.Map<unknown>>(PDF_NOTES
             Eure Hinweise werden beim PDF-Download als zusätzliche Seiten angefügt.
           </p>
         </header>
-        <div class="pdf-add-note">
+        {#if editable}<div class="pdf-add-note">
           <label>
             Seite
             <select value={page} aria-label="PDF-Seite" on:change={(event) => setPage(Number(event.currentTarget.value))}>
@@ -80,7 +81,7 @@ $: { void $documentRevisionStore; notes = doc.getArray<Y.Map<unknown>>(PDF_NOTES
           <Button disabled={!editable} onClick={addNote}>
             <Plus size={16}></Plus> Notiz
           </Button>
-        </div>
+        </div>{/if}
         <div class="pdf-notes-list">
           {#if notes.length}{#each notes.toArray() as note, index (String(note.get("id")))}{@const text = note.get("text")}<article class="pdf-shared-note">
                   <header>
@@ -96,7 +97,7 @@ $: { void $documentRevisionStore; notes = doc.getArray<Y.Map<unknown>>(PDF_NOTES
 }}></textarea>
                 </article>{/each}{:else}<div class="document-notes-empty">
               <strong>Noch keine Notizen</strong>
-              <p>Wähle eine Seite und ergänze euren ersten Hinweis.</p>
+              <p>{editable ? "Wähle eine Seite und ergänze euren ersten Hinweis." : "Zu diesem PDF liegen keine gemeinsamen Notizen vor."}</p>
             </div>{/if}
         </div>
       </section>
