@@ -8,6 +8,17 @@ export type TradeGuide = {
   check: string;
 };
 export const tradeGuides: Record<string, TradeGuide> = {
+  design: {
+    label: "Ausstattung & Bühnenbild",
+    purpose:
+      "Entwürfe mit Bühne, Werkstätten, Kostüm und Maske zu einem geprüften Produktionsstand verbinden.",
+    work: "Entwurfs- und Zeichnungsfassungen anlegen, Anlagen beifügen, Modell- und Bauprobe disponieren und offene Änderungen verteilen.",
+    partners: "Regie, Werkstätten, Bühne, Kostüm und Maske",
+    example: "Eine geänderte Figurine mit privater Anlage zur Prüfung an die Maske schicken",
+    target: "makeup",
+    check:
+      "Der unveränderte Entwurf wurde durch die zuständige andere Leitung freigegeben; Abgaben und Bauprobe sind geklärt.",
+  },
   disposition: {
     label: "Disposition & KBB",
     purpose: "Termine, Besetzung und verfügbare Räume zu einer belastbaren Planung verbinden.",

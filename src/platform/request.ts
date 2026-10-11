@@ -5,6 +5,7 @@ export type RequestScope = {
   request: Request;
   context?: Context;
   transaction?: Transaction;
+  integration?: { id: string; scopes: string[] };
   after: (() => Promise<unknown> | void)[];
 };
 export const requestScope = new AsyncLocalStorage<RequestScope>();

@@ -83,6 +83,7 @@ export interface Member {
   grants?: import("@/platform/access").Grant[];
 }
 export interface Workspace {
+  timezone?: string;
   currentModuleId?: string;
   pages?: Partial<Record<RecordKind, string | null>>;
   scopes?: {

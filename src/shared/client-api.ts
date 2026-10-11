@@ -53,25 +53,25 @@ export const num = (data: RecordData, key: string) =>
   typeof data[key] === "number" ? (data[key] as number) : 0;
 export const ids = (data: RecordData, key: string): string[] =>
   Array.isArray(data[key]) ? (data[key] as string[]) : [];
-export const localDate = (date = new Date()) =>
-  formatInTimeZone(date, "Europe/Berlin", "yyyy-MM-dd");
-export const instantDate = (date: string) =>
+export const localDate = (date = new Date(), zone = "Europe/Berlin") =>
+  formatInTimeZone(date, zone, "yyyy-MM-dd");
+export const instantDate = (date: string, zone = "Europe/Berlin") =>
   /(?:Z|[+-]\d{2}:\d{2})$/i.test(date)
     ? new Date(date)
-    : fromZonedTime(date.length === 10 ? `${date}T00:00:00` : date, "Europe/Berlin");
-export const localDateTime = (date: string) =>
-  formatInTimeZone(instantDate(date), "Europe/Berlin", "yyyy-MM-dd'T'HH:mm");
-export const dateLabel = (date: string, time = false) =>
+    : fromZonedTime(date.length === 10 ? `${date}T00:00:00` : date, zone);
+export const localDateTime = (date: string, zone = "Europe/Berlin") =>
+  formatInTimeZone(instantDate(date, zone), zone, "yyyy-MM-dd'T'HH:mm");
+export const dateLabel = (date: string, time = false, zone = "Europe/Berlin") =>
   date
     ? new Intl.DateTimeFormat("de-DE", {
-        timeZone: "Europe/Berlin",
+        timeZone: zone,
         day: "2-digit",
         month: "short",
         ...(time ? { hour: "2-digit", minute: "2-digit" } : {}),
-      }).format(instantDate(date))
+      }).format(instantDate(date, zone))
     : "–";
-export const weekStart = (date = new Date()) => {
-  const day = new Date(`${localDate(date)}T12:00:00Z`);
+export const weekStart = (date = new Date(), zone = "Europe/Berlin") => {
+  const day = new Date(`${localDate(date, zone)}T12:00:00Z`);
   day.setUTCDate(day.getUTCDate() - ((day.getUTCDay() + 6) % 7));
   return day.toISOString().slice(0, 10);
 };

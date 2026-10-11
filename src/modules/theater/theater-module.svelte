@@ -1,8 +1,12 @@
 <script lang="ts">
+  import { useTheaterTime } from "@/components/theater-time";
+  const { localDate } = useTheaterTime();
+  import { theaterLabel, theaterInstant } from "@/shared/theater-time";
   import { onMount } from "svelte";
   import { useWorkspace } from "@/components/workspace-context";
   import { PageHeader, Button, ErrorMessage, Modal, Empty, Badge } from "@/components/ui";
-  import { api, post, dateLabel, localDate, shiftDate } from "@/shared/client-api";
+  import { api, post, shiftDate } from "@/shared/client-api";
+  import { navigateWorkspace } from "@/shared/client-navigation";
   import { hasPermission, type Permission } from "@/platform/access";
   import ScopePicker from "@/components/scope-picker.svelte";
   import type { Planning, TradeItem, Configuration } from "./types";
@@ -14,10 +18,15 @@
   import TheaterCollaborations from "./theater-collaborations.svelte";
   import TheaterOverview from "./theater-overview.svelte";
   import TradeGuide from "@/modules/help/components/trade-guide.svelte";
+  import { tradeChoiceLabel } from "@/shared/trade-labels";
+  import TradeDetail from "./trade-detail.svelte";
+  import ReadinessPanel from "./readiness-panel.svelte";
+  import TheaterIntegrations from "./theater-integrations.svelte";
   import "./theater-operations.css";
   export let initialView = "trade";
   export let productionId = "";
   export let requestId = "";
+  export let itemId = "";
   const store = useWorkspace();
   $: workspace = $store.workspace;
   let view = [
@@ -28,6 +37,7 @@
     "administration",
     "collaborations",
     "overview",
+    "integrations",
   ].includes(initialView)
     ? initialView
     : "trade";
@@ -35,13 +45,31 @@
   let error = "";
   let busy = false;
   let selectedProduction = productionId;
+  function navigateTheater(nextView: string, nextProduction = selectedProduction) {
+    const params = new URLSearchParams({ module: "theater", view: nextView });
+    if (nextProduction) params.set("productionId", nextProduction);
+    navigateWorkspace("/?" + params.toString(), { retainOrigin: false });
+  }
+  $: if (
+    !selectedProduction &&
+    workspace.user.grants?.length &&
+    workspace.user.grants.every((grant) => grant.role === "guest") &&
+    workspace.records.productions.length === 1
+  )
+    selectedProduction = workspace.records.productions[0].id;
   let collaborationSource: TradeItem | null = null;
   let selectedModule = "";
   let selectedFeature = "";
   let editor: TradeItem | null = null;
+  let detailItem: TradeItem | null = null;
+  let includeArchived = false,
+    ownerId = "",
+    deputyId = "",
+    dueAt = "";
   let editing = false;
   let title = "";
   let status = "draft";
+  let initialItemOpened = false;
   let fields: Record<string, unknown> = {};
   let dependencies: string[] = [];
   let invitationUrl = "";
@@ -60,7 +88,11 @@
     selected?.manifest.features[0];
   $: items =
     planning?.items.filter(
-      (i) => i.type !== "workspace" && i.moduleId === selected?.moduleId && i.type === feature?.id,
+      (i) =>
+        i.type !== "workspace" &&
+        i.moduleId === selected?.moduleId &&
+        i.type === feature?.id &&
+        (includeArchived || !["archived", "cancelled"].includes(i.status)),
     ) || [];
   $: views = [
     ...(allowed("budget.read") ? [["overview", "Hausübersicht"]] : []),
@@ -69,6 +101,7 @@
     ["resources", "Ressourcen"],
     ["schedule", "Spielplan"],
     ["readiness", "Bereitschaft"],
+    ["integrations", "Schnittstellen"],
     ["administration", "Theater & Zugänge"],
   ];
   const itemStatus: Record<string, string> = {
@@ -80,6 +113,8 @@
     blocked: "Blockiert",
     approved: "Genehmigt",
     rejected: "Abgelehnt",
+    archived: "Archiviert",
+    cancelled: "Abgebrochen",
   };
   const allowed = (
     permission: Permission,
@@ -100,6 +135,13 @@
     error = "";
     try {
       planning = await api<Planning>(query());
+      if (itemId && !initialItemOpened) {
+        initialItemOpened = true;
+        const loaded = await api<{ item: TradeItem }>(
+          "/api/theater/operations?id=" + encodeURIComponent(itemId),
+        );
+        detailItem = loaded.item;
+      }
       if (!selectedModule || !modules.some((m) => m.moduleId === selectedModule))
         selectedModule =
           planning.modules.find((m) => m.config.departmentId === workspace.department.id)
@@ -131,11 +173,17 @@
       .find((m) => m.moduleId === selectedModule)
       ?.manifest.features.find((f) => f.id === selectedFeature);
     title = item?.title || "";
+    ownerId = item?.ownerId || workspace.user.id;
+    deputyId = String(item?.data._deputyId || "");
+    dueAt = item?.dueAt?.slice(0, 10) || "";
     status = item?.status || (feature?.id === "audience-report" ? "done" : "draft");
     fields = Object.fromEntries(
       (contract?.fields || [])
         .filter((f) => item?.data[f.key] !== undefined)
-        .map((f) => [f.key, item!.data[f.key]]),
+        .map((f) => [
+          f.key,
+          f.managed === "approval" ? (f.type === "checkbox" ? false : "draft") : item!.data[f.key],
+        ]),
     );
     dependencies = Array.isArray(item?.data.dependencyIds)
       ? (item.data.dependencyIds as string[])
@@ -170,6 +218,11 @@
         productionId: selectedProduction || undefined,
         data: fields,
         dependencyIds: dependencies,
+        ownerId,
+        ...(deputyId ? { deputyId } : {}),
+        ...(dueAt
+          ? { dueAt: theaterInstant(dueAt + "T12:00", planning?.timezone || "Europe/Berlin") }
+          : {}),
       });
       editing = false;
     } catch {}
@@ -234,6 +287,18 @@
   function display(item: TradeItem, key: string) {
     const field = featureFor(item)?.fields.find((f) => f.key === key),
       value = item.data[key];
+    if (field?.managed && !item.approvalVerified) return "Freigabe noch erforderlich";
+    if (field?.type === "member")
+      return workspace.members.find((m) => m.id === value)?.name || "Teammitglied";
+    if (field?.type === "trade")
+      return (
+        planning?.items.find((i) => i.id === value)?.title ||
+        "Referenz außerhalb der geladenen Seite"
+      );
+    if (field?.type === "trades")
+      return (Array.isArray(value) ? value : [])
+        .map((id) => planning?.items.find((i) => i.id === id)?.title || "Fachstand")
+        .join(", ");
     if (field?.type === "checkbox") return value ? "Ja" : "Nein";
     if (field?.type === "date") return dateLabel(String(value));
     if (field?.type === "datetime") return dateLabel(String(value), true);
@@ -261,8 +326,10 @@
       const row = workspace.records[field.source].find((r) => r.id === value);
       return String(row?.data.title || row?.data.name || value);
     }
-    return String(value);
+    return field?.type === "select" ? tradeChoiceLabel(String(value)) : String(value);
   }
+  const dateLabel = (value: string, withTime = false) =>
+    theaterLabel(value, planning?.timezone || "Europe/Berlin", withTime);
 </script>
 
 <div class="theater-workspace">
@@ -278,11 +345,11 @@
         role="tab"
         aria-selected={view === id}
         class:active={view === id}
-        on:click={() => (view = id)}>{label}</button
+        on:click={() => navigateTheater(id)}>{label}</button
       >{/each}
   </div>
   <label class="theater-view-picker"
-    >Theaterbereich<select bind:value={view}
+    >Theaterbereich<select bind:value={view} on:change={() => navigateTheater(view)}
       >{#each views as [id, label]}<option value={id}>{label}</option>{/each}</select
     ></label
   >
@@ -292,7 +359,7 @@
         moduleId={planning.modules.find(
           (module) => module.config.departmentId === workspace.department.id,
         )?.moduleId || "makeup"}
-        onOpen={(next) => (view = next)}
+        onOpen={(next) => navigateTheater(next)}
       />{/key}{/if}
   {#if view !== "overview"}
     <div class="filters">
@@ -300,7 +367,7 @@
         >Produktion<select
           bind:value={selectedProduction}
           disabled={busy}
-          on:change={() => void load()}
+          on:change={() => navigateTheater(view, selectedProduction)}
           ><option value="">Alle / ohne Produktion</option
           >{#each workspace.records.productions as p (p.id)}<option value={p.id}
               >{String(p.data.title)}</option
@@ -320,11 +387,7 @@
   <ErrorMessage message={error} />
   {#if !planning}<p class="muted">Theaterdaten werden geladen …</p>
   {:else if view === "overview" && allowed("budget.read")}<TheaterOverview
-      onProduction={(id) => {
-        selectedProduction = id;
-        view = "readiness";
-        void load();
-      }}
+      onProduction={(id) => navigateTheater("readiness", id)}
     />
   {:else if view === "collaborations"}{#key `${selectedProduction}:${collaborationSource?.id || ""}`}<TheaterCollaborations
         {planning}
@@ -364,6 +427,25 @@
         title="Kein Fachmodul aktiviert"
         description="Die Theateradministration kann ein Modul für dieses Gewerk aktivieren."
       />{/if}
+    {#if selected?.moduleId === "stage-management" && selectedProduction}<section class="surface">
+        <h2>Druck & Offline</h2>
+        <p>
+          Speichere den aktuell zugänglichen Cue-Stand als unveränderlichen Auszug. Gleiche ihn vor
+          jeder Vorstellung mit der aktuellen Freigabe ab.
+        </p>
+        <a
+          class="button secondary"
+          href={"/api/theater/cues?productionId=" + encodeURIComponent(selectedProduction)}
+          >Cue-Stand für Druck / Offline speichern</a
+        ><a
+          class="button secondary"
+          href={"/api/theater/cues?format=csv&productionId=" +
+            encodeURIComponent(selectedProduction)}>Cues als CSV</a
+        >
+      </section>{/if}
+    <label class="check-label"
+      ><input type="checkbox" bind:checked={includeArchived} />Archivierte Stände anzeigen</label
+    >
     <div class="card-grid">
       {#each items as item (item.id)}{@const contract = featureFor(item)}
         <article class="surface">
@@ -382,17 +464,32 @@
           <dl class="detail-grid">
             {#each contract?.fields || [] as field (field.key)}{#if item.data[field.key] !== undefined && item.data[field.key] !== ""}<div
                 >
-                  <dt>{field.label}</dt>
+                  <dt>
+                    {field.key === "amountCents"
+                      ? field.label.replace("(Cent)", "(€)")
+                      : field.label}
+                  </dt>
                   <dd>{display(item, field.key)}</dd>
                 </div>{/if}{/each}
           </dl>
+          <p class="small muted">
+            Verantwortlich: {workspace.members.find((m) => m.id === item.ownerId)?.name ||
+              "Erstellende Person"}{item.dueAt ? " · fällig " + dateLabel(item.dueAt) : ""}
+          </p>
+          <div class="button-row">
+            <Button onClick={() => (detailItem = item)}>Details, Fassungen & Anlagen</Button
+            >{#if item.type === "asset" && item.data._stock}<span class="small"
+                >Verfügbar: {String((item.data._stock as { available: number }).available)} · ausgeliehen:
+                {String((item.data._stock as { loaned: number }).loaned)}</span
+              >{/if}
+          </div>
           {#if Array.isArray(item.data.dependencyIds) && item.data.dependencyIds.length}<p
               class="small"
             >
               Vorarbeiten: {item.data.dependencyIds
                 .map((id) => planning?.items.find((i) => i.id === id)?.title || "Eintrag")
                 .join(", ")}
-            </p>{/if}{#if contract && allowed(contract.permission, item.productionId || "", item.departmentId) && !["approved", "rejected"].includes(item.status)}<Button
+            </p>{/if}{#if contract && allowed(contract.permission, item.productionId || "", item.departmentId) && !["approved", "rejected", "archived", "cancelled", "stock-movement"].includes(item.status) && item.type !== "stock-movement"}<Button
               disabled={busy}
               onClick={() => start(item)}>Bearbeiten</Button
             >{/if}{#if item.type === "purchase" && item.status === "review" && item.createdBy !== workspace.user.id && allowed("budget.approve", item.productionId || "", item.departmentId)}<Button
@@ -412,7 +509,15 @@
                   decision: "rejected",
                 }).catch(() => {})}>Ablehnen</Button
             >{/if}
-          {#if contract && !contract.private && item.productionId && item.departmentId === workspace.department.id && allowed("handover.create", item.productionId, item.departmentId)}<Button
+          {#if item.approvalVerified && item.data._approval}<p class="small">
+              Geprüfte Fassung: Freigabe durch {workspace.members.find(
+                (member) =>
+                  member.id === (item.data._approval as { approvedBy: string }).approvedBy,
+              )?.name || "berechtigte Leitung"} · {dateLabel(
+                String((item.data._approval as { approvedAt: string }).approvedAt),
+              )}
+            </p>{/if}
+          {#if contract && !contract.private && item.productionId && item.departmentId === workspace.department.id && allowed("collaboration.create", item.productionId, item.departmentId)}<Button
               disabled={busy}
               onClick={() => {
                 collaborationSource = item;
@@ -423,38 +528,37 @@
     </div>
     {#if !items.length && selected}<Empty
         title="Noch keine Einträge"
-        description="Wähle einen Arbeitsablauf und lege den ersten Eintrag an."
+        description={feature && allowed(feature.permission)
+          ? "Wähle die passende Produktion und lege einen Arbeitsstand an. Verknüpfte Personen und Geräte werden beim Speichern geprüft."
+          : "Hier erscheinen die für dich freigegebenen Arbeitsstände. Deine zuständige Leitung kann neue Einträge anlegen."}
       />{/if}{#if planning.nextCursor}<Button disabled={busy} onClick={() => void moreItems()}
         >Weitere Einträge laden</Button
       >{/if}
   {:else if view === "resources"}<TheaterResources {planning} {run} {busy} {more} />
+  {:else if view === "integrations"}<TheaterIntegrations
+      {planning}
+      productionId={selectedProduction}
+      onChanged={async () => {
+        await $store.refresh();
+        await load();
+      }}
+    />
   {:else if view === "schedule"}<TheaterSchedule
       {planning}
       {run}
       {busy}
       {more}
       productionId={selectedProduction}
+      onChanged={async () => {
+        await $store.refresh();
+        await load();
+      }}
     />
-  {:else if view === "readiness"}<section class="surface">
-      <h2>Bereitschaft der Gewerke</h2>
-      {#if !selectedProduction}<p>
-          Wähle eine Produktion, um die Bereitschaft für technische Proben und Vorstellungen zu
-          sehen.
-        </p>{:else}<table>
-          <thead><tr><th>Gewerk</th><th>Erforderlich</th><th>Stand</th><th>Geändert</th></tr></thead
-          ><tbody
-            >{#each planning.readiness as state (state.moduleId)}<tr
-                ><td>{state.label}</td><td>{state.required ? "Ja" : "Optional"}</td><td
-                  ><Badge>{state.ready ? "Bereit" : "Offen"}</Badge></td
-                ><td>{state.updatedAt ? dateLabel(state.updatedAt, true) : "–"}</td></tr
-              >{/each}</tbody
-          >
-        </table>
-        <p class="small muted">
-          Eine Teamleitung bestätigt die Bereitschaft im jeweiligen Fachmodul. Offene erforderliche
-          Gewerke sperren den Wechsel zur Generalprobe und zum Spielbetrieb.
-        </p>{/if}
-    </section>
+  {:else if view === "readiness"}{#key selectedProduction}<ReadinessPanel
+        {planning}
+        productionId={selectedProduction}
+        onChanged={load}
+      />{/key}
   {:else}<section class="surface">
       <h2>Arbeitsbereich wechseln</h2>
       <ScopePicker compact onSelect={switchScope} />
@@ -476,12 +580,26 @@
       ><form class="form-grid" on:submit|preventDefault={() => void save()}>
         <label class="full">Titel<input bind:value={title} required maxlength="200" /></label
         ><TradeFields
+          privateData={feature.private || false}
           fields={feature.fields}
           data={fields}
           {planning}
           productionId={selectedProduction}
           update={(key, value) => (fields = { ...fields, [key]: value })}
-        />{#if !feature.private}<fieldset class="form-multi full">
+        /><label
+          >Verantwortlich<select bind:value={ownerId}
+            >{#each workspace.members.filter((m) => m.id === workspace.user.id || allowed("task.assign")) as member (member.id)}<option
+                value={member.id}>{member.name}</option
+              >{/each}</select
+          ></label
+        >{#if allowed("task.assign")}<label
+            >Vertretung<select bind:value={deputyId}
+              ><option value="">Keine</option>{#each workspace.members as member (member.id)}<option
+                  value={member.id}>{member.name}</option
+                >{/each}</select
+            ></label
+          >{/if}<label>Frist<input type="date" bind:value={dueAt} /></label
+        >{#if !feature.private}<fieldset class="form-multi full">
             <legend>Erforderliche Vorarbeiten</legend
             >{#each planning.items.filter((i) => i.productionId === (selectedProduction || null) && i.id !== editor?.id && i.type !== "workspace" && featureFor(i) && !featureFor(i)?.private) as dependency (dependency.id)}<label
                 class="check-label"
@@ -508,4 +626,13 @@
         >
       </form></Modal
     >{/if}
+  {#if detailItem && planning}<TradeDetail
+      item={detailItem}
+      {planning}
+      onClose={() => (detailItem = null)}
+      onChanged={async () => {
+        await $store.refresh();
+        await load();
+      }}
+    />{/if}
 </div>

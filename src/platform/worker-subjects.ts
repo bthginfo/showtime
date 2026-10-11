@@ -68,6 +68,7 @@ export async function activeSubjects(
         organizationId,
         departmentId: identity.departmentId,
         organizationName: "",
+        timezone: settings.timezone,
         departmentName: "",
         grants,
         activeDepartmentIds: [...departments],

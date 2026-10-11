@@ -25,6 +25,7 @@
   import { ThemeSwitch } from "./theme-switch";
   import { Modal } from "./ui";
   import { LinkedText } from "./linked-text";
+  import PlatformHealth from "./platform-health.svelte";
 
   type Scope = {
     organizationId: string;
@@ -365,6 +366,7 @@
         >
       </div>{/if}
     {#if tab === "theaters"}
+      <PlatformHealth {theaters} />
       <div class="platform-management">
         <section class="platform-list" aria-label="Theaterübersicht" aria-busy={loading}>
           <div class="platform-toolbar">

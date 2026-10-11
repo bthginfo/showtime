@@ -11,6 +11,10 @@ export type TheaterOverview = {
     committedCents: number;
     pendingCents: number;
     remainingCents: number;
+    orderedCents: number;
+    invoicedCents: number;
+    paidCents: number;
+    forecastCents: number;
   };
   audience: {
     reports: number;
@@ -30,6 +34,22 @@ export type TheaterOverview = {
     required: number;
     missing: string[];
   }[];
+  trend: {
+    month: string;
+    visitors: number;
+    incomeCents: number;
+    reports: number;
+    occupancy: number | null;
+  }[];
+  comparison: {
+    label: string;
+    visitors: number;
+    incomeCents: number;
+    reports: number;
+    occupancy: number | null;
+  };
+  seasons: { id: string; label: string; start: string; end: string }[];
+  workload: { plannedHours: number; people: number; over40Hours: number; available: boolean };
 };
 export function audienceOccupancy(visitors: number, seats: number) {
   return seats > 0 ? Math.round((visitors / seats) * 1000) / 10 : null;

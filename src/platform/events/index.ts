@@ -107,7 +107,17 @@ export async function processEvents(eventId?: string) {
           .limit(1);
         if (!reference) {
           const { del } = await import("@vercel/blob");
-          await del(String(event.payload.path));
+          const references = await db
+            .select({ id: records.id })
+            .from(records)
+            .where(
+              and(
+                eq(records.kind, "files"),
+                sql`${records.data}->>'path'=${String(event.payload.path)}`,
+              ),
+            )
+            .limit(1);
+          if (!references.length) await del(String(event.payload.path));
           if (
             event.payload.fileId &&
             /\.(?:docx|xlsx|csv|pdf)$/i.test(String(event.payload.path))

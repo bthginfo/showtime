@@ -15,6 +15,9 @@ export type TradeItem = {
   version: number;
   data: RecordData;
   updatedAt: string;
+  ownerId?: string | null;
+  dueAt?: string | null;
+  approvalVerified?: boolean;
 };
 export type Resource = {
   id: string;
@@ -62,6 +65,9 @@ export type ProductionMetadata = {
   version: number;
 };
 export type Planning = {
+  timezone: string;
+  resourceBlocks: { itemId: string; resourceId: string; title: string }[];
+  tradeFiles: { id: string; data: Record<string, unknown> }[];
   items: TradeItem[];
   nextCursor: string | null;
   pages: Partial<Record<Collection, string | null>>;
@@ -90,6 +96,8 @@ export type Planning = {
     costCentre: string;
   }[];
   readiness: {
+    stale?: boolean;
+    waiver?: { reason: string; expiresAt: string; approvedBy: string } | null;
     moduleId: string;
     departmentId: string;
     label: string;
@@ -108,6 +116,9 @@ export type Configuration = {
     settings: {
       quotas?: { members: number; filesBytes: number; uploadsPerUserPerDay?: number };
       workRules?: Record<string, number | boolean>;
+      workRuleProfiles?: import("@/shared/work-rule-profiles").WorkRuleProfile[];
+      reminderRules?: { beforeDays: number; escalateAfterDays: number };
+      setupCompletedAt?: string;
       requiredReadinessModules?: string[];
     };
   };

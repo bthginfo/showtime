@@ -34,12 +34,12 @@ Der verbindliche Erstumfang und seine Umsetzung stehen in [APPROVED-PLAN.md](APP
 - [x] Mobile Navigation verwendet die wirksamen Rollenrechte des Seitenmenüs.
 - [x] Rückmeldung Maske → Kostüm über den echten Produktions-Queue-Consumer bestätigt.
 
-Die im Fachtest ermittelten weiteren P1/P2/P3-Ausbaupunkte sind **offen** und im Bericht je Rolle und Gewerk beschrieben. Sie sind keine als erledigt gekennzeichneten Funktionen. Dazu gehören insbesondere durchgehende Fachreferenzen, formale Fachfreigaben, KBB-Abstimmungsrechte und rollenbezogene Startseiten.
+Die anschließend freigegebenen P1/P2/P3-Ausbaupunkte sind umgesetzt. Fachreferenzen, formale Freigaben, KBB-Abstimmungsrechte, rollenbezogene Startseiten und der weitere Umfang sind in [AUSBAU-ABNAHME.md](AUSBAU-ABNAHME.md) mit passenden Prüfungen dokumentiert. [AUSBAU-ARBEITSPLAN.md](AUSBAU-ARBEITSPLAN.md) enthält die vollständige Umsetzungsliste.
 
 ## Spätere Erweiterungen außerhalb der Erstfreigabe
 
-- Anbieterabhängige Schnittstellen für Ticketing, CAD, Buchhaltung, Lohn und Showtechnik.
+- Produktabhängige Anbindungen an noch nicht gewählte Hersteller. Offene API, CSV/JSON, iCalendar, MVR/GDTF-Metadaten und neutrale Adapterprofile sind implementiert.
 - SaaS-Abrechnung und optional eigene Datenbanken für besonders abgeschottete Theater.
 - Redis-Transport bei passendem kostenfreien oder ausdrücklich genehmigtem Tarif und höherer Live-Last.
-- Große Medienarchive und Tournee-/Vertragsverwaltung.
+- Medienarchive oberhalb der vorhandenen Quoten und 64-MB-Dateigrenze. Versionierte private Medien sowie Tournee-/Vertragsstände sind implementiert.
 - Übernommene Svelte-Kompatibilitätssyntax bei späteren Funktionsänderungen schrittweise modernisieren, mit Referenzvergleich der betroffenen Ansichten.

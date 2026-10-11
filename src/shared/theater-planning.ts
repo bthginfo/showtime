@@ -1,4 +1,5 @@
 export type PlanningInterval = { start: Date; end: Date };
+import { fromZonedTime } from "date-fns-tz";
 
 /** Availability dates belong to the theater's zone. The end of a service is exclusive. */
 export function planningDateWindow(interval: PlanningInterval, timeZone: string) {
@@ -40,7 +41,7 @@ export function workRuleViolation(
   proposed: PlanningInterval,
   existing: PlanningInterval[],
   rules: Record<string, unknown>,
-): "maximum-duty" | "minimum-rest" | null {
+): "maximum-duty" | "minimum-rest" | "maximum-week" | "consecutive-days" | null {
   if (rules.confirmedByTheater !== true) return null;
   const blocks = continuousPlanningBlocks([proposed, ...existing]);
   const duty = blocks.find((block) => block.start <= proposed.start && block.end >= proposed.end)!;
@@ -55,6 +56,64 @@ export function workRuleViolation(
         ? duty.start.getTime() - block.end.getTime()
         : block.start.getTime() - duty.end.getTime();
     if (gap > 0 && gap < minimumRest * 3600000) return "minimum-rest";
+  }
+  const zone = String(rules.timezone || "Europe/Berlin");
+  const proposedDates = planningDateWindow(proposed, zone);
+  if (typeof rules.maxWeeklyHours === "number") {
+    let day = proposedDates.from;
+    const weeks = new Set<string>();
+    while (day <= proposedDates.to) {
+      const value = new Date(day + "T00:00Z"),
+        weekday = (value.getUTCDay() + 6) % 7;
+      value.setUTCDate(value.getUTCDate() - weekday);
+      weeks.add(value.toISOString().slice(0, 10));
+      day = new Date(Date.parse(day + "T00:00Z") + 86400000).toISOString().slice(0, 10);
+    }
+    for (const monday of weeks) {
+      const from = fromZonedTime(monday + "T00:00", zone).getTime(),
+        until = fromZonedTime(
+          new Date(Date.parse(monday + "T00:00Z") + 7 * 86400000).toISOString().slice(0, 10) +
+            "T00:00",
+          zone,
+        ).getTime();
+      const hours = blocks.reduce(
+        (sum, b) =>
+          sum +
+          Math.max(0, Math.min(b.end.getTime(), until) - Math.max(b.start.getTime(), from)) /
+            3600000,
+        0,
+      );
+      if (hours > rules.maxWeeklyHours) return "maximum-week";
+    }
+  }
+  if (typeof rules.maxConsecutiveDays === "number") {
+    const days = new Set<string>();
+    for (const block of blocks) {
+      const range = planningDateWindow(block, zone);
+      let day = range.from;
+      while (day <= range.to) {
+        days.add(day);
+        day = new Date(Date.parse(day + "T00:00Z") + 86400000).toISOString().slice(0, 10);
+      }
+    }
+    const sorted = [...days].sort();
+    let count = 0,
+      previous = "",
+      first = "";
+    for (const day of sorted) {
+      if (previous && Date.parse(day) - Date.parse(previous) === 86400000) count++;
+      else {
+        count = 1;
+        first = day;
+      }
+      if (
+        count > rules.maxConsecutiveDays &&
+        first <= proposedDates.to &&
+        day >= proposedDates.from
+      )
+        return "consecutive-days";
+      previous = day;
+    }
   }
   return null;
 }

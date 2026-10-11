@@ -8,6 +8,7 @@ import type { Context } from "@/platform/context";
 import { processEvents } from "./index";
 import { publishEvents } from "./transport";
 import { checkpointDirtyDocuments } from "@/modules/documents/service";
+import { theaterReminders } from "@/modules/theater/reminders";
 export async function runWorkerScope<T>(request: Request, context: Context, run: () => Promise<T>) {
   const scope: RequestScope = { request, after: [] };
   return requestScope.run(scope, async () => {
@@ -49,6 +50,7 @@ export async function recoverTenants(request: Request) {
         const [department] = await db.select().from(departments).limit(1);
         if (!department) return;
         context.departmentId = department.id;
+        await theaterReminders(context);
         const events = process.env.VERCEL ? await publishEvents() : await processEvents();
         processed += "processed" in events ? events.processed : events.published;
         const documents = await checkpointDirtyDocuments();

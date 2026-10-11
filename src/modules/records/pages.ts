@@ -67,7 +67,7 @@ export function rowReadable(
   row: typeof records.$inferSelect,
   refs: ReadReferences,
 ) {
-  if (row.kind === "handovers" && row.data.collaborationId) return false;
+  if (row.kind === "handovers" && (row.data.collaborationId || row.data.tradeItemId)) return false;
   if (
     !centralKinds.includes(row.kind) &&
     row.departmentId !== context.departmentId &&
@@ -104,18 +104,23 @@ export async function recordPage(
     from?: string | null;
     to?: string | null;
     limit?: number;
+    productionId?: string;
   } = {},
   references?: ReadReferences,
 ) {
   const cursor = decodePosition(
       options.cursor,
       context,
-      `records:${kind}:${options.from || ""}:${options.to || ""}`,
+      `records:${kind}:${options.from || ""}:${options.to || ""}:${options.productionId || ""}`,
     ),
     refs = references || (await readReferences(context)),
     limit = Math.min(300, Math.max(1, options.limit || 200));
   const from = options.from ? z.iso.date().parse(options.from) : null,
     to = options.to ? z.iso.date().parse(options.to) : null;
+  if (options.productionId) {
+    const { assertProject } = await import("./repository");
+    await assertProject(context, options.productionId);
+  }
   if (from && to && to < from) throw new HttpError(400, "Ungültiger Zeitraum.");
   const page = await db
     .select({ ...getTableColumns(records), positionAt: pageTimestamp(records.createdAt) })
@@ -124,6 +129,7 @@ export async function recordPage(
       and(
         eq(records.organizationId, context.organizationId),
         eq(records.kind, kind),
+        options.productionId ? eq(records.productionId, options.productionId) : undefined,
         cursor ? sql`(${records.createdAt},${records.id})<(${cursor[0]},${cursor[1]})` : undefined,
         ["categories", "calendarCategories"].includes(kind)
           ? eq(records.departmentId, context.departmentId)
@@ -196,7 +202,7 @@ export async function recordPage(
         ? encodePosition(
             [scanned.at(-1)!.positionAt, scanned.at(-1)!.id],
             context,
-            `records:${kind}:${options.from || ""}:${options.to || ""}`,
+            `records:${kind}:${options.from || ""}:${options.to || ""}:${options.productionId || ""}`,
           )
         : null,
   };

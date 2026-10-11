@@ -12,6 +12,7 @@ import {
   moduleActivations,
   platformAdmins,
   invitations,
+  records,
 } from "@/platform/db/schema";
 import { identity, requireContext, requirePermission, type Context } from "@/platform/context";
 import { HttpError } from "@/platform/http";
@@ -22,6 +23,7 @@ import { auditChange, scheduleEvents } from "@/platform/events";
 import { outbox } from "@/platform/db/schema";
 import { roleKeys, canDelegate } from "@/platform/access";
 import { tenantInput } from "@/shared/tenant-management";
+import { workRuleProfilesInput } from "@/shared/work-rule-profiles";
 export async function requirePlatformAdmin() {
   const person = await identity();
   const [grant] = await authDb
@@ -241,6 +243,14 @@ export async function tenantConfiguration(context: Context, input: unknown) {
           })
           .optional(),
         requiredReadinessModules: z.array(z.string()).max(100).optional(),
+        workRuleProfiles: workRuleProfilesInput.optional(),
+        reminderRules: z
+          .object({
+            beforeDays: z.number().int().min(0).max(30),
+            escalateAfterDays: z.number().int().min(0).max(30),
+          })
+          .optional(),
+        setupComplete: z.boolean().optional(),
       })
       .parse(body.data);
     if (data.timezone) {
@@ -251,14 +261,61 @@ export async function tenantConfiguration(context: Context, input: unknown) {
       }
     }
     const [previous] = await db.select().from(tenantSettings).limit(1);
+    if (data.setupComplete) {
+      const enabled = await db
+        .select()
+        .from(moduleActivations)
+        .where(eq(moduleActivations.enabled, true));
+      if (!enabled.length || enabled.some((m) => !m.config.departmentId))
+        throw new HttpError(
+          409,
+          "Ordne zunächst mindestens ein aktives Fachmodul einem Gewerk zu.",
+        );
+    }
+    if (data.workRuleProfiles) {
+      const members = await db
+        .select({ id: memberships.userId })
+        .from(memberships)
+        .where(eq(memberships.status, "active"));
+      const actors = await db
+        .select({ id: records.id })
+        .from(records)
+        .where(eq(records.kind, "actors"));
+      const membersSet = new Set(members.map((m) => m.id)),
+        actorsSet = new Set(actors.map((a) => a.id));
+      if (
+        data.workRuleProfiles.some(
+          (p) =>
+            p.memberIds.some((id) => !membersSet.has(id)) ||
+            p.actorIds.some((id) => !actorsSet.has(id)),
+        )
+      )
+        throw new HttpError(
+          400,
+          "Regelprofile dürfen nur aktive Personen dieses Theaters enthalten.",
+        );
+    }
     await db
       .update(tenantSettings)
       .set({
         ...(data.timezone ? { timezone: data.timezone } : {}),
         settings: {
           ...previous.settings,
+          ...(data.setupComplete
+            ? { setupCompletedAt: new Date().toISOString(), setupCompletedBy: context.user.id }
+            : {}),
           ...(data.workRules ? { workRules: data.workRules } : {}),
           ...(data.quotas ? { quotas: data.quotas } : {}),
+          ...(data.workRuleProfiles
+            ? {
+                workRuleProfiles: data.workRuleProfiles.map((profile) => ({
+                  ...profile,
+                  confirmedBy: profile.rules.confirmedByTheater ? context.user.id : null,
+                  confirmedAt: profile.rules.confirmedByTheater ? new Date().toISOString() : null,
+                })),
+              }
+            : {}),
+          ...(data.reminderRules ? { reminderRules: data.reminderRules } : {}),
           ...(data.requiredReadinessModules
             ? { requiredReadinessModules: data.requiredReadinessModules }
             : {}),
@@ -266,6 +323,7 @@ export async function tenantConfiguration(context: Context, input: unknown) {
         permissionVersion: previous.permissionVersion + 1,
       })
       .where(eq(tenantSettings.organizationId, context.organizationId));
+    await auditChange(db as never, context, "theater.settings", context.organizationId);
     return { ok: true };
   }
   if (body.action === "department") {
@@ -291,10 +349,20 @@ export async function tenantConfiguration(context: Context, input: unknown) {
         scope: z.enum(["tenant", "department", "production"]),
         scopeId: z.string().nullable(),
         expiresAt: z.iso.datetime().optional(),
+        sensitiveConfirmed: z.boolean().optional(),
+        sensitiveReason: z.string().trim().max(2000).optional(),
       })
       .parse(body.data);
     if (!canDelegate({ id: context.user.id, grants: context.grants }, data))
       throw new HttpError(403, "Nur die Theateradministration darf diese Rolle delegieren.");
+    if (
+      ["personnel", "costume_specialist", "intendance"].includes(data.role) &&
+      (!data.sensitiveConfirmed || (data.sensitiveReason || "").length < 10)
+    )
+      throw new HttpError(
+        400,
+        "Bestätige den sensiblen Zusatzbereich mit einer nachvollziehbaren Begründung.",
+      );
     if (data.scope !== "production" && data.role === "guest")
       throw new HttpError(400, "Gäste erhalten Zugriff auf eine konkrete Produktion.");
     const [member] = await db
@@ -334,13 +402,32 @@ export async function tenantConfiguration(context: Context, input: unknown) {
     const saved = (
       await db
         .insert(permissionGrants)
-        .values({ ...data, expiresAt: data.expiresAt ? new Date(data.expiresAt) : null })
+        .values({
+          userId: data.userId,
+          role: data.role,
+          scope: data.scope,
+          scopeId: data.scopeId,
+          expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+        })
         .returning()
     )[0];
     await db
       .update(tenantSettings)
       .set({ permissionVersion: sql`${tenantSettings.permissionVersion}+1` })
       .where(eq(tenantSettings.organizationId, context.organizationId));
+    await auditChange(
+      db as never,
+      context,
+      data.sensitiveConfirmed ? "role.sensitive.confirmed" : "role.assigned",
+      saved.id,
+    );
+    if (data.sensitiveConfirmed)
+      await db
+        .update(tenantSettings)
+        .set({
+          settings: sql`jsonb_set(${tenantSettings.settings},'{sensitiveGrantApprovals}',coalesce(${tenantSettings.settings}->'sensitiveGrantApprovals','{}'::jsonb) || ${JSON.stringify({ [saved.id]: { reason: data.sensitiveReason, userId: data.userId, role: data.role, scope: data.scope, scopeId: data.scopeId, confirmedBy: context.user.id, confirmedAt: new Date().toISOString() } })}::jsonb)`,
+        })
+        .where(eq(tenantSettings.organizationId, context.organizationId));
     return saved;
   }
   if (body.action === "grant-revoke") {
@@ -418,6 +505,11 @@ export async function tenantConfiguration(context: Context, input: unknown) {
       expiresInDays: z.number().int().min(1).max(30).default(7),
     })
     .parse(body.data);
+  if (["personnel", "costume_specialist", "intendance"].includes(data.role))
+    throw new HttpError(
+      400,
+      "Lade die Person zunächst als Mitarbeitende ein. Sensible Zusatzrollen werden anschließend mit geprüfter Zuständigkeit und Begründung zugewiesen.",
+    );
   if (
     !canDelegate(
       { id: context.user.id, grants: context.grants },

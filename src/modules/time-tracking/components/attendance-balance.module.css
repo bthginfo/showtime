@@ -129,8 +129,16 @@
 }
 .unconfigured {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 8px;
   font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.unconfigured > :global(.button) {
+  max-width: 100%;
+  white-space: normal;
+  flex-wrap: wrap;
 }
 .card .unconfigured > strong {
   font-size: 14px;

@@ -1,12 +1,14 @@
 import { getTableColumns } from "drizzle-orm";
 import { pageTimestamp } from "@/platform/db/page-timestamp";
-import { and, eq, desc, sql, ne, isNull } from "drizzle-orm";
+import { and, eq, desc, sql, ne, isNull, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { planningSnapshot, snapshotIdentity } from "./snapshot";
 import { decodePosition, encodePosition } from "@/platform/pagination";
 import { collectionPage, collections, planningWindow, type PlanningWindow } from "./collections";
 import { assertPlanning } from "./planning-rules";
 import { assertStageReady, productionReadiness, dependencyCheck } from "./readiness";
+import { approvalContentHash, verifiedApproval, approvalCurrent } from "./approval";
+import { validateFach, applyFachEffects } from "./fach-logic";
 import { readReferences } from "@/modules/records/pages";
 import { db } from "@/platform/db";
 import {
@@ -23,6 +25,8 @@ import {
   theaterWorks,
   theaterSeasons,
   scheduleVersions,
+  tenantSettings,
+  memberships,
 } from "@/platform/db/schema";
 import { can, requirePermission, type Context } from "@/platform/context";
 import { HttpError } from "@/platform/http";
@@ -42,7 +46,8 @@ const inputSchema = z.object({
   performanceId: z.string().optional(),
   ownerId: z.string().optional(),
   dependencyIds: z.array(z.string().max(100)).max(50).default([]),
-  dueAt: z.string().optional(),
+  dueAt: z.iso.datetime().optional(),
+  deputyId: z.string().optional(),
   data: z.record(z.string(), z.unknown()),
   status: z.enum(["draft", "review", "published", "ready", "done", "blocked"]).default("draft"),
 });
@@ -71,13 +76,25 @@ export function tradeReadable(context: Context, item: typeof tradeItems.$inferSe
   const feature = moduleById(item.moduleId)?.features.find((f) => f.id === item.type);
   if (item.type === "workspace") return can(context, "production.read", item.productionId || "");
   if (!feature) return false;
+  if (
+    !feature.private &&
+    ["cue", "scene"].includes(item.type) &&
+    item.productionId &&
+    can(
+      context,
+      item.type === "cue" ? "cue.read" : "scene.read",
+      item.productionId,
+      context.departmentId,
+    ) &&
+    can(context, "production.read", item.productionId)
+  )
+    return true;
   if (!feature.private)
-    return (
-      can(context, "document.read", item.productionId || "", item.departmentId) ||
-      item.createdBy === context.user.id
-    );
+    return can(context, "document.read", item.productionId || "", item.departmentId);
   if (item.type === "measurements")
     return can(context, "measurements.read", item.productionId || "", item.departmentId);
+  if (item.type === "participant")
+    return can(context, "education.participants.read", item.productionId || "", item.departmentId);
   if (item.type === "audience-report")
     return (
       item.createdBy === context.user.id ||
@@ -130,6 +147,20 @@ export async function theaterWorkspace(
     .from(moduleActivations)
     .where(eq(moduleActivations.enabled, true));
   const result: Record<string, unknown> = {};
+  const [tenantConfiguration] = await db.select().from(tenantSettings).limit(1);
+  const blocks = await db
+    .select()
+    .from(tradeItems)
+    .where(
+      and(
+        sql`${tradeItems.data}->>'resourceId' is not null`,
+        sql`${tradeItems.status} not in ('done','archived','cancelled')`,
+        sql`((${tradeItems.data}->>'blockResource'='true' and (${tradeItems.type}='incident' or ${tradeItems.data}->>'result'='failed')) or (${tradeItems.type}='asset' and ${tradeItems.data}->>'condition' in ('blocked','maintenance')))`,
+      ),
+    )
+    .limit(1001);
+  if (blocks.length > 1000)
+    throw new HttpError(413, "Zu viele Ressourcensperren. Kläre abgeschlossene Störungen zuerst.");
   const pages: Record<string, string | null> = {};
   for (const name of collections) {
     const page = await collectionPage(context, name, undefined, productionId, range, refs);
@@ -140,8 +171,40 @@ export async function theaterWorkspace(
     .select()
     .from(tradeItems)
     .where(and(eq(tradeItems.type, "budget"), eq(tradeItems.status, "published")));
+  const visibleItems = items
+    .slice(0, 300)
+    .filter((i) => tradeReadable(context, i) && permitted(i.productionId));
+  const tradeFiles = visibleItems.length
+    ? await db
+        .select({ id: records.id, data: records.data })
+        .from(records)
+        .where(
+          and(
+            eq(records.kind, "files"),
+            inArray(
+              sql`${records.data}->>'recordId'`,
+              visibleItems.map((i) => "trade-files:" + i.id),
+            ),
+            sql`${records.data}->>'pendingDeletionOperation' is null`,
+          ),
+        )
+        .limit(2000)
+    : [];
   return {
     ...result,
+    timezone: tenantConfiguration?.timezone || "Europe/Berlin",
+    resourceBlocks: blocks
+      .filter((i) => tradeReadable(context, i) && permitted(i.productionId))
+      .map((i) => ({ itemId: i.id, resourceId: String(i.data.resourceId), title: i.title })),
+    tradeFiles: tradeFiles.map((file) => ({
+      id: file.id,
+      data: {
+        name: file.data.name,
+        title: file.data.name,
+        recordId: file.data.recordId,
+        size: file.data.size,
+      },
+    })),
     pages,
     window: range,
     departments: modules.map((m) => ({
@@ -163,9 +226,12 @@ export async function theaterWorkspace(
             costCentre: b.data.costCentre || "",
           }))
       : [],
-    items: items
-      .slice(0, 300)
-      .filter((i) => tradeReadable(context, i) && permitted(i.productionId)),
+    items: await Promise.all(
+      items
+        .slice(0, 300)
+        .filter((i) => tradeReadable(context, i) && permitted(i.productionId))
+        .map(async (i) => ({ ...i, approvalVerified: await approvalCurrent(i, db) })),
+    ),
     nextCursor:
       items.length > 300
         ? encodePosition(
@@ -300,6 +366,11 @@ export async function saveTradeItem(context: Context, input: unknown) {
     )
       throw new HttpError(403, "Dieses Fachmodul gehört zu einem anderen Gewerk.");
     if (existing) {
+      if (["archived", "cancelled"].includes(existing.status))
+        throw new HttpError(
+          409,
+          "Stelle diesen Fachstand zuerst mit einer Begründung wieder her oder lege einen Nachfolgestand an.",
+        );
       if (body.type === "purchase" && ["approved", "rejected"].includes(existing.status))
         throw new HttpError(
           409,
@@ -379,6 +450,26 @@ export async function saveTradeItem(context: Context, input: unknown) {
         .limit(1);
       if (!department) throw new HttpError(400, "Gewerk nicht gefunden.");
     }
+    const castDay = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: context.timezone || "Europe/Berlin",
+    }).format(new Date());
+    if (body.type === "cast-change") {
+      const [assignment] = await tx
+        .select()
+        .from(records)
+        .where(
+          and(
+            eq(records.kind, "casting"),
+            sql`${records.data}->>'productionId'=${body.productionId || ""}`,
+            sql`${records.data}->>'characterId'=${String(data.characterId)}`,
+          ),
+        )
+        .limit(1);
+      if (assignment && (!existing?.data._castApplied || data.actorId !== existing.data.actorId))
+        data.previousActorId = String(assignment.data.actorId);
+      data._castApplied = !data.effectiveFrom || String(data.effectiveFrom) <= castDay;
+      data._castAuthorId = context.user.id;
+    }
     for (const field of feature.fields.filter((f) => f.type === "record"))
       if (data[field.key])
         await assertRead(
@@ -386,7 +477,66 @@ export async function saveTradeItem(context: Context, input: unknown) {
           await findRecord(context, String(data[field.key]), field.source, tx),
           tx,
         );
+    await validateFach(context, body, data, feature, existing, tx, (item) =>
+      tradeReadable(context, item),
+    );
+    if (body.type === "readiness" && data.ready === true) {
+      if (!body.productionId)
+        throw new HttpError(400, "Wähle eine Produktion, deren Bereitschaft du bestätigst.");
+      const sources = await tx
+        .select()
+        .from(tradeItems)
+        .where(
+          and(
+            eq(tradeItems.productionId, body.productionId),
+            eq(tradeItems.moduleId, body.moduleId),
+          ),
+        );
+      if (
+        sources.some(
+          (i) =>
+            i.status === "blocked" &&
+            !moduleById(i.moduleId)?.features.find((f) => f.id === i.type)?.private,
+        )
+      )
+        throw new HttpError(
+          409,
+          "Ein blockierter Fachstand verhindert die Bereitschaft. Kläre ihn zuerst.",
+        );
+      data._checkedSources = Object.fromEntries(
+        sources
+          .filter(
+            (i) =>
+              !["readiness", "workspace", "collaboration"].includes(i.type) &&
+              !moduleById(i.moduleId)?.features.find((f) => f.id === i.type)?.private &&
+              !["archived", "cancelled"].includes(i.status),
+          )
+          .map((i) => [i.id, i.version]),
+      );
+      data._checkedBy = context.user.id;
+      data._checkedAt = new Date().toISOString();
+    }
+    const ownerId = body.ownerId || existing?.ownerId || context.user.id;
+    for (const memberId of [ownerId, body.deputyId].filter(Boolean) as string[]) {
+      if (
+        memberId !== context.user.id &&
+        !can(context, "task.assign", body.productionId, departmentId)
+      )
+        throw new HttpError(
+          403,
+          "Keine Berechtigung, andere Personen als Verantwortliche einzusetzen.",
+        );
+      const [member] = await tx
+        .select({ id: memberships.id })
+        .from(memberships)
+        .where(and(eq(memberships.userId, memberId), eq(memberships.status, "active")))
+        .limit(1);
+      if (!member)
+        throw new HttpError(400, "Eine verantwortliche Person ist kein aktives Theatermitglied.");
+    }
+    if (body.deputyId) data._deputyId = body.deputyId;
     data.dependencyIds = body.dependencyIds;
+    if (existing?.data._fileVersion !== undefined) data._fileVersion = existing.data._fileVersion;
     if (existing?.data.eventId) data.eventId = existing.data.eventId;
     if (feature.permission === "schedule.manage" && data.start && data.end) {
       const { saveRecord } = await import("@/modules/records/service");
@@ -436,6 +586,40 @@ export async function saveTradeItem(context: Context, input: unknown) {
       );
       data.eventId = calendar.id;
     }
+    const approvalField = feature.fields.find((field) => field.managed === "approval");
+    const proposedSource = {
+      moduleId: body.moduleId,
+      type: body.type,
+      title: body.title,
+      productionId: body.productionId,
+      data,
+    };
+    const unchangedApproval =
+      existing &&
+      (await approvalCurrent(existing, tx)) &&
+      approvalContentHash(existing) === approvalContentHash(proposedSource);
+    if (approvalField) {
+      const claimingApproval =
+        data[approvalField.key] === "approved" || data[approvalField.key] === true;
+      if (claimingApproval && !unchangedApproval)
+        throw new HttpError(
+          409,
+          "Fordere die Freigabe des Fachstands unter Zusammenarbeit an. Eine Selbstfreigabe ist nicht möglich.",
+        );
+      data[approvalField.key] = unchangedApproval
+        ? approvalField.type === "checkbox"
+          ? true
+          : "approved"
+        : approvalField.type === "checkbox"
+          ? false
+          : "draft";
+      if (["published", "ready", "done"].includes(body.status) && !unchangedApproval)
+        throw new HttpError(
+          409,
+          "Für die Veröffentlichung fehlt die Freigabe dieser unveränderten Fassung.",
+        );
+    }
+    if (unchangedApproval) data._approval = existing!.data._approval;
     const values = {
       organizationId: context.organizationId,
       departmentId,
@@ -444,7 +628,7 @@ export async function saveTradeItem(context: Context, input: unknown) {
       title: body.title,
       productionId: body.productionId || null,
       performanceId: body.performanceId || null,
-      ownerId: existing?.ownerId || context.user.id,
+      ownerId,
       dueAt: body.dueAt ? new Date(body.dueAt) : null,
       status: body.status,
       data,
@@ -462,6 +646,7 @@ export async function saveTradeItem(context: Context, input: unknown) {
           .values({ ...values, createdBy: context.user.id })
           .returning();
     if (!saved) throw new HttpError(409, "Der Eintrag wurde inzwischen geändert.");
+    await applyFachEffects(context, saved, tx, existing);
     await tx.insert(tradeItemHistory).values({
       organizationId: context.organizationId,
       itemId: saved.id,
@@ -469,7 +654,13 @@ export async function saveTradeItem(context: Context, input: unknown) {
       data: { title: saved.title, status: saved.status, data: saved.data },
       createdBy: context.user.id,
     });
-    if (body.type === "cast-change") {
+    if (
+      body.type === "cast-change" &&
+      data._castApplied &&
+      (!existing?.data._castApplied ||
+        data.actorId !== existing.data.actorId ||
+        data.characterId !== existing.data.characterId)
+    ) {
       if (!body.productionId)
         throw new HttpError(400, "Wähle eine Produktion für die Umbesetzung.");
       const { saveRecord } = await import("@/modules/records/service");
@@ -735,6 +926,22 @@ export async function reserveResource(
       .limit(1)
       .for("update");
     if (!resource) throw new HttpError(404, "Ressource nicht gefunden.");
+    const blocks = await tx
+      .select({ id: tradeItems.id })
+      .from(tradeItems)
+      .where(
+        and(
+          sql`${tradeItems.data}->>'resourceId'=${resource.id}`,
+          sql`${tradeItems.status} not in ('done','archived','cancelled')`,
+          sql`((${tradeItems.data}->>'blockResource'='true' and (${tradeItems.type}='incident' or ${tradeItems.data}->>'result'='failed')) or (${tradeItems.type}='asset' and ${tradeItems.data}->>'condition' in ('blocked','maintenance')))`,
+        ),
+      )
+      .limit(1);
+    if (blocks.length)
+      throw new HttpError(
+        409,
+        "Die Ressource ist wegen einer offenen Störung oder fehlgeschlagenen Prüfung gesperrt.",
+      );
     if (
       !can(
         context,

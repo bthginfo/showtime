@@ -4,6 +4,7 @@ import { randomUUID, createHmac } from "node:crypto";
 import postgres from "postgres";
 import type { Context } from "@/platform/context";
 import { allowedPermissions, type Grant } from "@/platform/access";
+import { moduleRegistry } from "@/modules/theater/registry";
 const enabled = process.env.SHOWTIME_INTEGRATION === "development";
 describe.skipIf(!enabled)("real Neon tenant isolation and event commands", () => {
   let app: ReturnType<typeof postgres>,
@@ -153,32 +154,28 @@ describe.skipIf(!enabled)("real Neon tenant isolation and event commands", () =>
   it("rejects composite cross-tenant foreign keys and rolls commands back with their outbox", async () => {
     await expect(
       run(b, () =>
-        db
-          .insert(tables.records)
-          .values({
-            id: randomUUID(),
-            organizationId: b.organizationId,
-            departmentId: b.departmentId,
-            createdBy: person,
-            kind: "tasks",
-            productionId: production,
-            data: { title: "Forbidden" },
-          }),
+        db.insert(tables.records).values({
+          id: randomUUID(),
+          organizationId: b.organizationId,
+          departmentId: b.departmentId,
+          createdBy: person,
+          kind: "tasks",
+          productionId: production,
+          data: { title: "Forbidden" },
+        }),
       ),
     ).rejects.toMatchObject({ cause: { code: "23503" } });
     const id = randomUUID();
     await expect(
       run(a, async () => {
-        await db
-          .insert(tables.records)
-          .values({
-            id,
-            organizationId: a.organizationId,
-            departmentId: a.departmentId,
-            createdBy: person,
-            kind: "tasks",
-            data: { title: "Rollback" },
-          });
+        await db.insert(tables.records).values({
+          id,
+          organizationId: a.organizationId,
+          departmentId: a.departmentId,
+          createdBy: person,
+          kind: "tasks",
+          data: { title: "Rollback" },
+        });
         await events.emit(db as never, a, "TaskAssignedV1", { recordId: id });
         throw new Error("forced rollback");
       }),
@@ -317,7 +314,7 @@ describe.skipIf(!enabled)("real Neon tenant isolation and event commands", () =>
               op.eq(tables.tradeItems.type, "workspace"),
             ),
           );
-        expect(workspaces).toHaveLength(20);
+        expect(workspaces).toHaveLength(moduleRegistry.length);
         const [event] = await db
           .select()
           .from(tables.outbox)
@@ -337,7 +334,7 @@ describe.skipIf(!enabled)("real Neon tenant isolation and event commands", () =>
                 op.eq(tables.tradeItems.type, "workspace"),
               ),
             ),
-        ).toHaveLength(20);
+        ).toHaveLength(moduleRegistry.length);
         expect(
           await db
             .select()
@@ -370,6 +367,179 @@ describe.skipIf(!enabled)("real Neon tenant isolation and event commands", () =>
         signature,
       }),
     ).toBe(false);
+  });
+  it("isolates API access, idempotency receipts, media leases and recovery evidence by tenant", async () => {
+    const keyId = randomUUID(),
+      uploadId = randomUUID(),
+      itemId = randomUUID();
+    await run(a, async () => {
+      await db.insert(tables.apiAccess).values({
+        id: keyId,
+        organizationId: a.organizationId,
+        departmentId: a.departmentId,
+        userId: person,
+        label: "QA scoped key",
+        tokenHash: randomUUID(),
+        scopes: ["records:read"],
+        expiresAt: new Date(Date.now() + 86400000),
+      });
+      await db.insert(tables.tradeItems).values({
+        id: itemId,
+        organizationId: a.organizationId,
+        departmentId: a.departmentId,
+        createdBy: person,
+        moduleId: "makeup",
+        type: "asset",
+        title: "QA private lease",
+      });
+      await db.insert(tables.mediaUploads).values({
+        id: uploadId,
+        organizationId: a.organizationId,
+        departmentId: a.departmentId,
+        userId: person,
+        itemId,
+        name: "synthetic.pdf",
+        mime: "application/pdf",
+        size: 100,
+        expiresAt: new Date(Date.now() + 3600000),
+      });
+      await db.insert(tables.integrationReceipts).values({
+        organizationId: a.organizationId,
+        accessId: keyId,
+        operationKey: "qa-isolation-" + keyId,
+        requestHash: "qa",
+        result: { id: itemId },
+      });
+      await db.insert(tables.recoveryChecks).values({
+        organizationId: a.organizationId,
+        kind: "restore",
+        status: "verified",
+        recordCount: 1,
+      });
+    });
+    for (const table of [
+      tables.apiAccess,
+      tables.integrationReceipts,
+      tables.mediaUploads,
+      tables.recoveryChecks,
+    ]) {
+      expect(await run(b, () => db.select().from(table))).toHaveLength(0);
+    }
+    for (const name of ["api_access", "integration_receipts", "media_uploads", "recovery_checks"])
+      expect(await app.unsafe("select id from " + name)).toHaveLength(0);
+    await expect(
+      run(b, () =>
+        db.insert(tables.integrationReceipts).values({
+          organizationId: b.organizationId,
+          accessId: keyId,
+          operationKey: "qa-cross-tenant",
+          requestHash: "qa",
+          result: {},
+        }),
+      ),
+    ).rejects.toThrow();
+    await expect(
+      run(b, () =>
+        db.insert(tables.mediaUploads).values({
+          organizationId: b.organizationId,
+          departmentId: b.departmentId,
+          userId: person,
+          itemId,
+          name: "synthetic.pdf",
+          mime: "application/pdf",
+          size: 100,
+          expiresAt: new Date(Date.now() + 3600000),
+        }),
+      ),
+    ).rejects.toThrow();
+    await expect(
+      run(a, () =>
+        db.insert(tables.mediaUploads).values({
+          organizationId: a.organizationId,
+          departmentId: a.departmentId,
+          userId: outsider,
+          itemId,
+          name: "synthetic.pdf",
+          mime: "application/pdf",
+          size: 100,
+          expiresAt: new Date(Date.now() + 3600000),
+        }),
+      ),
+    ).rejects.toThrow();
+  });
+  it("applies due cast changes exactly once with current authority and blocks withdrawn commands", async () => {
+    const { applyDueCastChanges } = await import("@/modules/theater/cast-scheduler");
+    const [disposition] =
+      await control`select id from departments where organization_id=${a.organizationId} and name='Disposition'`;
+    const castContext = {
+      ...a,
+      departmentId: disposition.id,
+      activeDepartmentIds: [disposition.id, a.departmentId],
+    };
+    await run(
+      castContext,
+      async () => {
+        const actor = await save(a, "actors", { name: "QA cast current" }),
+          alternate = await save(a, "actors", { name: "QA cast alternate" }),
+          character = await save(a, "characters", {
+            name: "QA cast character",
+            productionId: production,
+          });
+        const assignment = await save(a, "casting", {
+          productionId: production,
+          characterId: character.id,
+          actorId: actor.id,
+        });
+        const change = await theater.saveTradeItem(castContext, {
+          moduleId: "disposition",
+          type: "cast-change",
+          title: "QA scheduled cast",
+          productionId: production,
+          status: "draft",
+          data: { characterId: character.id, actorId: alternate.id, effectiveFrom: "2099-01-01" },
+        });
+        const [before] = await db
+          .select()
+          .from(tables.records)
+          .where(op.eq(tables.records.id, assignment.id));
+        expect(before.data.actorId).toBe(actor.id);
+        await db
+          .update(tables.tradeItems)
+          .set({ data: { ...change.data, effectiveFrom: "2020-01-01" } })
+          .where(op.eq(tables.tradeItems.id, change.id));
+        expect(await applyDueCastChanges(castContext)).toBe(1);
+        expect(await applyDueCastChanges(castContext)).toBe(0);
+        const [after] = await db
+          .select()
+          .from(tables.records)
+          .where(op.eq(tables.records.id, assignment.id));
+        expect(after.data.actorId).toBe(alternate.id);
+        const blocked = await theater.saveTradeItem(castContext, {
+          moduleId: "disposition",
+          type: "cast-change",
+          title: "QA withdrawn cast",
+          productionId: production,
+          status: "draft",
+          data: { characterId: character.id, actorId: actor.id, effectiveFrom: "2099-01-01" },
+        });
+        await db
+          .update(tables.tradeItems)
+          .set({ data: { ...blocked.data, effectiveFrom: "2020-01-01", _castAuthorId: outsider } })
+          .where(op.eq(tables.tradeItems.id, blocked.id));
+        expect(await applyDueCastChanges(castContext)).toBe(0);
+        const [stopped] = await db
+          .select()
+          .from(tables.tradeItems)
+          .where(op.eq(tables.tradeItems.id, blocked.id));
+        expect(stopped.status).toBe("blocked");
+        const [unchanged] = await db
+          .select()
+          .from(tables.records)
+          .where(op.eq(tables.records.id, assignment.id));
+        expect(unchanged.data.actorId).toBe(alternate.id);
+      },
+      true,
+    );
   });
   it("keeps all records reachable beyond 5000 rows and hides scan positions", async () => {
     const { recordPage } = await import("@/modules/records/pages");

@@ -14,11 +14,11 @@ export function durationSeconds(start: string, end: string, pause = 0) {
 export function intervalsOverlap(a: string, b: string, c: string, d: string) {
   return new Date(a) < new Date(d) && new Date(b) > new Date(c);
 }
-export function localDay(value: string | Date) {
-  return formatInTimeZone(value, THEATER_ZONE, "yyyy-MM-dd");
+export function localDay(value: string | Date, zone = THEATER_ZONE) {
+  return formatInTimeZone(value, zone, "yyyy-MM-dd");
 }
-export function startOfLocalDay(day: string) {
-  return fromZonedTime(`${day}T00:00:00`, THEATER_ZONE);
+export function startOfLocalDay(day: string, zone = THEATER_ZONE) {
+  return fromZonedTime(`${day}T00:00:00`, zone);
 }
 export function bookingWeeks(data?: RecordData): string[] {
   if (!data) return [];
@@ -35,6 +35,7 @@ export function splitAcrossDays(
   start: string,
   end: string,
   pauseSeconds = 0,
+  zone = THEATER_ZONE,
 ): { date: string; seconds: number }[] {
   const total = durationSeconds(start, end, pauseSeconds),
     elapsed = (new Date(end).getTime() - new Date(start).getTime()) / 1000;
@@ -42,10 +43,10 @@ export function splitAcrossDays(
   let cursor = new Date(start);
   const finish = new Date(end);
   while (cursor < finish) {
-    const date = localDay(cursor);
+    const date = localDay(cursor, zone);
     const noon = new Date(`${date}T12:00:00Z`);
     noon.setUTCDate(noon.getUTCDate() + 1);
-    const next = startOfLocalDay(noon.toISOString().slice(0, 10));
+    const next = startOfLocalDay(noon.toISOString().slice(0, 10), zone);
     const stop = next < finish ? next : finish;
     result.push({
       date,

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { useTheaterTime } from "@/components/theater-time";
+  const { dateLabel, localDate } = useTheaterTime();
   import { onMount, tick } from "svelte";
   import {
     ArrowLeft,
@@ -11,9 +13,9 @@
     Send,
     Upload,
   } from "@lucide/svelte";
-  import { Button, Empty, ErrorMessage, Badge } from "@/components/ui";
+  import { Button, Empty, ErrorMessage, Badge, Section } from "@/components/ui";
   import { useWorkspace } from "@/components/workspace-context";
-  import { api, post, dateLabel, localDate } from "@/shared/client-api";
+  import { api, post } from "@/shared/client-api";
   import { prepareUpload } from "@/shared/client-files";
   import { DocumentEditor } from "@/modules/documents/components/document-editor";
   import { documentAccept } from "@/modules/documents/components/record-documents";
@@ -25,6 +27,7 @@
     type CollaborationKind,
   } from "@/shared/collaboration";
   import { tradeGuides } from "@/shared/trade-guides";
+  import { tradeChoiceLabel } from "@/shared/trade-labels";
   import type { Planning, TradeItem } from "./types";
   import type { DomainRecord } from "@/shared/contracts";
   export let planning: Planning;
@@ -53,6 +56,7 @@
   let message = "",
     action = "comment",
     revisedBrief = "",
+    refreshSource = false,
     opened: DomainRecord | null = null;
   let formHeading: HTMLHeadingElement, detailHeading: HTMLHeadingElement;
   $: workspace = $store.workspace;
@@ -102,6 +106,7 @@
         "/api/theater/collaborations?id=" + encodeURIComponent(selectedId),
       );
       action = "comment";
+      refreshSource = false;
       revisedBrief = String(detail.entry.data.brief || "");
       await tick();
       detailHeading?.focus();
@@ -127,7 +132,8 @@
     title = source ? `Rückmeldung: ${source.title}` : "";
     brief = "";
     acceptance = "";
-    kind = "feedback";
+    kind =
+      source?.data.approval !== undefined || source?.type === "handover" ? "approval" : "feedback";
     recipient = "";
     production = source?.productionId || productionId;
     dueDate = "";
@@ -188,7 +194,7 @@
           expectedVersion: detail.entry.version,
           action,
           message,
-          ...(action === "revise" ? { brief: revisedBrief } : {}),
+          ...(action === "revise" ? { brief: revisedBrief, refreshSource } : {}),
         },
       });
       message = "";
@@ -273,7 +279,7 @@
     <div class="button-row">
       <Button disabled={busy || loading} onClick={() => void load()}
         ><RefreshCw size={16} />Aktualisieren</Button
-      >{#if !creating && workspace.user.permissions?.includes("handover.create")}<Button
+      >{#if !creating && workspace.user.permissions?.includes("collaboration.create")}<Button
           variant="primary"
           disabled={busy}
           onClick={() => void start()}><Plus size={16} />Neue Anfrage</Button
@@ -440,6 +446,48 @@
           >
         </div>
         <h4>Arbeitsauftrag</h4>
+        {#if detail.entry.data.sourceSnapshot}{@const snapshot = detail.entry.data
+            .sourceSnapshot as {
+            title: string;
+            version: number;
+            fields: { key: string; label: string; type: string; value: unknown }[];
+          }}
+          <Section title={`Fachstand: ${snapshot.title}`} meta={`Fassung ${snapshot.version}`}>
+            <dl class="detail-grid">
+              {#each snapshot.fields as field (field.key)}{#if field.value !== null && field.value !== ""}
+                  <div>
+                    <dt>
+                      {field.key === "amountCents"
+                        ? field.label.replace("(Cent)", "(€)")
+                        : field.label}
+                    </dt>
+                    <dd>
+                      {field.type === "checkbox"
+                        ? field.value
+                          ? "Ja"
+                          : "Nein"
+                        : field.key === "amountCents"
+                          ? new Intl.NumberFormat("de-DE", {
+                              style: "currency",
+                              currency: "EUR",
+                            }).format(Number(field.value) / 100)
+                          : field.type === "select"
+                            ? tradeChoiceLabel(String(field.value))
+                            : Array.isArray(field.value)
+                              ? field.value
+                                  .map(
+                                    (id) =>
+                                      workspace.members.find((member) => member.id === id)?.name ||
+                                      id,
+                                  )
+                                  .join(", ")
+                              : String(field.value)}
+                    </dd>
+                  </div>
+                {/if}{/each}
+            </dl>
+          </Section>
+        {/if}
         <p class="preserve-lines">{String(detail.entry.data.brief)}</p>
         {#if detail.entry.data.acceptance}<h4>Erledigt, wenn …</h4>
           <p class="preserve-lines">{String(detail.entry.data.acceptance)}</p>{/if}
@@ -520,7 +568,10 @@
                   maxlength="10000"
                   required
                   rows="4"></textarea></label
-              >{/if}<label
+              >{#if detail.entry.data.sourceItemId}<label class="check-label"
+                  ><input type="checkbox" bind:checked={refreshSource} />Aktuellen Fachstand erneut
+                  zur Prüfung übergeben</label
+                >{/if}{/if}<label
               >Text<textarea
                 bind:value={message}
                 maxlength="10000"

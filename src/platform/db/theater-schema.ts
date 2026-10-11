@@ -432,3 +432,94 @@ export const documentUpdates = pgTable(
     }).onDelete("cascade"),
   ],
 );
+export const apiAccess = pgTable(
+  "api_access",
+  {
+    id: id(),
+    organizationId: tenant(),
+    departmentId: text("department_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
+    label: text("label").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    scopes: jsonb("scopes").$type<string[]>().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    createdAt: created(),
+  },
+  (t) => [
+    scopeFK(t),
+    uniqueIndex("api_access_scope").on(t.organizationId, t.id),
+    foreignKey({
+      columns: [t.organizationId, t.userId],
+      foreignColumns: [tenantMembers.organizationId, tenantMembers.userId],
+    }),
+  ],
+);
+export const integrationReceipts = pgTable(
+  "integration_receipts",
+  {
+    id: id(),
+    organizationId: tenant(),
+    accessId: text("access_id"),
+    operationKey: text("operation_key").notNull(),
+    requestHash: text("request_hash").notNull(),
+    result: jsonb("result").$type<Record<string, unknown>>().notNull(),
+    createdAt: created(),
+  },
+  (t) => [
+    uniqueIndex("integration_operation").on(t.organizationId, t.operationKey),
+    foreignKey({
+      columns: [t.organizationId, t.accessId],
+      foreignColumns: [apiAccess.organizationId, apiAccess.id],
+    }),
+  ],
+);
+export const mediaUploads = pgTable(
+  "media_uploads",
+  {
+    id: id(),
+    organizationId: tenant(),
+    departmentId: text("department_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
+    itemId: text("item_id").notNull(),
+    name: text("name").notNull(),
+    mime: text("mime").notNull(),
+    size: integer("size").notNull(),
+    parts: jsonb("parts")
+      .$type<{ index: number; path: string; size: number; sha256: string }[]>()
+      .notNull()
+      .default([]),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    completedFileId: text("completed_file_id"),
+    createdAt: created(),
+  },
+  (t) => [
+    scopeFK(t),
+    foreignKey({
+      columns: [t.organizationId, t.userId],
+      foreignColumns: [tenantMembers.organizationId, tenantMembers.userId],
+    }),
+    foreignKey({
+      columns: [t.organizationId, t.itemId],
+      foreignColumns: [tradeItems.organizationId, tradeItems.id],
+    }),
+    foreignKey({
+      columns: [t.organizationId, t.completedFileId],
+      foreignColumns: [records.organizationId, records.id],
+    }),
+  ],
+);
+export const recoveryChecks = pgTable("recovery_checks", {
+  id: id(),
+  organizationId: tenant(),
+  kind: text("kind").notNull(),
+  status: text("status").notNull(),
+  digest: text("digest"),
+  recordCount: integer("record_count").notNull().default(0),
+  createdAt: created(),
+});

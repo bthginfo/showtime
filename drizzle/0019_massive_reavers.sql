@@ -1,0 +1,1 @@
+ALTER TABLE "media_uploads" ADD CONSTRAINT "media_uploads_organization_id_user_id_tenant_members_organization_id_user_id_fk" FOREIGN KEY ("organization_id","user_id") REFERENCES "public"."tenant_members"("organization_id","user_id") ON DELETE no action ON UPDATE no action;

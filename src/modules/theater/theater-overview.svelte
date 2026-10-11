@@ -16,6 +16,11 @@
     overview?.productions.filter((production) =>
       production.title.toLocaleLowerCase("de").includes(query.trim().toLocaleLowerCase("de")),
     ) || [];
+  function preset(days: number) {
+    to = localDate();
+    from = shiftDate(to, -days + 1);
+    void load();
+  }
   const money = (cents: number) =>
     new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
   async function load() {
@@ -49,6 +54,20 @@
       >Bis<input type="date" bind:value={to} min={from} required /></label
     ><button class="button secondary" disabled={busy}>Zeitraum anzeigen</button>
   </form>
+  <div class="button-row">
+    <Button disabled={busy} onClick={() => preset(7)}>7 Tage</Button><Button
+      disabled={busy}
+      onClick={() => preset(30)}>30 Tage</Button
+    ><Button disabled={busy} onClick={() => preset(90)}>90 Tage</Button
+    >{#each overview?.seasons || [] as season (season.id)}<Button
+        disabled={busy}
+        onClick={() => {
+          from = season.start;
+          to = season.end;
+          void load();
+        }}>{season.label}</Button
+      >{/each}
+  </div>
   <ErrorMessage message={error} />
   {#if !overview}<p role="status" class="muted">
       {busy ? "Hausübersicht wird geladen …" : "Lade die Übersicht erneut."}
@@ -105,8 +124,8 @@
           </div>
         </dl>
         <p class="small muted">
-          Budgetbindung aus den erfassten Rahmen und Bedarfsanträgen. Zahlungen und Buchhaltung sind
-          darin nicht enthalten.
+          Budgetbindung aus genehmigten Bedarfen. Die folgenden Beschaffungsstände sind erfasste
+          Nachweise; Geldbewegungen werden außerhalb von Showtime ausgeführt.
         </p>
       </section>
     </div>
@@ -150,6 +169,84 @@
         Besucher und Einnahmen stammen ausschließlich aus abgeschlossenen Besucher- und
         Kassenberichten des Vorderhauses. Fehlende Berichte erscheinen als fehlende Daten. Die
         Auslastung teilt erfasste Besucher durch angebotene Plätze derselben Berichte.
+      </p>
+    </section>
+    <section class="panel">
+      <h3>Beschaffung & Kostenprognose</h3>
+      <dl class="overview-values">
+        <div>
+          <dt>Bestellt / geliefert</dt>
+          <dd>{money(overview.budget.orderedCents)}</dd>
+        </div>
+        <div>
+          <dt>Rechnungen erfasst</dt>
+          <dd>{money(overview.budget.invoicedCents)}</dd>
+        </div>
+        <div>
+          <dt>Als bezahlt dokumentiert</dt>
+          <dd>{money(overview.budget.paidCents)}</dd>
+        </div>
+        <div>
+          <dt>Voraussichtliche Bindung</dt>
+          <dd>{money(overview.budget.forecastCents)}</dd>
+        </div>
+      </dl>
+      <p class="small muted">
+        Prognose: genehmigte Bedarfe plus Mehrkosten zugehöriger Rechnungen und noch offene Anträge.
+        Bereits zugeordnete Rechnungen werden nicht doppelt zum Bedarf addiert.
+      </p>
+    </section>
+    <section class="panel">
+      <h3>Entwicklung & Vorjahresvergleich</h3>
+      <div class="table-wrap">
+        <table>
+          <thead
+            ><tr
+              ><th>Monat</th><th>Berichte</th><th>Besucher</th><th>Auslastung</th><th>Einnahmen</th
+              ></tr
+            ></thead
+          ><tbody
+            >{#each overview.trend as month (month.month)}<tr
+                ><td>{month.month}</td><td>{month.reports}</td><td
+                  >{month.reports ? month.visitors : "—"}</td
+                ><td>{month.occupancy === null ? "—" : month.occupancy + " %"}</td><td
+                  >{month.reports ? money(month.incomeCents) : "—"}</td
+                ></tr
+              >{/each}</tbody
+          >
+        </table>
+      </div>
+      <p>
+        {overview.comparison.label}: {overview.comparison.reports
+          ? overview.comparison.visitors + " Besucher · " + money(overview.comparison.incomeCents)
+          : "Noch keine zugänglichen Besucherberichte vorhanden."}
+      </p>
+      <p class="small muted">
+        Nur abgeschlossene Besucherberichte werden verglichen. Die Berichtsabdeckung steht oberhalb
+        der Publikumszahlen; fehlende Berichte sind keine Nullbesucher.
+      </p>
+    </section>
+    <section class="panel">
+      <h3>Geplante Personalbelastung</h3>
+      {#if overview.workload.available}<dl class="overview-values">
+          <div>
+            <dt>Geplante Stunden im Zeitraum</dt>
+            <dd>{overview.workload.plannedHours}</dd>
+          </div>
+          <div>
+            <dt>Disponierte Personen</dt>
+            <dd>{overview.workload.people}</dd>
+          </div>
+          <div>
+            <dt>Über 40 Stunden im Wochenmittel</dt>
+            <dd>{overview.workload.over40Hours}</dd>
+          </div>
+        </dl>{:else}<p class="muted">
+          Noch keine personengebundenen Dienste im gewählten Zeitraum erfasst.
+        </p>{/if}
+      <p class="small muted">
+        Aus zugänglichen Kalenderdiensten, abzüglich eingetragener Pausen. Dies sind geplante
+        Stunden. Verbindliche Grenzwerte kommen aus den bestätigten Regelprofilen.
       </p>
     </section>
     <section class="panel overview-productions">

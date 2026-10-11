@@ -5,9 +5,10 @@ import { requireContext } from "./platform/context";
 import { tenantTransaction } from "./platform/db/tenant";
 import { HttpError } from "./platform/http";
 import { cleanAuthLocation } from "./shared/auth-form-feedback";
+import { integrationRate } from "./modules/theater/integrations";
 
 const publicAPI =
-  /^\/api\/(?:login|logout|register|reset-password|auth(?:\/|$)|cron$|calendar\/|realtime$|documents\/live$|events\/consume$|platform\/(?:(?:scopes|switch|support)$|tenants(?:\/|$)))/;
+  /^\/api\/(?:v1\/openapi\.json$|login|logout|register|reset-password|auth(?:\/|$)|cron$|calendar\/|realtime$|documents\/live$|events\/consume$|platform\/(?:(?:scopes|switch|support|health)$|tenants(?:\/|$)))/;
 class FailedResponse {
   constructor(public response: Response) {}
 }
@@ -20,6 +21,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   const decorate = (response: Response) => {
     if (authentication || event.url.pathname.startsWith("/api/"))
       response.headers.set("Cache-Control", "private, no-store");
+    if (response.status === 429) response.headers.set("Retry-After", "60");
     response.headers.set("X-Content-Type-Options", "nosniff");
     response.headers.set("Referrer-Policy", authentication ? "no-referrer" : "same-origin");
     return response;
@@ -33,6 +35,9 @@ export const handle: Handle = async ({ event, resolve }) => {
       const protectedAPI =
         event.url.pathname.startsWith("/api/") && !publicAPI.test(event.url.pathname);
       const context = protectedAPI ? await requireContext() : undefined;
+      // Commit the meter independently: rejected input must not refund an API request.
+      if (context && requestScope.getStore()?.integration)
+        await tenantTransaction(context, () => integrationRate(context));
       const response = context
         ? await tenantTransaction(context, async () => {
             const result = await resolve(event);

@@ -1,16 +1,21 @@
 <script lang="ts">
+  import { theaterLabel } from "@/shared/theater-time";
   import type { Planning, Performance, TheaterRun } from "./types";
   import type { Collection } from "./collections";
   import { stageLabels } from "./types";
   import { useWorkspace } from "@/components/workspace-context";
   import { hasPermission, type Permission } from "@/platform/access";
   import { Button, Badge, Modal } from "@/components/ui";
-  import { dateLabel, localDateTime } from "@/shared/client-api";
+  import {} from "@/shared/client-api";
+  import { theaterInstant, theaterDateTime } from "@/shared/theater-time";
+  import BatchPlanning from "./batch-planning.svelte";
+  import { tradeChoiceLabel } from "@/shared/trade-labels";
   export let planning: Planning;
   export let run: TheaterRun;
   export let busy = false;
   export let more: (collection: Collection) => Promise<void>;
   export let productionId = "";
+  export let onChanged: () => Promise<void>;
   const store = useWorkspace();
   $: workspace = $store.workspace;
   let editing: Performance | null = null;
@@ -34,7 +39,7 @@
     const form = new FormData(formElement);
     const data: Record<string, unknown> = Object.fromEntries(form);
     for (const key of ["curtainAt"])
-      if (data[key]) data[key] = new Date(String(data[key])).toISOString();
+      if (data[key]) data[key] = theaterInstant(String(data[key]), planning.timezone);
     for (const key of ["durationMinutes", "pauseMinutes"])
       if (data[key] !== undefined) data[key] = Number(data[key]);
     if (action === "performance") data.participantIds = form.getAll("participantIds").map(String);
@@ -66,8 +71,11 @@
   $: calendar = editing
     ? workspace.records.events.find((e) => e.id === editing?.eventId)
     : undefined;
+  const dateLabel = (value: string, withTime = false) =>
+    theaterLabel(value, planning.timezone, withTime);
 </script>
 
+<BatchPlanning {planning} {productionId} {onChanged} />
 <section class="surface">
   <div class="section-heading">
     <h2>Vorstellungen</h2>
@@ -83,7 +91,9 @@
               workspace.records.productions.find((p) => p.id === show.productionId)?.data.title ||
                 "Produktion",
             )}</td
-          ><td>{dateLabel(show.curtainAt, true)}</td><td><Badge>{show.status}</Badge></td><td
+          ><td>{dateLabel(show.curtainAt, true)}</td><td
+            ><Badge>{tradeChoiceLabel(show.status)}</Badge></td
+          ><td
             >{#if allowed("schedule.manage", show.productionId)}<Button
                 disabled={busy}
                 onClick={() => edit(show)}>Bearbeiten / absagen</Button
@@ -253,7 +263,7 @@
         >Vorstellungsbeginn<input
           name="curtainAt"
           type="datetime-local"
-          value={editing ? localDateTime(editing.curtainAt) : ""}
+          value={editing ? theaterDateTime(editing.curtainAt, planning.timezone) : ""}
           required
         /></label
       ><label

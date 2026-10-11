@@ -9,7 +9,10 @@ test.skip(
 );
 test.use({ trace: "off" });
 test.describe.configure({ mode: "serial" });
-let admin: APIRequestContext, receiver: APIRequestContext, outsider: APIRequestContext;
+let admin: APIRequestContext,
+  receiver: APIRequestContext,
+  outsider: APIRequestContext,
+  kbb: APIRequestContext;
 let tenant: { id: string; departments: { id: string; name: string }[] },
   productionId: string,
   requestId: string,
@@ -43,11 +46,15 @@ test.beforeAll(async () => {
       action: "grant",
       data: { userId: workspace.user.id, role, scope: "tenant", scopeId: null },
     });
-  async function member(label: string, team: string) {
+  async function member(
+    label: string,
+    team: string,
+    role: "team_lead" | "disposition" = "team_lead",
+  ) {
     const api = await request.newContext({ baseURL: base, extraHTTPHeaders: { Origin: base } });
     const invitation = await call(admin, "/api/platform/configuration", {
       action: "invite",
-      data: { departmentId: department(team), role: "team_lead" },
+      data: { departmentId: department(team), role },
     });
     const username = "qa-" + label + "-" + marker,
       password = "QA-" + randomUUID();
@@ -66,16 +73,22 @@ test.beforeAll(async () => {
   receiver = target.api;
   receiverId = target.id;
   outsider = other.api;
+  const coordinator = await member("KBB", "Disposition", "disposition");
+  kbb = coordinator.api;
   productionId = (
     await call(admin, "/api/records/productions", {
-      data: { title: "QA Gewerke " + marker, status: "active", memberIds: [receiverId, other.id] },
+      data: {
+        title: "QA Gewerke " + marker,
+        status: "active",
+        memberIds: [receiverId, other.id, coordinator.id],
+      },
     })
   ).id;
 });
 test.afterAll(async () => {
   if (admin && tenant)
     await admin.patch("/api/platform/tenants", { data: { id: tenant.id, status: "disabled" } });
-  for (const api of [admin, receiver, outsider])
+  for (const api of [admin, receiver, outsider, kbb])
     if (api) {
       await api.post("/api/logout", { data: {} });
       await api.dispose();
@@ -86,7 +99,7 @@ test("all twenty trades load their own module and validated feature contracts", 
   const scopes = await call(admin, "/api/platform/scopes", undefined, "GET");
   expect(
     scopes.scopes.filter((scope: { organizationId: string }) => scope.organizationId === tenant.id),
-  ).toHaveLength(20);
+  ).toHaveLength(21);
   for (const team of tenant.departments) {
     await switchTo(admin, team.id);
     const workspace = await call(admin, "/api/workspace", undefined, "GET");
@@ -334,6 +347,188 @@ test("the leadership overview uses actual audience reports and rejects duplicate
   expect(overview.productionCount).toBe(1);
   expect((await receiver.get("/api/theater/overview")).status()).toBe(403);
   expect((await outsider.get("/api/theater/overview")).status()).toBe(403);
+});
+
+test("the pure KBB role can create and attach without general document creation", async () => {
+  const workspace = await call(kbb, "/api/workspace", undefined, "GET");
+  expect(workspace.user.permissions).toContain("collaboration.create");
+  expect(workspace.user.permissions).not.toContain("document.create");
+  const entry = await call(kbb, "/api/theater/collaborations", {
+    action: "create",
+    data: {
+      id: randomUUID(),
+      title: "QA KBB Probenänderung",
+      kind: "change",
+      productionId,
+      recipientDepartmentId: department("Maske"),
+      brief: "Bitte den geänderten Probenbeginn prüfen.",
+    },
+  });
+  expect(entry.canAttach).toBe(true);
+  const document = await PDFDocument.create();
+  document.addPage([100, 100]);
+  const uploaded = await kbb.post("/api/files", {
+    multipart: {
+      recordKind: "handovers",
+      recordId: entry.id,
+      file: {
+        name: "QA-Probenstand.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from(await document.save()),
+      },
+    },
+  });
+  expect(uploaded.status()).toBe(201);
+  expect((await outsider.get("/api/theater/collaborations?id=" + entry.id)).status()).toBe(404);
+});
+
+test("formal campaign approval is tied to the unchanged source and cannot be self-declared", async () => {
+  await switchTo(admin, department("Presse & Marketing"));
+  const body = {
+    moduleId: "marketing",
+    type: "campaign",
+    title: "QA Kampagnenfassung",
+    productionId,
+    status: "draft",
+    data: { channel: "Website", copy: "Erste geprüfte Fassung", approval: "draft" },
+  };
+  expect(
+    (
+      await admin.post("/api/theater", {
+        data: {
+          action: "save-item",
+          data: { ...body, data: { ...body.data, approval: "approved" } },
+        },
+      })
+    ).status(),
+  ).toBe(409);
+  const source = await call(admin, "/api/theater", { action: "save-item", data: body });
+  const entry = await call(admin, "/api/theater/collaborations", {
+    action: "create",
+    data: {
+      id: randomUUID(),
+      title: "QA Textfassung freigeben",
+      kind: "approval",
+      productionId,
+      recipientDepartmentId: department("Maske"),
+      sourceItemId: source.id,
+      brief: "Bitte diese Textfassung prüfen.",
+    },
+  });
+  expect(entry.data.sourceVersion).toBe(source.version);
+  expect(entry.data.sourceSnapshot.fields).toContainEqual(
+    expect.objectContaining({ key: "copy", value: body.data.copy }),
+  );
+  await call(receiver, "/api/theater/collaborations", {
+    action: "reply",
+    data: {
+      id: entry.id,
+      expectedVersion: entry.version,
+      action: "approve",
+      message: "Die unveränderte Fassung ist geprüft.",
+    },
+  });
+  const planning = await call(admin, "/api/theater?productionId=" + productionId, undefined, "GET");
+  const approved = planning.items.find((item: { id: string }) => item.id === source.id);
+  expect(approved.data.approval).toBe("approved");
+  expect(approved.data._approval.approvedBy).toBe(receiverId);
+  const published = await call(admin, "/api/theater", {
+    action: "save-item",
+    data: {
+      ...body,
+      id: source.id,
+      expectedVersion: approved.version,
+      status: "published",
+    },
+  });
+  expect(published.data.approval).toBe("approved");
+  const revised = await call(admin, "/api/theater", {
+    action: "save-item",
+    data: {
+      ...body,
+      id: source.id,
+      expectedVersion: published.version,
+      data: { ...body.data, copy: "Nachträglich geänderter Text" },
+    },
+  });
+  expect(revised.data.approval).toBe("draft");
+  expect(revised.data._approval).toBeUndefined();
+  expect(
+    (
+      await admin.post("/api/theater", {
+        data: {
+          action: "save-item",
+          data: {
+            ...body,
+            id: source.id,
+            expectedVersion: revised.version,
+            status: "published",
+            data: { ...body.data, copy: "Nachträglich geänderter Text" },
+          },
+        },
+      })
+    ).status(),
+  ).toBe(409);
+  const pending = await call(admin, "/api/theater/collaborations", {
+    action: "create",
+    data: {
+      id: randomUUID(),
+      title: "QA neue Fassung prüfen",
+      kind: "approval",
+      productionId,
+      recipientDepartmentId: department("Maske"),
+      sourceItemId: source.id,
+      brief: "Bitte erneut prüfen.",
+    },
+  });
+  await call(admin, "/api/theater", {
+    action: "save-item",
+    data: {
+      ...body,
+      id: source.id,
+      expectedVersion: revised.version,
+      data: { ...body.data, copy: "Während der Prüfung verändert" },
+    },
+  });
+  expect(
+    (
+      await receiver.post("/api/theater/collaborations", {
+        data: {
+          action: "reply",
+          data: {
+            id: pending.id,
+            expectedVersion: pending.version,
+            action: "approve",
+            message: "Veralteten Fachstand freigeben.",
+          },
+        },
+      })
+    ).status(),
+  ).toBe(409);
+  const refreshed = await call(admin, "/api/theater/collaborations", {
+    action: "reply",
+    data: {
+      id: pending.id,
+      expectedVersion: pending.version,
+      action: "revise",
+      refreshSource: true,
+      brief: "Bitte den aktualisierten Text prüfen.",
+      message: "Die aktuelle Fassung wird erneut zur Prüfung eingereicht.",
+    },
+  });
+  expect(refreshed.data.sourceSnapshot.fields).toContainEqual(
+    expect.objectContaining({ key: "copy", value: "Während der Prüfung verändert" }),
+  );
+  await call(receiver, "/api/theater/collaborations", {
+    action: "reply",
+    data: {
+      id: pending.id,
+      expectedVersion: refreshed.version,
+      action: "approve",
+      message: "Aktuelle Fassung geprüft.",
+    },
+  });
+  await switchTo(admin, department("Kostüm"));
 });
 
 test("fresh membership withdrawal revokes existing file, request and notification access", async () => {

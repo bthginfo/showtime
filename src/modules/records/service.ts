@@ -31,6 +31,7 @@ import {
 import { validateRecord } from "./schemas";
 import { applySeasonDefaults } from "./season-defaults";
 import { findRecord, assertProject, serialize } from "./repository";
+import { moduleById } from "@/modules/theater/registry";
 import { invalidateWorkspace } from "./workspace";
 import { acquireWorkflowLock } from "@/modules/workflows/locks";
 import {
@@ -50,6 +51,13 @@ export async function assertRead(
   row: typeof records.$inferSelect,
   tx: Transaction | typeof db = db,
 ) {
+  if (row.kind === "handovers" && row.data.tradeItemId) {
+    const { readableTrade } = await import("@/modules/theater/operations");
+    const source = await readableTrade(context, String(row.data.tradeItemId));
+    if (row.id !== "trade-files:" + source.id || row.departmentId !== source.departmentId)
+      throw new HttpError(403, "Ungültige Fachanlage.");
+    return;
+  }
   if (row.kind === "handovers" && row.data.collaborationId) {
     if (row.data.collaborationId !== row.id)
       throw new HttpError(403, "Diese Übergabe ist nicht zugänglich.");
@@ -86,6 +94,25 @@ export function assertWrite(
   existing?: typeof records.$inferSelect,
   attachments = false,
 ) {
+  if (existing?.data.tradeItemId) {
+    const feature = moduleById(String(existing.data.moduleId))?.features.find(
+      (f) => f.id === existing.data.type,
+    );
+    if (
+      !attachments ||
+      !feature ||
+      !can(context, feature.permission, existing.productionId || "", existing.departmentId) ||
+      (existing.createdBy !== context.user.id &&
+        !can(
+          context,
+          feature.private ? feature.permission : "document.manage",
+          existing.productionId || "",
+          existing.departmentId,
+        ))
+    )
+      throw new HttpError(403, "Verwende die Anlagenverwaltung des berechtigten Fachstands.");
+    return;
+  }
   if (existing?.data.collaborationId) {
     if (
       !attachments ||
@@ -325,7 +352,12 @@ async function validateRelations(
         )
           continue;
         if (!listValue(row.data.participantIds).some((x) => selected.includes(x))) continue;
-        const other = occurrences(serialize(row), new Date(String(data.start)), horizon);
+        const other = occurrences(
+          serialize(row),
+          new Date(String(data.start)),
+          horizon,
+          context.timezone,
+        );
         if (proposed.some((a) => other.some((b) => a.start < b.end && a.end > b.start)))
           throw new HttpError(
             409,
@@ -381,12 +413,17 @@ export async function saveRecord(
         } as typeof records.$inferSelect),
     );
     if (existing) await assertRead(context, existing, tx);
+    if (kind === "events")
+      input = { ...input, theaterTimezone: context.timezone || "Europe/Berlin" };
     const data = validateRecord(
       kind,
       applySeasonDefaults(kind, { ...existing?.data, ...input }, existing?.createdAt.toISOString()),
     );
     if (kind === "tasks" && listValue(data.assigneeIds).some((id) => id !== context.user.id))
       requirePermission(context, "task.assign", textValue(data.productionId));
+    if (kind === "tasks" && existing)
+      for (const key of ["sourceReviewId", "sourceItemId", "sourceVersion", "affectedItemId"])
+        if (existing.data[key] !== undefined) data[key] = existing.data[key];
     if (kind === "reservations") await validateReservation(context, data, tx, existingId, existing);
     if (kind === "materials") await validateMaterialCapacity(context, data, tx, existingId);
     if (kind === "events" && !canSetCalendarParticipants(context.user, data))

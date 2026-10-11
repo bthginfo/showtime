@@ -8,6 +8,8 @@ import { occurrences } from "@/modules/calendar/occurrences";
 import { calendarCategoryBlocksTime } from "@/shared/calendar-categories";
 import { serialize } from "@/modules/records/repository";
 import { planningDateWindow, workRuleViolation } from "@/shared/theater-planning";
+import { limitedAvailabilityAllows } from "@/shared/theater-time";
+import type { WorkRuleProfile } from "@/shared/work-rule-profiles";
 type Interval = { start: Date; end: Date };
 /** Confirmed local theater rules only. This is planning validation, never payroll calculation. */
 export function checkWorkRules(
@@ -23,6 +25,13 @@ export function checkWorkRules(
     );
   if (violation === "minimum-rest")
     throw new HttpError(409, "Die vom Theater bestätigte Ruhezeit wird unterschritten.");
+  if (violation === "maximum-week")
+    throw new HttpError(409, "Die bestätigte Höchstdauer der Kalenderwoche wird überschritten.");
+  if (violation === "consecutive-days")
+    throw new HttpError(
+      409,
+      "Die bestätigte Zahl aufeinanderfolgender Diensttage wird überschritten.",
+    );
 }
 export async function assertPlanning(
   context: Context,
@@ -86,8 +95,8 @@ export async function assertPlanning(
     .where(eq(tenantSettings.organizationId, context.organizationId))
     .limit(1);
   const rules = (settings?.settings.workRules || {}) as Record<string, unknown>;
-  const start = new Date(interval.start.getTime() - 86400000),
-    end = new Date(interval.end.getTime() + 86400000);
+  const start = new Date(interval.start.getTime() - 32 * 86400000),
+    end = new Date(interval.end.getTime() + 32 * 86400000);
   const categories = await tx.select().from(records).where(eq(records.kind, "calendarCategories"));
   if (
     !actorIds.length &&
@@ -109,6 +118,12 @@ export async function assertPlanning(
         excludeId ? ne(records.id, excludeId) : undefined,
         sql`(${records.startAt}<${end.toISOString()} and ${records.endAt}>${start.toISOString()} or coalesce(${records.data}->>'recurrence','none')<>'none')`,
       ),
+    )
+    .limit(10001);
+  if (candidates.length > 10000)
+    throw new HttpError(
+      413,
+      "Für diesen Planungszeitraum liegen zu viele Termine vor. Teile die Planung in kleinere Zeiträume auf.",
     );
   const personIntervals = new Map<string, Interval[]>([
     ...participantIds.map((id) => [`member:${id}`, []] as [string, Interval[]]),
@@ -133,7 +148,12 @@ export async function assertPlanning(
       !actorIds.some((id) => cast.includes(id))
     )
       continue;
-    const existing = occurrences(serialize(candidate), start, end).map((o) => ({
+    const existing = occurrences(
+      serialize(candidate),
+      start,
+      end,
+      settings?.timezone || "Europe/Berlin",
+    ).map((o) => ({
       start: o.start,
       end: o.end,
     }));
@@ -147,10 +167,33 @@ export async function assertPlanning(
     for (const id of actorIds)
       if (cast.includes(id)) personIntervals.get(`actor:${id}`)!.push(...existing);
   }
+  const profiles = (settings?.settings.workRuleProfiles || []) as WorkRuleProfile[];
   if (personIntervals.size)
-    for (const existing of personIntervals.values()) checkWorkRules(interval, existing, rules);
+    for (const [person, existing] of personIntervals) {
+      const [kind, id] = person.split(":");
+      const profile = profiles.find((p) =>
+        (kind === "member" ? p.memberIds : p.actorIds).includes(id),
+      );
+      const applicable = profile?.rules || rules;
+      checkWorkRules(interval, existing, {
+        ...applicable,
+        timezone: settings?.timezone || "Europe/Berlin",
+      });
+      if (
+        applicable.confirmedByTheater === true &&
+        typeof applicable.breakAfterHours === "number" &&
+        Number(applicable.minimumBreakMinutes) > Number(data.pauseMinutes || 0) &&
+        (interval.end.getTime() - interval.start.getTime()) / 3600000 >=
+          Number(applicable.breakAfterHours)
+      )
+        throw new HttpError(
+          409,
+          "Die bestätigte Pausenregel der Beschäftigtengruppe ist noch nicht eingeplant.",
+        );
+    }
   else checkWorkRules(interval, [], rules);
   if (
+    !personIntervals.size &&
     rules.confirmedByTheater === true &&
     typeof rules.breakAfterHours === "number" &&
     Number(rules.minimumBreakMinutes) > Number(data.pauseMinutes || 0) &&
@@ -164,7 +207,8 @@ export async function assertPlanning(
       and(
         eq(tradeItems.organizationId, context.organizationId),
         eq(tradeItems.type, "availability"),
-        sql`${tradeItems.data}->>'availability'='unavailable'`,
+        sql`${tradeItems.data}->>'availability' in ('unavailable','limited')`,
+        sql`${tradeItems.status} not in ('archived','cancelled')`,
       ),
     );
   const localDates = planningDateWindow(interval, settings?.timezone || "Europe/Berlin");
@@ -173,7 +217,13 @@ export async function assertPlanning(
       (a) =>
         participantIds.includes(a.createdBy) &&
         String(a.data.start) <= localDates.to &&
-        String(a.data.end) >= localDates.from,
+        String(a.data.end) >= localDates.from &&
+        (a.data.availability === "unavailable" ||
+          !limitedAvailabilityAllows(
+            interval,
+            a.data as { start: string; end: string; allowedFrom: string; allowedTo: string },
+            settings?.timezone || "Europe/Berlin",
+          )),
     )
   )
     throw new HttpError(

@@ -15,11 +15,13 @@ import { HttpError } from "./http";
 import { currentRequest } from "./request";
 import { hasPermission, rolePermissions, type Grant, type Permission } from "./access";
 import type { Member } from "@/shared/contracts";
+import { integrationIdentity } from "./integration-auth";
 export interface Context {
   user: Member;
   organizationId: string;
   departmentId: string;
   organizationName: string;
+  timezone?: string;
   departmentName: string;
   grants: Grant[];
   platformAdmin?: boolean;
@@ -50,6 +52,7 @@ export async function availableScopes(userId: string) {
     .select({
       organizationId: organizations.id,
       organizationName: organizations.name,
+      timezone: tenantSettings.timezone,
       departmentId: departments.id,
       departmentName: departments.name,
       status: memberships.status,
@@ -113,9 +116,12 @@ export async function effectiveGrants(
 export async function requireContext(_fresh = true): Promise<Context> {
   const scope = currentRequest();
   if (scope.context) return scope.context;
-  const person = await identity();
+  const integration = await integrationIdentity();
+  const person = integration?.person || (await identity());
   const list = await availableScopes(person.id);
-  const selected = cookieValue(scope.request.headers.get("cookie") || "", "showtime.scope");
+  const selected =
+    integration?.selection ||
+    cookieValue(scope.request.headers.get("cookie") || "", "showtime.scope");
   const row = selected
     ? list.find((r) => `${r.organizationId}:${r.departmentId}` === selected)
     : list.length === 1
@@ -176,7 +182,7 @@ export async function requireContext(_fresh = true): Promise<Context> {
     user,
     grants,
     activeDepartmentIds: user.activeDepartmentIds,
-    platformAdmin: !!admin,
+    platformAdmin: !integration && !!admin,
   };
   scope.context = context;
   return context;

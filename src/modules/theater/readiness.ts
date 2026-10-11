@@ -19,31 +19,91 @@ export async function productionReadiness(
   context: Context,
   productionId: string,
   tx: Transaction | typeof db = db,
+  performanceId?: string,
 ) {
   await assertProject(context, productionId, tx);
   if (!can(context, "production.read", productionId))
     throw new HttpError(403, "Keine Berechtigung für diese Produktion.");
   const [settings] = await tx.select().from(tenantSettings).limit(1);
-  const required = Array.isArray(settings?.settings.requiredReadinessModules)
-    ? (settings.settings.requiredReadinessModules as string[])
-    : defaultRequired;
   const [modules, workspaces] = await Promise.all([
     tx.select().from(moduleActivations).where(eq(moduleActivations.enabled, true)),
-    tx
-      .select()
-      .from(tradeItems)
-      .where(and(eq(tradeItems.productionId, productionId), eq(tradeItems.type, "workspace"))),
+    tx.select().from(tradeItems).where(eq(tradeItems.productionId, productionId)),
   ]);
+  return readinessSnapshot(
+    productionId,
+    modules,
+    workspaces,
+    settings?.settings || {},
+    performanceId,
+  );
+}
+export function readinessSnapshot(
+  productionId: string,
+  modules: { moduleId: string; config: Record<string, unknown> }[],
+  entries: (typeof tradeItems.$inferSelect)[],
+  configuration: Record<string, unknown>,
+  performanceId?: string,
+) {
+  const workspaces = entries.filter((e) => e.productionId === productionId);
+  const policies = (configuration.readinessPolicies || {}) as Record<
+    string,
+    {
+      required: string[];
+      waivers: { moduleId: string; reason: string; expiresAt: string; approvedBy: string }[];
+    }
+  >;
+  const policy = policies[performanceId || ""] || policies[productionId];
+  const required =
+    policy?.required ||
+    (Array.isArray(configuration.requiredReadinessModules)
+      ? (configuration.requiredReadinessModules as string[])
+      : defaultRequired);
   return modules.map((module) => {
     const current = workspaces
-      .filter((w) => w.moduleId === module.moduleId)
-      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0];
+      .filter(
+        (w) =>
+          w.moduleId === module.moduleId &&
+          w.type === "readiness" &&
+          !["archived", "cancelled"].includes(w.status) &&
+          (performanceId
+            ? w.performanceId === performanceId ||
+              w.data.performanceId === performanceId ||
+              (!w.performanceId && !w.data.performanceId)
+            : !w.performanceId && !w.data.performanceId),
+      )
+      .sort((a, b) => {
+        const exact = (item: typeof a) =>
+          performanceId &&
+          (item.performanceId === performanceId || item.data.performanceId === performanceId)
+            ? 1
+            : 0;
+        return exact(b) - exact(a) || b.updatedAt.getTime() - a.updatedAt.getTime();
+      })[0];
+    const checked = (current?.data._checkedSources || {}) as Record<string, number>;
+    const sources = workspaces.filter(
+      (w) =>
+        w.moduleId === module.moduleId &&
+        !["readiness", "workspace", "collaboration"].includes(w.type) &&
+        !moduleById(w.moduleId)?.features.find((f) => f.id === w.type)?.private &&
+        !["archived", "cancelled"].includes(w.status),
+    );
+    const stale =
+      !!current &&
+      (sources.length !== Object.keys(checked).length ||
+        sources.some((source) => checked[source.id] !== source.version));
+    const waiver = policy?.waivers?.find(
+      (w) => w.moduleId === module.moduleId && Date.parse(w.expiresAt) > Date.now(),
+    );
     return {
       moduleId: module.moduleId,
       departmentId: String(module.config.departmentId || ""),
       label: moduleById(module.moduleId)?.label || module.moduleId,
       required: required.includes(module.moduleId),
-      ready: current?.status === "ready" || current?.status === "done",
+      ready: !!waiver || (!!current && current.data.ready === true && !stale),
+      stale,
+      waiver: waiver
+        ? { reason: waiver.reason, expiresAt: waiver.expiresAt, approvedBy: waiver.approvedBy }
+        : null,
       version: current?.version || 0,
       updatedAt: current?.updatedAt || null,
     };
@@ -82,12 +142,7 @@ export async function dependencyCheck(
     const found = entries.find((e) => e.id === id);
     if (!found || found.productionId !== (productionId || null))
       throw new HttpError(400, "Eine Abhängigkeit gehört nicht zu dieser Produktion.");
-    if (
-      found.type === "measurements" ||
-      found.type === "availability" ||
-      found.type === "purchase" ||
-      found.type === "budget"
-    )
+    if (moduleById(found.moduleId)?.features.find((f) => f.id === found.type)?.private)
       throw new HttpError(
         400,
         "Private Fachinformationen können keine sichtbare Produktionsabhängigkeit sein.",

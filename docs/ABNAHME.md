@@ -1,5 +1,7 @@
 # Showtime: Abnahme
 
+Aktueller Fachausbau: [AUSBAU-ABNAHME.md](AUSBAU-ABNAHME.md) dokumentiert den am 11. Oktober anschließend freigegebenen Umfang mit 21 Gewerken, 368 Unit-, zwölf Datenbank- und 28 API-Tests, neuen Demoabläufen und Wiederherstellungsprüfung. Die folgenden Abschnitte halten die früheren Abnahmen fest.
+
 Stand: 10. Oktober 2026. Alle Tests verwenden synthetische Showtime-Daten und neue Ressourcen. Die vorhandene DigitalMask-Installation dient nur als Quellreferenz.
 
 ## Automatisierte Prüfungen

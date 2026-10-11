@@ -43,6 +43,9 @@ const businessTables = [
   "event_receipts",
   "audit",
   "support_requests",
+  "api_access",
+  "integration_receipts",
+  "recovery_checks",
 ];
 function clients(environment: string) {
   if (!["development", "preview", "production"].includes(environment))
@@ -114,6 +117,7 @@ export async function backupTenant(
         const blobPath = String(data.path || "");
         if (!blobPath.startsWith(organizationId + "/"))
           throw new Error("Unexpected file tenant prefix");
+        if (archive.blobs.some((blob) => blob.path === blobPath)) continue;
         const blob = await get(blobPath, { access: "private", token: env.BLOB_READ_WRITE_TOKEN });
         if (!blob || blob.statusCode !== 200)
           throw new Error("A referenced private file is missing");
@@ -128,6 +132,11 @@ export async function backupTenant(
     });
     fs.mkdirSync(path.dirname(path.resolve(archivePath)), { recursive: true });
     fs.writeFileSync(archivePath, seal(archive, key), { flag: "wx" });
+    const digest = createHash("sha256").update(fs.readFileSync(archivePath)).digest("hex");
+    await worker.begin(async (tx) => {
+      await tx`select set_config('app.tenant_id',${organizationId},true)`;
+      await tx`insert into recovery_checks(id,organization_id,kind,status,digest,record_count) values(${randomUUID()},${organizationId},'backup','verified',${digest},${Object.values(archive.tables).reduce((n, rows) => n + rows.length, 0)})`;
+    });
     return {
       organizationId,
       createdAt: archive.createdAt,
@@ -149,6 +158,8 @@ export async function restoreTenant(
   if (!name.trim() || !/^[a-z0-9][a-z0-9-]{1,62}$/.test(slug))
     throw new Error("New theater name and slug required");
   const archive = open(fs.readFileSync(archivePath), key);
+  if (archive.environment !== environment)
+    throw new Error("Cross-environment restore requires a separately verified identity mapping");
   const { worker, control, auth, env } = clients(environment);
   const organizationId = randomUUID(),
     ids = new Map<string, string>([[archive.organizationId, organizationId]]);
@@ -160,6 +171,14 @@ export async function restoreTenant(
       if (id.startsWith("workspace:")) {
         const [, productionId, moduleId] = id.split(":");
         ids.set(id, `workspace:${ids.get(productionId) || productionId}:${moduleId}`);
+      }
+    for (const id of ids.keys())
+      if (id.startsWith("trade-files:")) {
+        const source = id.slice("trade-files:".length);
+        ids.set(id, "trade-files:" + (ids.get(source) || source));
+      } else if (id.startsWith("followup:")) {
+        const source = id.slice("followup:".length);
+        ids.set(id, "followup:" + (ids.get(source) || source));
       }
     // Global authentication accounts remain separate and must already exist in the destination.
     for (const member of archive.tables.tenant_members) {
@@ -197,7 +216,9 @@ export async function restoreTenant(
       }
       if (Array.isArray(value)) return value.map(remap);
       if (value && typeof value === "object")
-        return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, remap(v)]));
+        return Object.fromEntries(
+          Object.entries(value).map(([k, v]) => [ids.get(k) || k, remap(v)]),
+        );
       return value;
     }
     const tables = Object.fromEntries(
@@ -211,6 +232,49 @@ export async function restoreTenant(
     tables.tenant_settings[0].status = "disabled";
     tables.tenant_settings[0].permission_version =
       Number(tables.tenant_settings[0].permission_version) + 1;
+    const configuration = tables.tenant_settings[0].settings as Record<string, unknown>;
+    if (Array.isArray(configuration.workRuleProfiles))
+      configuration.workRuleProfiles = configuration.workRuleProfiles.map((profile) => ({
+        ...profile,
+        confirmed: false,
+        confirmedBy: undefined,
+        confirmedAt: undefined,
+      }));
+    if (configuration.readinessPolicies && typeof configuration.readinessPolicies === "object")
+      configuration.readinessPolicies = Object.fromEntries(
+        Object.entries(configuration.readinessPolicies).map(([id, value]) => {
+          const policy = value as Record<string, unknown>;
+          return [
+            id,
+            {
+              ...policy,
+              _restoredWaivers: policy.waivers || [],
+              waivers: [],
+              version: Number(policy.version || 0) + 1,
+            },
+          ];
+        }),
+      );
+    const { moduleRegistry } = await import("../src/modules/theater/registry");
+    for (const row of tables.trade_items || []) {
+      const data = row.data as Record<string, unknown>,
+        feature = moduleRegistry
+          .find((m) => m.id === row.module_id)
+          ?.features.find((f) => f.id === row.type);
+      if (data._approval) {
+        data._restoredApproval = data._approval;
+        delete data._approval;
+        for (const field of feature?.fields.filter((f) => f.managed) || [])
+          data[field.key] = field.key === "accepted" ? false : "review";
+        if (["published", "ready", "done"].includes(String(row.status))) row.status = "review";
+      }
+      if (row.type === "readiness") {
+        data.ready = false;
+        delete data._checkedSources;
+        delete data._checkedBy;
+        delete data._checkedAt;
+      }
+    }
     for (const row of tables.outbox)
       if (row.status !== "done") {
         row.status = "failed";
@@ -220,6 +284,13 @@ export async function restoreTenant(
       row.undo_payload = null;
       row.expires_at = new Date(0).toISOString();
     }
+    for (const row of tables.api_access || []) {
+      row.token_hash = createHash("sha256")
+        .update(String(row.token_hash) + organizationId)
+        .digest("hex");
+      row.revoked_at = new Date().toISOString();
+    }
+    for (const row of tables.integration_receipts || []) row.operation_key = "restored:" + row.id;
     const insert = async (tx: postgres.TransactionSql, table: string, rows: Row[]) => {
       for (let offset = 0; offset < rows.length; offset += 300)
         await tx`insert into ${tx(table)} ${tx(rows.slice(offset, offset + 300))}`;
@@ -253,7 +324,28 @@ export async function restoreTenant(
           throw new Error("Restore count mismatch: " + table);
       }
     });
+    for (const blob of archive.blobs) {
+      const copied = await get(paths.get(blob.path)!, {
+        access: "private",
+        token: env.BLOB_READ_WRITE_TOKEN,
+        useCache: false,
+      });
+      if (!copied || copied.statusCode !== 200)
+        throw new Error("Restored private file is unavailable");
+      const bytes = Buffer.from(await new Response(copied.stream).arrayBuffer());
+      if (createHash("sha256").update(bytes).digest("hex") !== blob.hash)
+        throw new Error("Restored private file checksum mismatch");
+    }
     await control`update tenant_settings set status='active' where organization_id=${organizationId}`;
+    const digest = createHash("sha256").update(fs.readFileSync(archivePath)).digest("hex");
+    await worker.begin(async (tx) => {
+      await tx`select set_config('app.tenant_id',${organizationId},true)`;
+      await tx`insert into recovery_checks(id,organization_id,kind,status,digest,record_count) values(${randomUUID()},${organizationId},'restore','verified',${digest},${Object.values(tables).reduce((n, rows) => n + rows.length, 0)})`;
+    });
+    await worker.begin(async (tx) => {
+      await tx`select set_config('app.tenant_id',${archive.organizationId},true)`;
+      await tx`insert into recovery_checks(id,organization_id,kind,status,digest,record_count) values(${randomUUID()},${archive.organizationId},'restore','verified',${digest},${Object.values(tables).reduce((n, rows) => n + rows.length, 0)})`;
+    });
     return {
       organizationId,
       sourceOrganizationId: archive.organizationId,

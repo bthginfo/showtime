@@ -25,11 +25,12 @@ export async function validateBooking(
         String(data.end),
         Number(data.pauseSeconds),
       );
-      data.date = localDay(String(data.start));
+      data.date = localDay(String(data.start), context.timezone);
       data.dayAllocations = splitAcrossDays(
         String(data.start),
         String(data.end),
         Number(data.pauseSeconds),
+        context.timezone,
       );
     } catch (e) {
       throw new HttpError(400, e instanceof Error ? e.message : "Bitte prüfe die Dauer.");

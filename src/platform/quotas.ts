@@ -1,6 +1,6 @@
-import { and, eq, gt, sql } from "drizzle-orm";
+import { and, eq, gt, ne, sql } from "drizzle-orm";
 import { db, type Transaction } from "./db";
-import { tenantSettings, records, audit, tenantMembers } from "./db/schema";
+import { tenantSettings, records, audit, tenantMembers, mediaUploads } from "./db/schema";
 import type { Context } from "./context";
 import { HttpError } from "./http";
 function ceiling(value: unknown, fallback: number, maximum: number) {
@@ -8,7 +8,11 @@ function ceiling(value: unknown, fallback: number, maximum: number) {
     ? Math.min(value, maximum)
     : fallback;
 }
-export async function fileQuota(context: Context, additionalBytes: number) {
+export async function fileQuota(
+  context: Context,
+  additionalBytes: number,
+  excludeUploadId?: string,
+) {
   await db.execute(
     sql`select pg_advisory_xact_lock(hashtext(${context.organizationId + ":file-quota"}))`,
   );
@@ -24,7 +28,17 @@ export async function fileQuota(context: Context, additionalBytes: number) {
     .select({ bytes: sql<number>`coalesce(sum((${records.data}->>'size')::bigint),0)::float8` })
     .from(records)
     .where(and(eq(records.organizationId, context.organizationId), eq(records.kind, "files")));
-  if (Number(used.bytes) + additionalBytes > maxBytes)
+  const [pending] = await db
+    .select({ bytes: sql<number>`coalesce(sum(${mediaUploads.size}),0)::float8` })
+    .from(mediaUploads)
+    .where(
+      and(
+        sql`${mediaUploads.completedFileId} is null`,
+        gt(mediaUploads.expiresAt, new Date()),
+        excludeUploadId ? ne(mediaUploads.id, excludeUploadId) : undefined,
+      ),
+    );
+  if (Number(used.bytes) + Number(pending.bytes) + additionalBytes > maxBytes)
     throw new HttpError(
       413,
       "Das Dateikontingent dieses Theaters ist erreicht. Entferne nicht mehr benötigte Dateien.",

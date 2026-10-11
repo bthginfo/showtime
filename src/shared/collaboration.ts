@@ -1,4 +1,4 @@
-import { hasPermission, type Grant } from "@/platform/access";
+import { hasPermission, type Grant, type Permission } from "@/platform/access";
 export const collaborationKinds = {
   feedback: "Feedback erbitten",
   approval: "Freigabe erbitten",
@@ -48,7 +48,7 @@ export function collaborationApprover(subject: CollaborationSubject, row: Collab
   return (
     subject.id !== row.createdBy &&
     collaborationSide(subject, row, "recipient") &&
-    (["document.publish", "readiness.manage"] as const).some((permission) =>
+    (["collaboration.approve"] as const).some((permission) =>
       hasPermission({ id: subject.id, grants: subject.grants || [] }, permission, {
         departmentId: String(row.data.recipientDepartmentId),
         productionId: row.productionId || undefined,
@@ -60,10 +60,17 @@ export function collaborationOpen(state: string) {
   return state === "review" || state === "changes_requested";
 }
 export function collaborationContributor(subject: CollaborationSubject, row: CollaborationScope) {
+  return collaborationPermission(subject, row, "collaboration.attach");
+}
+export function collaborationPermission(
+  subject: CollaborationSubject,
+  row: CollaborationScope,
+  permission: Permission,
+) {
   return (["sender", "recipient"] as const).some(
     (side) =>
       collaborationSide(subject, row, side) &&
-      hasPermission({ id: subject.id, grants: subject.grants || [] }, "document.create", {
+      hasPermission({ id: subject.id, grants: subject.grants || [] }, permission, {
         departmentId: side === "sender" ? row.departmentId : String(row.data.recipientDepartmentId),
         productionId: row.productionId || undefined,
       }),

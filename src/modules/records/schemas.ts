@@ -120,7 +120,7 @@ export const schemas: Record<RecordKind, z.ZodType> = {
     .object({
       title: short.default(""),
       mode: z.enum(["direct", "group", "team"]).default("group"),
-      scope: z.enum(['department','theater']).default('department'),
+      scope: z.enum(["department", "theater"]).default("department"),
       participantIds: z.array(z.string().min(1).max(100)).max(100).default([]),
       directKey: z.string().max(300).default(""),
       archived: z.boolean().default(false),
@@ -256,6 +256,7 @@ export const schemas: Record<RecordKind, z.ZodType> = {
     cancelled: z.boolean().default(false),
     blocksTime: z.boolean().default(true),
     location: short.default(""),
+    theaterTimezone: z.string().max(100).optional(),
     recurrence: z.enum(["none", "daily", "weekly"]).default("none"),
     until: z.string().max(10).default(""),
     exceptions: ids,

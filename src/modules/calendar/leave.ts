@@ -16,7 +16,7 @@ export async function decideLeave(
   status: unknown,
   categoryKey?: unknown,
 ) {
-  requirePermission(context,"leave.approve");
+  requirePermission(context, "leave.approve");
   if (status !== "approved" && status !== "rejected")
     throw new HttpError(400, "Ungültige Entscheidung.");
   const result = await db.transaction(async (tx) => {
@@ -24,14 +24,15 @@ export async function decideLeave(
       sql`select pg_advisory_xact_lock(hashtext(${context.departmentId + ":calendar"}))`,
     );
     const row = await findRecord(context, id, "leave", tx);
-    if(row.data.userId===context.user.id)throw new HttpError(403,"Eigene Anträge dürfen nicht selbst genehmigt werden.");
+    if (row.data.userId === context.user.id)
+      throw new HttpError(403, "Eigene Anträge dürfen nicht selbst genehmigt werden.");
     if (row.data.status === "withdrawn")
       throw new HttpError(409, "Dieser Antrag wurde zurückgezogen.");
     let eventId = String(row.data.eventId || "");
     if (status === "approved") {
-      const start = startOfLocalDay(String(row.data.start));
+      const start = startOfLocalDay(String(row.data.start), context.timezone);
       const next = addDays(parseISO(String(row.data.end)), 1);
-      const end = startOfLocalDay(format(next, "yyyy-MM-dd"));
+      const end = startOfLocalDay(format(next, "yyyy-MM-dd"), context.timezone);
       const planning = await tx
         .select()
         .from(records)
@@ -73,7 +74,11 @@ export async function decideLeave(
           !event.data.participantIds.includes(row.data.userId)
         )
           continue;
-        if (occurrences(serialize(event), start, end).some((o) => o.start < end && o.end > start))
+        if (
+          occurrences(serialize(event), start, end, context.timezone).some(
+            (o) => o.start < end && o.end > start,
+          )
+        )
           throw new HttpError(
             409,
             `Der Freiwunsch überschneidet sich mit „${
@@ -108,6 +113,7 @@ export async function decideLeave(
             recurrence: "none",
             until: "",
             exceptions: [],
+            theaterTimezone: context.timezone || "Europe/Berlin",
             leaveId: id,
           },
         })

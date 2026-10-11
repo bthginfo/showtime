@@ -2,7 +2,7 @@
 DROP FUNCTION IF EXISTS showtime_due_tenants();
 DROP FUNCTION IF EXISTS showtime_due_tenants(text,integer);
 CREATE FUNCTION showtime_due_tenants(after_id text, batch_size integer DEFAULT 25) RETURNS TABLE(organization_id text) LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public AS $f$
- SELECT DISTINCT m.organization_id FROM public.tenant_members m WHERE m.organization_id>after_id ORDER BY m.organization_id LIMIT LEAST(GREATEST(batch_size,1),100)
+ SELECT DISTINCT m.organization_id FROM public.tenant_members m JOIN public.tenant_settings s ON s.organization_id=m.organization_id AND s.status='active' WHERE m.organization_id>after_id ORDER BY m.organization_id LIMIT LEAST(GREATEST(batch_size,1),100)
 $f$;
 REVOKE ALL ON FUNCTION showtime_due_tenants(text,integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION showtime_due_tenants(text,integer) TO showtime_worker;
@@ -50,3 +50,31 @@ DROP POLICY IF EXISTS support_operator_update ON support_requests;
 GRANT SELECT,INSERT,UPDATE,DELETE ON support_requests TO showtime_app,showtime_worker;
 REVOKE UPDATE(status,version,updated_at) ON support_requests FROM showtime_control;
 GRANT SELECT ON support_requests TO showtime_control;
+DO $integrations$ DECLARE tbl text; BEGIN
+ FOREACH tbl IN ARRAY ARRAY['api_access','integration_receipts','media_uploads','recovery_checks'] LOOP
+  EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY',tbl);
+  EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY',tbl);
+  EXECUTE format('DROP POLICY IF EXISTS tenant_scope ON %I',tbl);
+  EXECUTE format('CREATE POLICY tenant_scope ON %I TO showtime_app,showtime_worker USING(organization_id=nullif(current_setting(''app.tenant_id'',true),'''') AND (current_user=''showtime_worker'' OR showtime_has_membership(organization_id,nullif(current_setting(''app.user_id'',true),'''')))) WITH CHECK(organization_id=nullif(current_setting(''app.tenant_id'',true),'''') AND (current_user=''showtime_worker'' OR showtime_has_membership(organization_id,nullif(current_setting(''app.user_id'',true),''''))))',tbl);
+  EXECUTE format('GRANT SELECT,INSERT,UPDATE,DELETE ON %I TO showtime_app,showtime_worker',tbl);
+ END LOOP;
+END $integrations$;
+DROP POLICY IF EXISTS auth_api_discovery ON api_access;
+CREATE POLICY auth_api_discovery ON api_access FOR SELECT TO showtime_auth USING(true);
+GRANT SELECT ON api_access TO showtime_auth;
+CREATE OR REPLACE FUNCTION showtime_platform_health() RETURNS TABLE(organization_id text,health jsonb) LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public AS $health$
+ SELECT s.organization_id,jsonb_build_object(
+  'members',(SELECT count(*) FROM public.tenant_members m WHERE m.organization_id=s.organization_id AND m.status='active'),
+  'filesBytes',(SELECT coalesce(sum((r.data->>'size')::bigint),0) FROM public.records r WHERE r.organization_id=s.organization_id AND r.kind='files'),
+  'files',(SELECT count(*) FROM public.records r WHERE r.organization_id=s.organization_id AND r.kind='files'),
+  'records',(SELECT count(*) FROM public.records r WHERE r.organization_id=s.organization_id),
+  'failedEvents',(SELECT count(*) FROM public.outbox e WHERE e.organization_id=s.organization_id AND e.status='failed'),
+  'pendingEvents',(SELECT count(*) FROM public.outbox e WHERE e.organization_id=s.organization_id AND e.status IN ('pending','queued','processing')),
+  'oldestPendingAt',(SELECT min(e.created_at) FROM public.outbox e WHERE e.organization_id=s.organization_id AND e.status IN ('pending','queued','processing')),
+  'lastBackup',(SELECT max(c.created_at) FROM public.recovery_checks c WHERE c.organization_id=s.organization_id AND c.kind='backup' AND c.status='verified'),
+  'lastRestoreTest',(SELECT max(c.created_at) FROM public.recovery_checks c WHERE c.organization_id=s.organization_id AND c.kind='restore' AND c.status='verified'),
+  'quotas',s.settings->'quotas')
+ FROM public.tenant_settings s ORDER BY s.organization_id LIMIT 2000
+$health$;
+REVOKE ALL ON FUNCTION showtime_platform_health() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION showtime_platform_health() TO showtime_control;

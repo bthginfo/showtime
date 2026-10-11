@@ -5,6 +5,7 @@
   import { useWorkspace } from "@/components/workspace-context";
   import { scopedBrowserKey } from "@/shared/browser-scope";
   import { tradeGuides } from "@/shared/trade-guides";
+  import PracticeGuide from "./practice-guide.svelte";
   import "@/modules/theater/theater-operations.css";
   export let moduleId = "makeup";
   export let compact = false;
@@ -158,3 +159,4 @@
     {/if}
   </section>
 {/if}
+{#if !compact}{#key moduleId}<PracticeGuide {moduleId} />{/key}{/if}

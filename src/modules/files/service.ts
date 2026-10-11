@@ -112,6 +112,10 @@ export async function uploadFile(
         const { collaborationAttachmentChanged } = await import("@/modules/theater/collaborations");
         await collaborationAttachmentChanged(context, current.id, tx);
       }
+      if (current.data.tradeItemId) {
+        const { tradeFileChanged } = await import("@/modules/theater/files");
+        await tradeFileChanged(context, String(current.data.tradeItemId), tx);
+      }
       return serialize(row);
     });
     invalidateWorkspace(context.departmentId);
@@ -165,6 +169,10 @@ export async function deleteFile(context: Context, id: string) {
     if (linked.data.collaborationId) {
       const { collaborationAttachmentChanged } = await import("@/modules/theater/collaborations");
       await collaborationAttachmentChanged(context, linked.id, tx);
+    }
+    if (linked.data.tradeItemId) {
+      const { tradeFileChanged } = await import("@/modules/theater/files");
+      await tradeFileChanged(context, String(linked.data.tradeItemId), tx);
     }
   });
   invalidateWorkspace(context.departmentId);

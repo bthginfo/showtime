@@ -1,20 +1,24 @@
 import { dateLabel, instantDate, localDate, shiftDate } from "@/shared/client-api";
 import type { CalendarInstance } from "./team-calendar";
 
-export const calendarDayLabel = (day: string) =>
+export const calendarDayLabel = (day: string, zone = "Europe/Berlin") =>
   new Intl.DateTimeFormat("de-DE", {
-    timeZone: "Europe/Berlin",
+    timeZone: zone,
     weekday: "long",
     day: "numeric",
     month: "long",
-  }).format(instantDate(day));
+  }).format(instantDate(day, zone));
 
-export function calendarDayEntries(events: CalendarInstance[], day: string) {
+export function calendarDayEntries(
+  events: CalendarInstance[],
+  day: string,
+  zone = "Europe/Berlin",
+) {
   return events
     .filter(
       (event) =>
-        localDate(new Date(event.start)) <= day &&
-        localDate(new Date(new Date(event.end).getTime() - 1)) >= day,
+        localDate(new Date(event.start), zone) <= day &&
+        localDate(new Date(new Date(event.end).getTime() - 1), zone) >= day,
     )
     .sort(
       (a, b) =>
@@ -24,23 +28,28 @@ export function calendarDayEntries(events: CalendarInstance[], day: string) {
     );
 }
 
-export function calendarDayIndex(events: CalendarInstance[], from: string, through: string) {
+export function calendarDayIndex(
+  events: CalendarInstance[],
+  from: string,
+  through: string,
+  zone = "Europe/Berlin",
+) {
   const days = new Map<string, CalendarInstance[]>();
   for (let day = from; day <= through; day = shiftDate(day, 1)) {
-    days.set(day, calendarDayEntries(events, day));
+    days.set(day, calendarDayEntries(events, day, zone));
   }
   return days;
 }
 
-export function calendarInstanceTime(event: CalendarInstance) {
+export function calendarInstanceTime(event: CalendarInstance, zone = "Europe/Berlin") {
   if (event.allDay) return "Ganztägig";
   const clock = (date: string) =>
     new Intl.DateTimeFormat("de-DE", {
-      timeZone: "Europe/Berlin",
+      timeZone: zone,
       hour: "2-digit",
       minute: "2-digit",
     }).format(new Date(date));
-  return localDate(new Date(event.start)) === localDate(new Date(event.end))
+  return localDate(new Date(event.start), zone) === localDate(new Date(event.end), zone)
     ? `${clock(event.start)}–${clock(event.end)}`
-    : `${dateLabel(event.start, true)} – ${dateLabel(event.end, true)}`;
+    : `${dateLabel(event.start, true, zone)} – ${dateLabel(event.end, true, zone)}`;
 }

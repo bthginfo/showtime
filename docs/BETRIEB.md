@@ -8,11 +8,11 @@ Der Produktionsalias ist `showtime-ingolstadt.vercel.app`. `APP_URL` und `BETTER
 
 Production, Preview und Development besitzen jeweils ein eigenes Neon-Free-Projekt, einen eigenen privaten Blob-Store sowie eigene Auth-, Cron- und VAPID-Schlüssel. Die Produktionsdatenbank ist das Neon-Projekt `royal-glade-27927910`. Die Ressourcen sind unabhängig von DigitalMask. Ein Preview-Deployment verwendet seinen eigenen Vercel-Host für Auth und Einladungslinks.
 
-| Umgebung    | Verwendung                                                        |
-| ----------- | ----------------------------------------------------------------- |
-| Development | Synthetische Integrationstests, Browserabnahme und Restoreproben  |
-| Preview     | Geschützte Vorschau mit ausschließlich eigenen Vorschauressourcen |
-| Production  | Separates Starttheater; keine Altdatenmigration                   |
+| Umgebung    | Verwendung                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------------------ |
+| Development | Synthetische Integrationstests, Browserabnahme und Restoreproben                                 |
+| Preview     | Geschützte Vorschau mit ausschließlich eigenen Vorschauressourcen                                |
+| Production  | Eigene Showtime-Theater einschließlich der ausdrücklich beauftragten getrennten Ingolstadt-Kopie |
 
 Laufzeitvariablen stehen in `.env.example`. Die vier Rollen-URLs, Authsecret, Cronsecret, private Blob-Zugangsdaten und VAPID-Schlüssel gehören in die jeweilige Vercel-Umgebung. Migrationseigentümer und Verwaltungs-PATs gehören nicht in Functions oder Git. `.env*`, `.local` und `.vercel` sind ignoriert.
 
@@ -23,7 +23,7 @@ Die lokale Erstinstallation verwahrt `.local/runtime-<environment>.json`, `.loca
 1. Node.js 24 installieren und `npm ci` ausführen.
 2. Ausschließlich neue Showtime-Ressourcen provisionieren. Eigentümervariablen der gewünschten Neon-Umgebung privat unter `.local/.env.owner-<environment>` ablegen; den passenden privaten Blob-Token hinzufügen.
 3. `npm run db:migrate -- development` ausführen. Für andere Ziele den Namen ausdrücklich ersetzen. Das Skript wendet Drizzle-Migrationen, RLS-Policies und getrennte Laufzeitrollen an und schreibt nur ignorierte Runtime-Dateien.
-4. `npm run bootstrap -- development` einmalig ausführen. Ein neutraler Theaterdatensatz mit zwanzig Gewerken und einem privaten Bootstrap-Zugang entsteht. Keine Schauspieler- oder DigitalMask-Daten werden importiert.
+4. `npm run bootstrap -- development` einmalig ausführen. Ein neutraler Theaterdatensatz mit 21 Gewerken und einem privaten Bootstrap-Zugang entsteht. Keine Schauspieler- oder DigitalMask-Daten werden durch den Bootstrap importiert.
 5. `npm run typecheck`, `npm run lint`, `npx tsc --noEmit -p tsconfig.scripts.json`, `npm test` und `npm run build` ausführen. Sicherheits- oder Planungsänderungen zusätzlich gegen die separate Entwicklungsdatenbank und im Browser prüfen.
 6. Geprüften Commit veröffentlichen und das separate Vercel-Projekt deployen. Produktion mit `vercel deploy --prod`; Vorschau mit `vercel deploy`. Eigentümervariablen niemals ins Deployment übernehmen.
 7. Auf der tatsächlichen Deployment-Adresse Anmeldung, Kontextwechsel, private Datei, Dokumentänderung, PDF-Export und Queue-Folgeaktion prüfen. Ein erfolgreicher Build allein genügt nicht.
@@ -36,7 +36,7 @@ Das Vercel-Projekt ist mit `bthginfo/showtime` verbunden; `main` ist der Produkt
 
 Neue Theater entstehen über die Plattformverwaltung und erhalten einen einmaligen, sieben Tage gültigen Einladungslink für die Theateradministration. Bestehende Konten können die Einladung ebenfalls annehmen. Gewerk- und Gastzugänge vergibt die zuständige Theaterverwaltung; Gastrollen sind an eine Produktion gebunden und können ablaufen. Mitgliedschaften, Rollen und Theatersperren werden bei jedem neuen Zugriff geprüft.
 
-Die Theaterverwaltung konfiguriert Gewerke, Module, Arbeitsregeln, Bereitschaftsanforderungen, Mitglieder, Rollen und Kontingente. Der Anfangsbestand ist neutral. Vor Nutzung der automatischen Planprüfung die tatsächlich geltenden Hausregeln bestätigen. Die übernommene Kalenderdarstellung verwendet Europe/Berlin.
+Die Theaterverwaltung konfiguriert Gewerke, Module, Arbeitsregeln, Bereitschaftsanforderungen, Mitglieder, Rollen und Kontingente. Der Anfangsbestand ist neutral. Vor Nutzung der automatischen Planprüfung die tatsächlich geltenden Hausregeln bestätigen. Planung und Darstellung verwenden die konfigurierte Theaterzeitzone; Ingolstadt verwendet Europe/Berlin.
 
 Die Plattformverwaltung bearbeitet ausschließlich bewusst eingereichte Supportanfragen. Sie kann Theater sperren und wieder freigeben. Private Chats, Dateien, Personalangaben und sonstige Fachinhalte werden dadurch nicht global freigegeben.
 
@@ -60,10 +60,22 @@ Beim ersten Backup entsteht ein zufälliger 32-Byte-Schlüssel in `.local/backup
 
 Restore erzeugt ein neues Theater, neue Objekt-IDs und neue private Dateipfade. Referenzen, Counts und Datei-SHA-256 werden geprüft. Während der Wiederherstellung ist das neue Theater gesperrt; erst nach erfolgreicher Prüfung wird es aktiviert. Bei Fehlern bleibt der Zwischenstand gesperrt. Ausstehende alte Events werden zur kontrollierten Prüfung zurückgehalten, damit der Restore keine ungewollten Nebenwirkungen auslöst.
 
-Identitäten müssen im Ziel bereits vorhanden sein. Passwörter, Sessions, Einladungen, ICS-Tokens, Push-Abonnements und laufende Timer werden nicht kopiert. Für eine vollständige Wiederherstellung in ein neues Authsystem sind deshalb zusätzlich ein gesicherter Identitätsbestand und neue Einladungen nötig. Die getestete Tenant-Wiederherstellung arbeitet in der isolierten Entwicklungsumgebung.
+Die Wiederherstellung erfolgt innerhalb derselben ausdrücklich ausgewählten Umgebung. Identitäten müssen dort bereits vorhanden sein; ein Wechsel zwischen Umgebungen verlangt eine gesondert geprüfte Identitätszuordnung. Passwörter, Sessions, Einladungen, ICS-Tokens, Push-Abonnements, unvollständige Medienuploads und laufende Timer werden nicht kopiert. Wiederhergestellte API-Zugänge sind widerrufen, Wiederholschlüssel erhalten einen eigenen Namensraum und Undo-Belege werden ungültig. Regelprofile, fachliche Freigaben, Bereitschaft und deren Ausnahmen verlangen eine erneute Bestätigung. Frühere Freigaben und Ausnahmen bleiben als historische Belege sichtbar. Die kopierten Blob-Dateien werden vor Aktivierung erneut heruntergeladen und per SHA-256 geprüft.
+
+Die Fachausbau-Migrationen `0017` bis `0019` ergänzen FORCED-RLS-geschützte Integrations-, Upload- und Recoverytabellen, Ausstattung sowie den zusammengesetzten Upload-Mitgliedschaftsschlüssel. Sie sind additiv und für Entwicklung, Preview und Produktion ausgeführt. Private Nachweise und die neue verschlüsselte Ingolstadt-Sicherung liegen ausschließlich unter `.local`.
+
+`scripts/seed-theater-expansion.ts <environment> <tenant-id> <authorized-username> --apply` ergänzt eine gekennzeichnete synthetische Fachproduktion und verknüpfte Beispiele. Der ausführende Plattformzugang braucht bereits explizite Theateradministrations- und Produktionsleitungsrollen. Das Skript behält bestehende Passwörter bei, erzeugt nur fehlende Gewerk-Demozugänge und speichert private Checkpoints; erneute Ausführung erzeugt keine zweite Beispielproduktion.
 
 ## Kosten und Kontingente
 
 Neue Datenbanken bleiben auf Neon Free; es wurde kein neuer kostenpflichtiger Datenbank- oder Redis-Tarif gekauft. Private Blob-Speicher, Queue-, Function- und Datenverkehrsnutzung unterliegen den Freikontingenten beziehungsweise der Abrechnung des vorhandenen Vercel-Pro-Kontos. Das ist keine Garantie für kostenlosen Betrieb bei beliebiger Nutzung.
 
-Die Erstinstallation arbeitet ohne Redis. Aktive Live- und Dokumentansichten prüfen PostgreSQL regelmäßig; Hintergrundtabs pausieren, aber dauerhaft aktive Clients können Neon am Einschlafen hindern. Listen sind paginiert, Kalender zeitlich begrenzt, Uploads auf 4 MB pro Datei beschränkt und Exportmengen begrenzt. Die Theaterkontingente sind technische Zugangsgrenzen und ersetzen keine anbieterweiten Budgetalarme. Verbrauch bei wachsender Nutzung im Neon- und Vercel-Dashboard prüfen.
+Die Erstinstallation arbeitet ohne Redis. Aktive Live- und Dokumentansichten prüfen PostgreSQL regelmäßig; Hintergrundtabs pausieren, aber dauerhaft aktive Clients können Neon am Einschlafen hindern. Listen sind paginiert, Kalender zeitlich begrenzt und Exportmengen begrenzt. Normale Uploads bleiben auf 4 MB beschränkt; private Fachanlagen erlauben bis 64 MB in wiederaufnehmbaren 2-MB-Teilen. Die theaterbezogenen Speicher-, Mitglieder- und Uploadkontingente werden bei der Speicherung geprüft. Die Plattformübersicht zeigt aggregierten Verbrauch, Queuezustand sowie bestätigte Backup-/Restore-Belege. Fehlgeschlagene oder länger als 30 Minuten ausstehende Ereignisse und 80 Prozent Dateiverbrauch erzeugen interne Alarme an aktuell berechtigte Theateradministrationen. Diese technischen Grenzen ersetzen keine anbieterweiten Budgetalarme; Verbrauch im Neon- und Vercel-Dashboard prüfen.
+
+## Offene API und Fachbetrieb
+
+Der öffentliche Vertrag liegt unter `/api/v1/openapi.json`, die Erläuterungen und Vorlagen unter `/schnittstellen`. API-Zugänge sind an Theater, Gewerk, Person und explizite Scopes gebunden, laufen spätestens nach 90 Tagen ab und prüfen bei jeder Anfrage die aktuellen Rechte. Pro Zugang gelten 120 Anfragen pro Minute; auch abgewiesene fachliche Anfragen werden gezählt. Drosselung antwortet mit 429 und `Retry-After`. Schreibende Integrationsaufrufe benötigen einen Wiederholschlüssel; derselbe Schlüssel mit anderem Inhalt wird abgewiesen.
+
+Importe verwenden begrenzte CSV-/JSON-Dateien mit Feldzuordnung, Vorschau und Zeilenfehlern. MVR-/GDTF-Archive werden auf Größen, XML und Gerätemetadaten geprüft. Verbindliche Hersteller-, Steuer- oder Lohnverträge werden damit nicht vorausgesetzt. Details: [OFFENE-SCHNITTSTELLEN.md](OFFENE-SCHNITTSTELLEN.md).
+
+Arbeitsregeln wirken erst nach ausdrücklicher Bestätigung des Theaters. Gemeinsame Produktionsszenen und Vorstellungs-Cues besitzen eigene Leserechte; private Teilnehmer-, Maß-, Personal- und Gesprächsdaten behalten ihre gesonderten Grenzen. Freigaben beziehen sich auf Inhalt, Referenzen und Dateifassung des geprüften Standes. Änderungen verlangen erneute Abnahme. Archiv, Nachfolgestände, Bestandsbewegungen und Wartungsfolgen behalten ihre Historien.

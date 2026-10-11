@@ -126,7 +126,7 @@
           <ArrowRight size={16}></ArrowRight>
         </a>
       {:else}
-        <p class="eyebrow">WILLKOMMEN IN DER MASKE</p>
+        <p class="eyebrow">WILLKOMMEN IN DEINEM THEATER</p>
         <h2>{register ? "Dein Zugang." : "Schön, dass du da bist."}</h2>
         <p class="muted">
           {register

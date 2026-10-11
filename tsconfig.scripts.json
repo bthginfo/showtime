@@ -8,6 +8,7 @@
     "scripts/import-digitalmask.ts",
     "scripts/seed-theater-demo.ts",
     "scripts/seed-theater-workflows.ts",
+    "scripts/seed-theater-expansion.ts",
     "src/platform/**/*.ts",
     "src/**/*.d.ts"
   ]

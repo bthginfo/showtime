@@ -2,6 +2,7 @@ import { z } from "zod";
 import { HttpError } from "@/platform/http";
 import type { RecordKind } from "@/shared/contracts";
 import type { Permission } from "@/platform/access";
+import { extendFachContracts } from "./fach-contracts";
 export type Field = {
   key: string;
   label: string;
@@ -19,10 +20,14 @@ export type Field = {
     | "members"
     | "budget"
     | "department"
-    | "performance";
+    | "performance"
+    | "trade"
+    | "trades";
+  sourceTypes?: string[];
   source?: RecordKind;
   options?: string[];
   required?: boolean;
+  managed?: "approval";
 };
 export type Feature = {
   id: string;
@@ -545,7 +550,16 @@ export const moduleRegistry: ModuleManifest[] = [
     ),
   ]),
 ];
+extendFachContracts(moduleRegistry);
 export const moduleById = (id: string) => moduleRegistry.find((m) => m.id === id);
+for (const module of moduleRegistry)
+  for (const feature of module.features)
+    for (const field of feature.fields)
+      if (
+        field.key === "approval" ||
+        (module.id === "workshops" && feature.id === "handover" && field.key === "accepted")
+      )
+        field.managed = "approval";
 export function validateFeature(moduleId: string, type: string, input: Record<string, unknown>) {
   const module = moduleById(moduleId),
     feature = module?.features.find((f) => f.id === type);
@@ -567,7 +581,7 @@ export function validateFeature(moduleId: string, type: string, input: Record<st
             : z.number().finite().min(0).max(1_000_000_000)
         : field.type === "checkbox"
           ? z.boolean()
-          : field.type === "members"
+          : field.type === "members" || field.type === "trades"
             ? z.array(z.string().min(1).max(100)).max(200)
             : field.type === "select"
               ? z.enum(field.options! as [string, ...string[]])
