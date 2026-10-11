@@ -11,7 +11,80 @@ import {
 } from "@/platform/db/schema";
 import type { Transaction } from "@/platform/db";
 import { moduleById } from "./registry";
+import { activeSubjects } from "@/platform/worker-subjects";
+import { collaborationReadable } from "@/shared/collaboration";
+import { assertProject } from "@/modules/records/repository";
 export async function handleTheaterEvent(tx: Transaction, event: typeof outbox.$inferSelect) {
+  if (event.type === "TradeCollaborationChangedV1") {
+    const [source] = await tx
+      .select()
+      .from(tradeItems)
+      .where(
+        and(
+          eq(tradeItems.id, String(event.payload.recordId)),
+          eq(tradeItems.type, "collaboration"),
+        ),
+      )
+      .limit(1);
+    if (!source || source.version !== event.payload.version) return;
+    const subjects = await activeSubjects(
+      event.organizationId,
+      String(source.data.recipientDepartmentId),
+      tx,
+    );
+    const notices: string[] = [];
+    for (const subject of subjects) {
+      if (
+        subject.user.id === event.payload.actorId ||
+        !collaborationReadable(
+          {
+            ...subject.user,
+            grants: subject.grants,
+            activeDepartmentIds: subject.activeDepartmentIds,
+          },
+          source,
+        )
+      )
+        continue;
+      try {
+        await assertProject(subject, source.productionId, tx);
+      } catch (error) {
+        if (
+          error &&
+          typeof error === "object" &&
+          "status" in error &&
+          [403, 404].includes(Number(error.status))
+        )
+          continue;
+        throw error;
+      }
+      const noticeId = `notice:${event.id}:${subject.user.id}`;
+      await tx
+        .insert(records)
+        .values({
+          id: noticeId,
+          organizationId: event.organizationId,
+          departmentId: subject.departmentId,
+          kind: "notifications",
+          createdBy: String(event.payload.actorId),
+          ownerId: subject.user.id,
+          productionId: source.productionId,
+          data: {
+            type: event.type,
+            recordId: source.id,
+            userId: subject.user.id,
+            title: "Neue Abstimmung zwischen Gewerken",
+            body: "Öffne die Anfrage für Auftrag, Rückmeldung und Freigabestand.",
+            read: false,
+            productionId: source.productionId,
+            link: `/?module=theater&view=collaborations&requestId=${encodeURIComponent(source.id)}`,
+          },
+        })
+        .onConflictDoNothing();
+      notices.push(noticeId);
+    }
+    return notices;
+  }
   const modules = await tx
     .select()
     .from(moduleActivations)

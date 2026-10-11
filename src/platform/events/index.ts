@@ -137,7 +137,7 @@ export async function processEvents(eventId?: string) {
           noticeIds.push(...previous.map((n) => n.id));
           return;
         }
-        await handleTheaterEvent(tx, event);
+        noticeIds.push(...((await handleTheaterEvent(tx, event)) || []));
         if (
           event.type === "TaskAssignedV1" ||
           event.type === "LeaveRequestDecidedV1" ||

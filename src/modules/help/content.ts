@@ -8,6 +8,54 @@ export type HelpArticle = {
 };
 export const helpArticles: HelpArticle[] = [
   {
+    id: "collaboration",
+    title: "Zwischen Gewerken übergeben, prüfen und freigeben",
+    module: "/?module=theater&view=collaborations",
+    intro:
+      "Ein Arbeitsauftrag gehört zu einer Produktion und verbindet zwei Gewerke. Auftrag, Anlagen, Rückmeldungen und Entscheidungen bleiben zusammen.",
+    steps: [
+      "Öffne Theaterbetrieb → Zusammenarbeit. Wähle die Produktion und Neue Anfrage. Alternativ beginnt Mit anderem Gewerk abstimmen direkt an einem Facheintrag.",
+      "Wähle das empfangende Gewerk und die Art: Feedback, Freigabe, Übergabe oder Änderung. Beschreibe, was geprüft werden soll, und wann eine Rückmeldung gebraucht wird.",
+      "Nach dem Senden ergänzt du Bilder, PDF, Word-, Excel- oder CSV-Dateien als Anlagen. Die Anlagen sind gespeicherte Arbeitsstände; nur die beteiligten Gewerke mit Produktionszugriff sehen sie.",
+      "Empfänger kommentieren oder bitten um Überarbeitung. Bei einer fachlichen Freigabe entscheidet eine andere Teamleitung des empfangenden Gewerks. Die erstellende Person darf ihren eigenen Auftrag nicht freigeben.",
+      "Die erstellende Person sendet bei Änderungen einen überarbeiteten Auftrag. Der Verlauf zeigt jeden Arbeitsschritt. Neue Anlagen verändern den Prüfstand, damit niemand unbemerkt einen alten Stand freigibt.",
+      "Für Feedback und Übergaben kann der Empfänger Übernehmen und abschließen wählen. Freigabeanfragen brauchen eine berechtigte Teamleitung. Nach Abschluss bleiben die Anlagen unverändert; neue Änderungen beginnen mit einer neuen Anfrage.",
+      "Wenn inzwischen eine neue Rückmeldung eingegangen ist, wähle Stand laden. Dein nicht gesendeter Rückmeldungstext bleibt erhalten. Über die Mitteilungen gelangst du direkt zur Anfrage.",
+    ],
+    note: "Fachliche Freigaben ersetzen keine vorgeschriebenen Sicherheitsabnahmen und keine Budgetgenehmigungen. Private Chats, Maßdaten und Personaldaten werden nicht automatisch mitgeteilt.",
+  },
+  {
+    id: "intendance",
+    title: "Hausübersicht und Kennzahlen für die Intendanz",
+    module: "/?module=theater&view=overview",
+    intro:
+      "Die Intendanz startet mit einer Hausübersicht. Sie zeigt die zugänglichen aktiven Produktionen, erforderliche Bereitschaften, offene Abstimmungen und erfasste Budgetbindung.",
+    steps: [
+      "Öffne Heute als Intendanz oder Theaterbetrieb → Hausübersicht mit einer berechtigten Leitungsrolle. Plattformadministration allein gewährt keinen Zugriff auf Geschäftsdaten.",
+      "Wähle einen Zeitraum für Vorstellungen, Besucher und Karteneinnahmen. Produktionsbereitschaft und Budgetrahmen gelten für die aktiven zugänglichen Produktionen und sind nicht auf diese Termine begrenzt.",
+      "Unter Was Aufmerksamkeit braucht stehen offene und überfällige Rückmeldungen, Überarbeitungen und blockierte Facheinträge. In Zusammenarbeit kannst du den zugänglichen Verlauf dazu öffnen.",
+      "Die Budgetübersicht trennt freigegebene Rahmen, genehmigte Bedarfe und offene Anträge. Noch verfügbar ist Rahmen minus genehmigte Bedarfe. Tatsächliche Zahlungen und Buchhaltung sind damit nicht abgebildet.",
+      "Das Vorderhaus erfasst je bereits gespielter Vorstellung einen Besucher- und Kassenbericht. Abgeschlossene Berichte liefern Besucher, angebotene Plätze und Karteneinnahmen. Ohne Berichte zeigt die Übersicht fehlende Daten, keine geschätzten Zahlen.",
+      "Die Berichtsabdeckung zeigt, für wie viele vergangene Termine Daten vorliegen. Die Auslastung ist Besucherzahl geteilt durch angebotene Plätze derselben erfassten Vorstellungen.",
+      "Bereitschaft öffnen führt zur Produktion und ihren Gewerken. Dort siehst du, welche Bestätigungen noch fehlen; die jeweilige Teamleitung bearbeitet ihren Fachbereich.",
+    ],
+    note: "Mit DEMO gekennzeichnete Produktionen und Berichte sind Beispieldaten. Die Hausübersicht zeigt weder persönliche Zeitkonten noch private Chat-Inhalte.",
+  },
+  {
+    id: "trade-onboarding",
+    title: "Geführter Einstieg für jedes Gewerk",
+    module: "theater",
+    intro:
+      "Jedes der Fachmodule hat einen eigenen Leitfaden mit typischen Arbeitsschritten und Partnern. Die Oberfläche und gemeinsamen Bereiche folgen dem vertrauten DigitalMask-Aufbau.",
+    steps: [
+      "Öffne Theaterbetrieb. Der Einstieg nennt dein aktuelles Theater und Gewerk.",
+      "Geführt starten begleitet dich durch Arbeitsbereich, Produktionsauswahl, Facheinträge, Zusammenarbeit und Bereitschaft.",
+      "Diesen Schritt öffnen führt zum passenden Bereich; es werden keine Daten automatisch verändert. Zurück und Weiter bleiben jederzeit verfügbar.",
+      "Mit Später fortsetzen behältst du deinen Fortschritt auf diesem Gerät. Der Fortschritt ist nach Theater, Zugang und Gewerk getrennt.",
+      "Unter Hilfe → Mein Gewerk kannst du Leitfäden aller Gewerke lesen und die Einführung erneut starten. Deine Berechtigungen werden dadurch nicht erweitert.",
+    ],
+  },
+  {
     id: "context-navigation",
     title: "Zurück zur vorherigen Ansicht",
     module: "today",
@@ -25,10 +73,10 @@ export const helpArticles: HelpArticle[] = [
     intro:
       "Lege Showtime auf deinen Startbildschirm. Danach öffnest du sie über das App-Symbol und kannst Mitteilungen einschalten. Eine Installation aus dem App Store oder Play Store ist nicht nötig.",
     steps: [
-      "iPhone oder iPad: Öffne digitalmask.vercel.app in Safari. Tippe auf Teilen. Je nach Safari-Ansicht findest du Teilen im Seitenmenü oder unter Mehr (…).",
+      "iPhone oder iPad: Öffne showtime-ingolstadt.vercel.app in Safari. Tippe auf Teilen. Je nach Safari-Ansicht findest du Teilen im Seitenmenü oder unter Mehr (…).",
       "iPhone oder iPad: Wähle Zum Home-Bildschirm beziehungsweise Zu Home-Bildschirm hinzufügen. Fehlt der Eintrag, scrolle in der Liste zu Aktionen bearbeiten und ergänze ihn dort.",
       "iPhone oder iPad: Lass Als Web-App öffnen eingeschaltet, falls diese Auswahl erscheint, und tippe auf Hinzufügen. Öffne Showtime danach über das neue Symbol. Für Mitteilungen brauchst du iOS oder iPadOS 16.4 oder neuer.",
-      "Android: Öffne digitalmask.vercel.app in Chrome. Tippe auf App installieren, falls Showtime den Button anbietet, und bestätige die Installation.",
+      "Android: Öffne showtime-ingolstadt.vercel.app in Chrome. Tippe auf App installieren, falls Showtime den Button anbietet, und bestätige die Installation.",
       "Android: Alternativ öffnest du das Dreipunkt-Menü von Chrome. Wähle Zum Startbildschirm hinzufügen beziehungsweise Zum Home-Bildschirm hinzufügen und dann Installieren. Die Bezeichnung kann je nach Chrome-Version abweichen. Öffne die App danach über ihr Symbol.",
       "Melde dich in der App an. Unter Mehr → Einstellungen → Mitteilungen auf diesem Gerät tippst du auf Mitteilungen aktivieren. Erlaube die Nachfrage deines Handys. Bei Nicht erlauben oder Blockieren bleibt der Empfang ausgeschaltet.",
       "Tippe auf Testmitteilung, um den Empfang zu prüfen. Wenn nichts ankommt, prüfe die Mitteilungen in den Handy-Einstellungen und den Fokus- beziehungsweise Nicht-stören-Modus. Die ausführliche Anleitung Mitteilungen auf dem Handy hilft dir weiter.",

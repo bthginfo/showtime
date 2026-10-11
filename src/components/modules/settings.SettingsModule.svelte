@@ -120,7 +120,7 @@ $: admin = memberCan(workspace.user, 'members.manage');
           </div>
         </Section>
         <Section title="Passwort ändern">
-          <form class="panel-content" on:submit={password}>
+          <form class="panel-content" method="POST" action="/api/actions" on:submit={password}>
             <PasswordInput label="Aktuelles Passwort" name="currentPassword" autoComplete="current-password" required></PasswordInput>
             <PasswordInput label="Neues Passwort" name="newPassword" autoComplete="new-password" minLength={10} required placeholder="Mindestens 10 Zeichen"></PasswordInput>
             <PasswordInput label="Neues Passwort wiederholen" name="repeat" autoComplete="new-password" minLength={10} required></PasswordInput>

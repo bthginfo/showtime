@@ -9,6 +9,8 @@ import { useWorkspace } from "../workspace-context";
 import { Badge, Button, Empty, PageHeader, Section } from "../ui";
 import { RecordDetail } from "../resource-view";
 import { TimerPanel } from "./time";
+import TheaterOverview from "@/modules/theater/theater-overview.svelte";
+import "@/modules/theater/theater-operations.css";
 import { expandEvents } from "./calendar";
 import { statusLabels } from "../resource-fields";
 import { initialPeriod, recordMatchesPeriod } from "@/shared/period-filter";
@@ -25,6 +27,7 @@ const workspaceStore=useWorkspace();
 let { workspace, action, notify } = $workspaceStore;
 $: ({ workspace, action, notify } = $workspaceStore);
 let showTimer = isStaff(workspace.user);
+let isIntendance = workspace.user.grants?.some(grant => grant.role === 'intendance') || false;
 let detail: DomainRecord | null = initialState<DomainRecord | null>(null);
 const setDetail = (next: DomainRecord | null | ((current: DomainRecord | null) => DomainRecord | null)) => { detail = typeof next === "function" ? (next as (current: DomainRecord | null) => DomainRecord | null)(detail) : next; };
 let now = (Date.now)();
@@ -51,6 +54,7 @@ let hour = new Date().getHours();
 let greet = hour < 11 ? "Guten Morgen" : hour < 18 ? "Guten Tag" : "Guten Abend";
 
 $: showTimer = isStaff(workspace.user);
+$: isIntendance = workspace.user.grants?.some(grant => grant.role === 'intendance') || false;
 $: today = localDate(new Date(now));
 $: week = weekStart();
 $: weekEnd = shiftDate(week, 6);
@@ -76,6 +80,7 @@ $: greet = hour < 11 ? "Guten Morgen" : hour < 18 ? "Guten Tag" : "Guten Abend";
 </script>
 
 
+      {#if isIntendance}<PageHeader title="Intendanz"><Button onClick={() => navigate('/?module=help&guide=intendance')}>Hilfe zur Hausübersicht</Button></PageHeader><TheaterOverview onProduction={id => navigate(`/?module=theater&view=readiness&productionId=${encodeURIComponent(id)}`)} />{:else}
       <PageHeader eyebrow={new Intl.DateTimeFormat("de-DE", {
     weekday: "long",
     day: "numeric",
@@ -84,10 +89,10 @@ $: greet = hour < 11 ? "Guten Morgen" : hour < 18 ? "Guten Tag" : "Guten Abend";
 })
     .format(new Date())
     .toUpperCase()} title={`${greet}, ${workspace.user.name.split(" ")[0]}.`} >
-        <Button variant="primary" onClick={() => navigate("time")}>
+        {#if workspace.user.permissions?.includes('time.own')}<Button variant="primary" onClick={() => navigate("time")}>
           <Clock3 size={16}></Clock3>
           Zeit buchen
-        </Button>
+        </Button>{/if}
       </PageHeader>
       <div class={`today-summary${showTimer ? ` ${attendanceBalanceStyles.dashboardSummary}` : ""}`}>
         <button on:click={() => navigate(myTasks.some((task) => task.data.productionId) ? "productions" : "tasks")}>
@@ -210,3 +215,4 @@ $: greet = hour < 11 ? "Guten Morgen" : hour < 18 ? "Guten Tag" : "Guten Abend";
           </aside>{/if}
       </div>
       {#if detail}<RecordDetail record={detail} onClose={() => setDetail(null)}></RecordDetail>{/if}
+      {/if}

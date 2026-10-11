@@ -5,7 +5,7 @@ import {clearPrivateBrowserData} from "@/shared/private-browser-data";import { i
 import TheaterModule from "@/modules/theater/theater-module.svelte";
 import {scopedBrowserKey} from "@/shared/browser-scope";
 import { BrandMark } from "./brand-mark";
-import { Bell, ArrowLeft, BookOpen, CalendarDays, ClipboardCheck, Clock3, Download, Home, CircleHelp, Layers3, LogOut, Menu, MessageSquare, Package, Search, Settings2, Theater, Users, WifiOff, X, type LucideIcon, } from "@lucide/svelte";
+import { Bell, Building2, ArrowLeft, BookOpen, CalendarDays, ClipboardCheck, Clock3, Download, Home, CircleHelp, Layers3, LogOut, Menu, MessageSquare, Package, Search, Settings2, Theater, Users, WifiOff, X, type LucideIcon, } from "@lucide/svelte";
 import { captureNavigationScroll, closeRecordDetail, navigateWorkspace, navigationReturn, recordHref, restoreNavigationScroll, returnToContext, setNavigationUser, } from "@/shared/client-navigation";
 import { subscribeLocation, subscribeMobile } from "@/shared/client-storage";
 import { onboardingVersion, type DomainRecord, type RecordKind } from "@/shared/contracts";
@@ -242,7 +242,7 @@ $: active = nav.find((x) => x.id === activeModule)!;
 
 </script>
 {#if true}
-{#snippet render_screen()}{#if activeModule === "theater"}<TheaterModule/>{:else if activeModule === "today"}<TodayModule navigate={navigate}></TodayModule>{:else}{#if activeModule === "productions"}<ProductionsModule productionId={params.get("productionId") || ""} activeTab={params.get("tab") === "handovers" ? "overview" : params.get("tab") || "overview"} onNavigate={(id, tab) => {
+{#snippet render_screen()}{#if activeModule === "theater"}{#key `${params.get('view') || ''}:${params.get('productionId') || ''}:${params.get('requestId') || ''}`}<TheaterModule initialView={params.get('view') || 'trade'} productionId={params.get('productionId') || ''} requestId={params.get('requestId') || ''}/>{/key}{:else if activeModule === "today"}<TodayModule navigate={navigate}></TodayModule>{:else}{#if activeModule === "productions"}<ProductionsModule productionId={params.get("productionId") || ""} activeTab={params.get("tab") === "handovers" ? "overview" : params.get("tab") || "overview"} onNavigate={(id, tab) => {
     const next = new URLSearchParams({
         module: "productions",
         ...(id ? { productionId: id, tab } : {}),
@@ -338,6 +338,7 @@ $: active = nav.find((x) => x.id === activeModule)!;
             <strong>{active.label}</strong>
           </div>
           <div class="topbar-actions">
+            {#if workspace.platformAdmin}<a href="/platform" class="icon-button" aria-label="Plattformverwaltung" title="Theater verwalten"><Building2 size={19}/></a>{/if}
             <button class="global-search-button" on:click={() => setSearchOpen(true)}>
               <Search size={16}></Search>
               <span>Alles durchsuchen</span>

@@ -5,17 +5,21 @@ import { and, eq } from "drizzle-orm";
 import { hashPassword } from "better-auth/crypto";
 import { authDb as db } from "@/platform/db/connections";
 import { user, account, session, verification } from "@/platform/db/schema";
-import { readJson, route, HttpError } from "@/platform/http";
+import { route, HttpError } from "@/platform/http";
+import { readAuthInput, authFormResponse, isAuthForm } from "@/platform/auth/form-request";
 import { throttle } from "@/platform/auth/throttle";
 async function legacyPOST(request: Request) {
   return route(async () => {
+    const input = await readAuthInput(request);
     const body = z
       .object({
         username: z.string().min(3).max(32),
         code: z.string().min(1).max(100),
         password: z.string().min(10).max(128),
       })
-      .parse(await readJson(request));
+      .parse(input);
+    if (isAuthForm(request) && input.repeat !== body.password)
+      throw new HttpError(400, "Die Passwörter stimmen nicht überein.");
     await throttle(request, "reset-password", 5);
     const password = await hashPassword(body.password);
     await db.transaction(async (tx) => {
@@ -47,4 +51,5 @@ async function legacyPOST(request: Request) {
 }
 
 import type { RequestHandler } from "@sveltejs/kit";
-export const POST: RequestHandler = ({ request, params }) => legacyPOST(request);
+export const POST: RequestHandler = async ({ request }) =>
+  authFormResponse(request, await legacyPOST(request), "reset-password");

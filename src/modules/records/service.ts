@@ -1,8 +1,9 @@
-import {privateRowReadable,guestOnly} from "@/shared/access-policy";
+import { privateRowReadable, guestOnly } from "@/shared/access-policy";
+import { collaborationOpen, collaborationContributor } from "@/shared/collaboration";
 import { and, eq, ne, or, sql, inArray } from "drizzle-orm";
 import { db, type Transaction } from "@/platform/db";
 import { records, memberships, recordHistory } from "@/platform/db/schema";
-import { requirePermission,can,type Context } from "@/platform/context";
+import { requirePermission, can, type Context } from "@/platform/context";
 import { canManageRecord, canSetCalendarParticipants } from "@/shared/record-permissions";
 import { HttpError } from "@/platform/http";
 import { emit, auditChange, scheduleEvents } from "@/platform/events";
@@ -49,19 +50,61 @@ export async function assertRead(
   row: typeof records.$inferSelect,
   tx: Transaction | typeof db = db,
 ) {
-  if(['time','attendance','timesheets'].includes(row.kind)){if(!privateRowReadable(context.user,row,context.departmentId))throw new HttpError(403,'Keine Berechtigung für diese Zeitbuchung.');return;}
-  await assertProject(context, row.kind === 'productions' ? row.id : row.data.productionId, tx);
-  if(row.kind==='files'){await assertRead(context,await findRecord(context,String(row.data.recordId||row.parentId),undefined,tx),tx);return;}
+  if (row.kind === "handovers" && row.data.collaborationId) {
+    if (row.data.collaborationId !== row.id)
+      throw new HttpError(403, "Diese Übergabe ist nicht zugänglich.");
+    const { assertCollaborationRead } = await import("@/modules/theater/collaborations");
+    await assertCollaborationRead(context, row.id, tx);
+    return;
+  }
+  if (["time", "attendance", "timesheets"].includes(row.kind)) {
+    if (!privateRowReadable(context.user, row, context.departmentId))
+      throw new HttpError(403, "Keine Berechtigung für diese Zeitbuchung.");
+    return;
+  }
+  await assertProject(context, row.kind === "productions" ? row.id : row.data.productionId, tx);
+  if (row.kind === "files") {
+    await assertRead(
+      context,
+      await findRecord(context, String(row.data.recordId || row.parentId), undefined, tx),
+      tx,
+    );
+    return;
+  }
   if (row.kind === "conversations") await assertConversation(context, row.id, tx);
   else await assertConversation(context, row.data.conversationId, tx);
-  if(guestOnly(context.user)&&["actors","people"].includes(row.kind)){const {readReferences,rowReadable}=await import("./pages");if(rowReadable(context,row,await readReferences(context)))return;}
-  if(!privateRowReadable(context.user,row,context.departmentId))throw new HttpError(403,"Dieser Eintrag ist privat.");
+  if (guestOnly(context.user) && ["actors", "people"].includes(row.kind)) {
+    const { readReferences, rowReadable } = await import("./pages");
+    if (rowReadable(context, row, await readReferences(context))) return;
+  }
+  if (!privateRowReadable(context.user, row, context.departmentId))
+    throw new HttpError(403, "Dieser Eintrag ist privat.");
 }
 export function assertWrite(
   context: Context,
   kind: RecordKind,
   existing?: typeof records.$inferSelect,
+  attachments = false,
 ) {
+  if (existing?.data.collaborationId) {
+    if (
+      !attachments ||
+      !collaborationOpen(String(existing.data.collaborationState)) ||
+      !collaborationContributor(
+        {
+          ...context.user,
+          grants: context.grants,
+          activeDepartmentIds: context.activeDepartmentIds,
+        },
+        existing,
+      )
+    )
+      throw new HttpError(
+        403,
+        "Verwende die Abstimmung zwischen Gewerken. Abgeschlossene Anlagen bleiben unverändert.",
+      );
+    return;
+  }
   if (
     kind === "messages" &&
     existing?.data.conversationId &&
@@ -87,10 +130,7 @@ export function assertWrite(
   if (!canManageRecord(context.user, kind, existing))
     throw new HttpError(403, "Du hast keine Berechtigung, diesen Eintrag zu verändern.");
   if (existing && context.user.role === "user") {
-    if (
-      ["leave", "messages"].includes(kind) &&
-      existing.data.userId !== context.user.id
-    )
+    if (["leave", "messages"].includes(kind) && existing.data.userId !== context.user.id)
       throw new HttpError(403, "Du kannst nur eigene Einträge bearbeiten.");
   }
 }
@@ -103,11 +143,15 @@ async function validateRelations(
   previousMaskPlan?: ReturnType<typeof maskPlanValue>,
   previousData?: RecordData,
 ) {
+  if (kind === "handovers" && data.collaborationId)
+    throw new HttpError(403, "Lege diese Übergabe im Bereich Zusammenarbeit an.");
   // A booking remains correctable after a production assignment is withdrawn.
   // Retaining an existing reference does not grant access to that production.
   const preservedBooking = (kind === "time" || kind === "attendance") && previousData;
-  const production = preservedBooking && data.productionId === previousData.productionId
-    ? undefined : await assertProject(context, data.productionId, tx);
+  const production =
+    preservedBooking && data.productionId === previousData.productionId
+      ? undefined
+      : await assertProject(context, data.productionId, tx);
   const maskPlan = kind === "maskPlans" ? maskPlanValue(data) : undefined;
   let eventTitle = textValue(data.title);
   let conversation: typeof records.$inferSelect | undefined;
@@ -198,7 +242,9 @@ async function validateRelations(
     const linkedRecords = await tx
       .select()
       .from(records)
-      .where(and(eq(records.organizationId, context.organizationId), inArray(records.id, linkedIds)));
+      .where(
+        and(eq(records.organizationId, context.organizationId), inArray(records.id, linkedIds)),
+      );
     if (linkedRecords.length !== linkedIds.length)
       throw new HttpError(404, "Ein verknüpfter Eintrag wurde nicht gefunden.");
     for (const linked of linkedRecords) {
@@ -231,7 +277,7 @@ async function validateRelations(
     throw new HttpError(400, "Das Sprintende muss nach dem Beginn liegen.");
   if (kind === "leave" && String(data.end) < String(data.start))
     throw new HttpError(400, "Bitte prüfe den Zeitraum.");
-  if (kind === "events" && data.cancelled!==true) {
+  if (kind === "events" && data.cancelled !== true) {
     const categoryName = await normalizeEventCategory(context, data, tx);
     eventTitle ||= textValue(production?.data.title) || categoryName;
     if (new Date(String(data.end)) <= new Date(String(data.start)))
@@ -272,7 +318,7 @@ async function validateRelations(
       const references = candidates.map(serialize);
       const calendarCategories = references.filter((item) => item.kind === "calendarCategories");
       for (const row of candidates) {
-        if (row.kind !== "events"||row.data.cancelled===true) continue;
+        if (row.kind !== "events" || row.data.cancelled === true) continue;
         if (
           !calendarCategoryBlocksTime(String(data.category), calendarCategories) ||
           !calendarCategoryBlocksTime(String(row.data.category), calendarCategories)
@@ -319,13 +365,28 @@ export async function saveRecord(
         sql`select pg_advisory_xact_lock(hashtext(${`people:${context.departmentId}`}))`,
       );
     const existing = existingId ? await findRecord(context, existingId, kind, tx, true) : undefined;
-    assertWrite(context, kind, existing || {createdBy:context.user.id,data:{...input,...(['time','attendance','leave','messages','feedback'].includes(kind)?{userId:context.user.id}:{})},departmentId:context.departmentId} as typeof records.$inferSelect);
+    assertWrite(
+      context,
+      kind,
+      existing ||
+        ({
+          createdBy: context.user.id,
+          data: {
+            ...input,
+            ...(["time", "attendance", "leave", "messages", "feedback"].includes(kind)
+              ? { userId: context.user.id }
+              : {}),
+          },
+          departmentId: context.departmentId,
+        } as typeof records.$inferSelect),
+    );
     if (existing) await assertRead(context, existing, tx);
     const data = validateRecord(
       kind,
       applySeasonDefaults(kind, { ...existing?.data, ...input }, existing?.createdAt.toISOString()),
     );
-    if(kind==="tasks"&&listValue(data.assigneeIds).some(id=>id!==context.user.id))requirePermission(context,"task.assign",textValue(data.productionId));
+    if (kind === "tasks" && listValue(data.assigneeIds).some((id) => id !== context.user.id))
+      requirePermission(context, "task.assign", textValue(data.productionId));
     if (kind === "reservations") await validateReservation(context, data, tx, existingId, existing);
     if (kind === "materials") await validateMaterialCapacity(context, data, tx, existingId);
     if (kind === "events" && !canSetCalendarParticipants(context.user, data))
@@ -461,7 +522,13 @@ export async function saveRecord(
       data.title = lookTitle(data);
       if (data.sections !== undefined) data.status = "published";
     }
-    if(kind==="looks"&&data.status==="published"&&existing&&existing.createdBy!==context.user.id)requirePermission(context,"document.publish",textValue(data.productionId));
+    if (
+      kind === "looks" &&
+      data.status === "published" &&
+      existing &&
+      existing.createdBy !== context.user.id
+    )
+      requirePermission(context, "document.publish", textValue(data.productionId));
     const values = {
       data,
       productionId: textValue(data.productionId) || null,
@@ -501,14 +568,55 @@ export async function saveRecord(
         })
         .returning();
     }
-    if(kind==="events"){
-      if(!data.cancelled){const {assertPlanning}=await import("@/modules/theater/planning-rules");await assertPlanning(context,{start:String(data.start),end:String(data.end),participantIds:listValue(data.participantIds),actorIds:listValue(data.actorIds),pauseMinutes:Number(data.pauseMinutes||0),category:String(data.category||""),blocksTime:data.blocksTime===true},row.id,tx);}
-      const {syncEventBooking}=await import("@/modules/theater/event-booking");const bookingId=await syncEventBooking(context,row,tx);
-      row={...row,data:{...row.data,bookingId}};await tx.update(records).set({data:row.data}).where(eq(records.id,row.id));
+    if (kind === "events") {
+      if (!data.cancelled) {
+        const { assertPlanning } = await import("@/modules/theater/planning-rules");
+        await assertPlanning(
+          context,
+          {
+            start: String(data.start),
+            end: String(data.end),
+            participantIds: listValue(data.participantIds),
+            actorIds: listValue(data.actorIds),
+            pauseMinutes: Number(data.pauseMinutes || 0),
+            category: String(data.category || ""),
+            blocksTime: data.blocksTime === true,
+          },
+          row.id,
+          tx,
+        );
+      }
+      const { syncEventBooking } = await import("@/modules/theater/event-booking");
+      const bookingId = await syncEventBooking(context, row, tx);
+      row = { ...row, data: { ...row.data, bookingId } };
+      await tx.update(records).set({ data: row.data }).where(eq(records.id, row.id));
     }
-    if(kind==='productions'&&!existing){await emit(tx,context,'ProductionCreatedV1',{recordId:row.id,productionId:row.id,title:String(data.title||'Produktion'),version:row.version});eventQueued=true;}
-    if(kind==='casting'){const {syncCastPlanning}=await import('@/modules/theater/cast-planning');await syncCastPlanning(context,String(data.productionId),tx);await emit(tx,context,'CastAssignmentChangedV1',{recordId:row.id,productionId:data.productionId,version:row.version});eventQueued=true;}
-    if(['productions','conversations'].includes(kind)){const {tenantSettings}=await import('@/platform/db/schema');await tx.update(tenantSettings).set({permissionVersion:sql`${tenantSettings.permissionVersion}+1`}).where(eq(tenantSettings.organizationId,context.organizationId));}
+    if (kind === "productions" && !existing) {
+      await emit(tx, context, "ProductionCreatedV1", {
+        recordId: row.id,
+        productionId: row.id,
+        title: String(data.title || "Produktion"),
+        version: row.version,
+      });
+      eventQueued = true;
+    }
+    if (kind === "casting") {
+      const { syncCastPlanning } = await import("@/modules/theater/cast-planning");
+      await syncCastPlanning(context, String(data.productionId), tx);
+      await emit(tx, context, "CastAssignmentChangedV1", {
+        recordId: row.id,
+        productionId: data.productionId,
+        version: row.version,
+      });
+      eventQueued = true;
+    }
+    if (["productions", "conversations"].includes(kind)) {
+      const { tenantSettings } = await import("@/platform/db/schema");
+      await tx
+        .update(tenantSettings)
+        .set({ permissionVersion: sql`${tenantSettings.permissionVersion}+1` })
+        .where(eq(tenantSettings.organizationId, context.organizationId));
+    }
     await auditChange(tx, context, existing ? `${kind}.updated` : `${kind}.created`, row.id);
     if (kind === "looks" || kind === "templates")
       await tx
@@ -582,7 +690,10 @@ export async function saveRecord(
         .select({ id: memberships.userId, role: memberships.role })
         .from(memberships)
         .where(
-          and(eq(memberships.organizationId, context.organizationId), eq(memberships.status, "active")),
+          and(
+            eq(memberships.organizationId, context.organizationId),
+            eq(memberships.status, "active"),
+          ),
         );
       await emit(tx, context, "LookPublishedV1", {
         userIds: audience
@@ -633,7 +744,10 @@ export async function deleteRecord(
       await assertUnusedDomainCategory(context, String(row.data.scope), String(row.data.key), tx);
     if (kind === "events" && row.data.leaveId)
       throw new HttpError(409, "Diese Abwesenheit wird über die Freiwunschentscheidung verwaltet.");
-    if(kind==="time"||kind==="attendance")await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.organizationId+":"+kind+":"+String(row.data.userId)}))`);
+    if (kind === "time" || kind === "attendance")
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${context.organizationId + ":" + kind + ":" + String(row.data.userId)}))`,
+      );
     if (kind === "leave") {
       await validateRelations(context, kind, { ...row.data }, tx, id);
       if (kind === "leave" && row.data.status === "approved")
@@ -657,7 +771,20 @@ export async function deleteRecord(
         409,
         "Der Eintrag wird noch verwendet. Entferne zuerst die Zuordnungen oder archiviere die Produktion.",
       );
-    if(kind==="events"){const {resourceBookings,performances}=await import("@/platform/db/schema");const [performance]=await tx.select().from(performances).where(eq(performances.eventId,id)).limit(1);if(performance)throw new HttpError(409,"Dieser Termin gehört zu einer Vorstellung. Sage die Vorstellung in der Disposition ab.");await tx.delete(resourceBookings).where(eq(resourceBookings.activityId,id));}
+    if (kind === "events") {
+      const { resourceBookings, performances } = await import("@/platform/db/schema");
+      const [performance] = await tx
+        .select()
+        .from(performances)
+        .where(eq(performances.eventId, id))
+        .limit(1);
+      if (performance)
+        throw new HttpError(
+          409,
+          "Dieser Termin gehört zu einer Vorstellung. Sage die Vorstellung in der Disposition ab.",
+        );
+      await tx.delete(resourceBookings).where(eq(resourceBookings.activityId, id));
+    }
     const attachments = await tx
       .select()
       .from(records)

@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import {fileQuota} from "@/platform/quotas";
+import { fileQuota } from "@/platform/quotas";
 import { put, get, del } from "@vercel/blob";
 import { eq } from "drizzle-orm";
 import { db } from "@/platform/db";
@@ -23,7 +23,7 @@ export async function uploadFile(
 ) {
   const linked = await findRecord(context, recordId, recordKind);
   await assertRead(context, linked);
-  assertWrite(context, recordKind, linked);
+  assertWrite(context, recordKind, linked, true);
   if (file.size <= 0 || file.size > 4_000_000)
     throw new HttpError(
       413,
@@ -60,14 +60,15 @@ export async function uploadFile(
   const id = crypto.randomUUID();
   if (image && recordKind === "actors") portrait = await analyzePortrait(bytes);
   const path = `${context.organizationId}/${context.departmentId}/${recordKind}/${recordId}/${id}.${extension}`;
-  await fileQuota(context,bytes.length);
+  await fileQuota(context, bytes.length);
   await put(path, bytes, { access: "private", contentType: mime, addRandomSuffix: false });
   let deletionQueued = false;
   try {
     const result = await db.transaction(async (tx) => {
+      await acquireWorkflowLock(context, recordKind, tx);
       const current = await findRecord(context, recordId, recordKind, tx, true);
       await assertRead(context, current, tx);
-      assertWrite(context, recordKind, current);
+      assertWrite(context, recordKind, current, true);
       const [row] = await tx
         .insert(records)
         .values({
@@ -107,6 +108,10 @@ export async function uploadFile(
           .where(eq(records.id, recordId));
       }
       await auditChange(tx, context, "file.uploaded", id);
+      if (current.data.collaborationId) {
+        const { collaborationAttachmentChanged } = await import("@/modules/theater/collaborations");
+        await collaborationAttachmentChanged(context, current.id, tx);
+      }
       return serialize(row);
     });
     invalidateWorkspace(context.departmentId);
@@ -135,7 +140,7 @@ export async function deleteFile(context: Context, id: string) {
     if (row.data.pendingDeletionOperation)
       throw new HttpError(409, "Diese Datei wurde bereits entfernt.");
     await assertRead(context, linked, tx);
-    assertWrite(context, linked.kind, linked);
+    assertWrite(context, linked.kind, linked, true);
     const field = linked.kind === "messages" ? "attachmentIds" : "imageIds";
     const data = { ...linked.data, [field]: listValue(linked.data[field]).filter((x) => x !== id) };
     if (linked.kind === "actors" && linked.data.portraitFileId === id) {
@@ -157,6 +162,10 @@ export async function deleteFile(context: Context, id: string) {
       fileId: row.id,
     });
     await auditChange(tx, context, "file.deleted", id);
+    if (linked.data.collaborationId) {
+      const { collaborationAttachmentChanged } = await import("@/modules/theater/collaborations");
+      await collaborationAttachmentChanged(context, linked.id, tx);
+    }
   });
   invalidateWorkspace(context.departmentId);
   scheduleEvents();

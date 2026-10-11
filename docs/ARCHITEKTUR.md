@@ -1,6 +1,6 @@
 # Showtime: Architektur und Rechte
 
-Stand: 10. Oktober 2026. Der freigegebene fachliche Umfang und die Recherche stehen in [APPROVED-PLAN.md](APPROVED-PLAN.md). DigitalMask, Quellstand `daafd42`, ist die historische Referenz. Showtime besitzt eigene Ressourcen und übernimmt keine realen DigitalMask-Daten.
+Stand: 11. Oktober 2026. Der freigegebene fachliche Umfang und die Recherche stehen in [APPROVED-PLAN.md](APPROVED-PLAN.md) und [GEWERKE-ABLAEUFE.md](GEWERKE-ABLAEUFE.md). DigitalMask, Quellstand `daafd42`, ist die historische Referenz. Showtime besitzt eigene Ressourcen. Auf ausdrücklichen Auftrag wurden die vorhandenen DigitalMask-Daten als getrennte Kopie in den Tenant Stadttheater Ingolstadt übernommen; die Quelle wurde nicht verändert.
 
 ## Aufbau
 

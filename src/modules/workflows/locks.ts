@@ -9,7 +9,9 @@ export async function acquireWorkflowLock(context: Context, kind: RecordKind, tx
     ? "inventory"
     : ["events", "casting", "shiftSwaps", "calendarCategories"].includes(kind)
       ? "calendar"
-      : undefined;
+      : kind === "handovers"
+        ? "collaborations"
+        : undefined;
   if (group)
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${context.organizationId + ":" + group}))`,

@@ -1,11 +1,12 @@
 const NextResponse = Response;
 import { auth } from "@/platform/auth";
-import { HttpError, readJson, route } from "@/platform/http";
+import { HttpError, route } from "@/platform/http";
+import { readAuthInput, authFormResponse } from "@/platform/auth/form-request";
 import { authFeedback, loginInput } from "@/shared/auth-feedback";
 import { throttle } from "@/platform/auth/throttle";
 async function legacyPOST(request: Request) {
   return route(async () => {
-    const input = loginInput.safeParse(await readJson(request));
+    const input = loginInput.safeParse(await readAuthInput(request));
     if (!input.success) throw new HttpError(400, input.error.issues[0].message);
     const body = { ...input.data, username: input.data.username.toLowerCase() };
     await throttle(request, "login", 10);
@@ -24,4 +25,5 @@ async function legacyPOST(request: Request) {
 }
 
 import type { RequestHandler } from "@sveltejs/kit";
-export const POST: RequestHandler = ({ request, params }) => legacyPOST(request);
+export const POST: RequestHandler = async ({ request }) =>
+  authFormResponse(request, await legacyPOST(request), "login");

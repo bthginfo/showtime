@@ -31,6 +31,7 @@ import { invalidateWorkspace } from "@/modules/records/workspace";
 import { assertProject, findRecord, projectVisible } from "@/modules/records/repository";
 import { assertRead } from "@/modules/records/service";
 import { validateFeature, moduleById, moduleRegistry } from "./registry";
+import { collaborationReadable } from "@/shared/collaboration";
 const inputSchema = z.object({
   id: z.string().optional(),
   expectedVersion: z.number().int().positive().optional(),
@@ -62,6 +63,11 @@ async function changedEntity<T extends { id: string; version?: number }>(
   return row;
 }
 export function tradeReadable(context: Context, item: typeof tradeItems.$inferSelect) {
+  if (item.type === "collaboration")
+    return collaborationReadable(
+      { ...context.user, grants: context.grants, activeDepartmentIds: context.activeDepartmentIds },
+      item,
+    );
   const feature = moduleById(item.moduleId)?.features.find((f) => f.id === item.type);
   if (item.type === "workspace") return can(context, "production.read", item.productionId || "");
   if (!feature) return false;
@@ -72,6 +78,12 @@ export function tradeReadable(context: Context, item: typeof tradeItems.$inferSe
     );
   if (item.type === "measurements")
     return can(context, "measurements.read", item.productionId || "", item.departmentId);
+  if (item.type === "audience-report")
+    return (
+      item.createdBy === context.user.id ||
+      can(context, "budget.read", item.productionId || "", item.departmentId) ||
+      can(context, "schedule.manage", item.productionId || "", item.departmentId)
+    );
   if (item.type === "availability")
     return (
       item.createdBy === context.user.id ||
@@ -218,6 +230,48 @@ export async function saveTradeItem(context: Context, input: unknown) {
       : [];
     if (body.id && !existing) throw new HttpError(404, "Eintrag nicht gefunden.");
     const departmentId = existing?.departmentId || context.departmentId;
+    if (body.type === "audience-report") {
+      const performanceId = String(data.performanceId);
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${context.organizationId + ":audience:" + performanceId}))`,
+      );
+      const [show] = await tx
+        .select()
+        .from(performances)
+        .where(eq(performances.id, performanceId))
+        .limit(1);
+      if (
+        !show ||
+        show.productionId !== body.productionId ||
+        show.status === "cancelled" ||
+        show.curtainAt > new Date()
+      )
+        throw new HttpError(400, "Wähle eine bereits gespielte Vorstellung dieser Produktion.");
+      if (
+        Number(data.visitors) > Number(data.offeredSeats) ||
+        Number(data.paidTickets) + Number(data.complimentaryTickets) > Number(data.offeredSeats)
+      )
+        throw new HttpError(
+          400,
+          "Besucher und ausgegebene Karten dürfen die angebotenen Plätze nicht überschreiten.",
+        );
+      const [duplicate] = await tx
+        .select({ id: tradeItems.id })
+        .from(tradeItems)
+        .where(
+          and(
+            eq(tradeItems.type, "audience-report"),
+            sql`${tradeItems.data}->>'performanceId'=${performanceId}`,
+            existing ? ne(tradeItems.id, existing.id) : undefined,
+          ),
+        )
+        .limit(1);
+      if (duplicate)
+        throw new HttpError(
+          409,
+          "Für diese Vorstellung gibt es bereits einen Bericht. Bearbeite den vorhandenen Eintrag.",
+        );
+    }
     if (
       body.status === "published" &&
       !can(

@@ -23,6 +23,7 @@ export interface Context {
   departmentName: string;
   grants: Grant[];
   platformAdmin?: boolean;
+  activeDepartmentIds?: string[];
 }
 export const scopeTag = (departmentId: string) => `workspace:${departmentId}`;
 export function cookieValue(cookie: string, key: string) {
@@ -162,12 +163,21 @@ export async function requireContext(_fresh = true): Promise<Context> {
     status: "active",
     permissions,
     grants,
+    activeDepartmentIds: list
+      .filter((s) => s.organizationId === row.organizationId && s.status === "active")
+      .map((s) => s.departmentId),
     preferences: {
       accentPalette: preference?.accentPalette || "green",
       onboardingVersion: preference?.onboardingVersion || 0,
     },
   };
-  const context = { ...row, user, grants, platformAdmin: !!admin };
+  const context = {
+    ...row,
+    user,
+    grants,
+    activeDepartmentIds: user.activeDepartmentIds,
+    platformAdmin: !!admin,
+  };
   scope.context = context;
   return context;
 }

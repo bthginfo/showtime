@@ -28,7 +28,7 @@ export const helpTutorials: HelpTutorial[] = [
     poster: "/tutorials/v1/ios-install.webp",
     captions: "/tutorials/v1/ios-install.vtt",
     steps: [
-      "Öffne digitalmask.vercel.app in Safari.",
+      "Öffne showtime-ingolstadt.vercel.app in Safari.",
       "Tippe auf Teilen, gegebenenfalls im Seitenmenü oder unter Mehr (…).",
       "Wähle Zum Home-Bildschirm beziehungsweise Zu Home-Bildschirm hinzufügen. Fehlt die Option, ergänze sie über Aktionen bearbeiten.",
       "Lass Als Web-App öffnen eingeschaltet, falls angezeigt. Tippe auf Hinzufügen.",
@@ -48,7 +48,7 @@ export const helpTutorials: HelpTutorial[] = [
     poster: "/tutorials/v1/android-install.webp",
     captions: "/tutorials/v1/android-install.vtt",
     steps: [
-      "Öffne digitalmask.vercel.app in Chrome.",
+      "Öffne showtime-ingolstadt.vercel.app in Chrome.",
       "Tippe auf App installieren, falls angeboten. Sonst öffne das Dreipunkt-Menü von Chrome.",
       "Wähle Zum Startbildschirm hinzufügen beziehungsweise Zum Home-Bildschirm hinzufügen und bestätige Installieren. Die Bezeichnung kann je nach Chrome-Version abweichen.",
       "Öffne Showtime über das neue App-Symbol und melde dich an.",

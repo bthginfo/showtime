@@ -1,1 +1,14 @@
-{"extends":"./tsconfig.json","compilerOptions":{"paths":{"@/*":["./src/*"]}},"include":["scripts/migrate-showtime.ts","scripts/bootstrap-showtime.ts","scripts/tenant-backup.ts","src/platform/**/*.ts","src/**/*.d.ts"]}
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "paths": { "@/*": ["./src/*"] } },
+  "include": [
+    "scripts/migrate-showtime.ts",
+    "scripts/bootstrap-showtime.ts",
+    "scripts/tenant-backup.ts",
+    "scripts/import-digitalmask.ts",
+    "scripts/seed-theater-demo.ts",
+    "scripts/seed-theater-workflows.ts",
+    "src/platform/**/*.ts",
+    "src/**/*.d.ts"
+  ]
+}

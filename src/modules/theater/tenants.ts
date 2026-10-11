@@ -21,6 +21,7 @@ import { db } from "@/platform/db";
 import { auditChange, scheduleEvents } from "@/platform/events";
 import { outbox } from "@/platform/db/schema";
 import { roleKeys, canDelegate } from "@/platform/access";
+import { tenantInput } from "@/shared/tenant-management";
 export async function requirePlatformAdmin() {
   const person = await identity();
   const [grant] = await authDb
@@ -32,56 +33,49 @@ export async function requirePlatformAdmin() {
   return person;
 }
 export async function createTenant(input: unknown, administratorId?: string, creatorId?: string) {
-  const body = z
-    .object({
-      name: z.string().trim().min(2).max(150),
-      slug: z.string().regex(/^[a-z0-9][a-z0-9-]{1,62}$/),
-    })
-    .parse(input);
-  const tenant = await controlDb.transaction(async (tx) => {
-    const organizationId = crypto.randomUUID();
-    await tx.insert(organizations).values({ id: organizationId, name: body.name });
-    await tx
-      .insert(tenantSettings)
-      .values({
+  const body = tenantInput.parse(input);
+  const tenant = await controlDb
+    .transaction(async (tx) => {
+      const organizationId = crypto.randomUUID();
+      await tx.insert(organizations).values({ id: organizationId, name: body.name });
+      await tx.insert(tenantSettings).values({
         organizationId,
         slug: body.slug,
+        status: "provisioning",
         settings: {
           version: 1,
           quotas: { members: 500, filesBytes: 1_000_000_000 },
           workRules: { configured: false },
         },
       });
-    if (administratorId) {
-      await tx
-        .insert(tenantMembers)
-        .values({ organizationId, userId: administratorId, status: "active" });
-      await tx.insert(permissionGrants).values([
-        {
-          organizationId,
-          userId: administratorId,
-          role: "theater_admin",
-          scope: "tenant",
-          scopeId: null,
-        },
-        {
-          organizationId,
-          userId: administratorId,
-          role: "employee",
-          scope: "tenant",
-          scopeId: null,
-        },
-      ]);
-    }
-    const created = moduleRegistry.map((module) => ({
-      id: crypto.randomUUID(),
-      name: module.department,
-    }));
-    await tx.insert(departments).values(created.map((d) => ({ ...d, organizationId })));
-    if (administratorId)
-      await tx
-        .insert(memberships)
-        .values(
+      if (administratorId) {
+        await tx
+          .insert(tenantMembers)
+          .values({ organizationId, userId: administratorId, status: "active" });
+        await tx.insert(permissionGrants).values([
+          {
+            organizationId,
+            userId: administratorId,
+            role: "theater_admin",
+            scope: "tenant",
+            scopeId: null,
+          },
+          {
+            organizationId,
+            userId: administratorId,
+            role: "employee",
+            scope: "tenant",
+            scopeId: null,
+          },
+        ]);
+      }
+      const created = moduleRegistry.map((module) => ({
+        id: crypto.randomUUID(),
+        name: module.department,
+      }));
+      await tx.insert(departments).values(created.map((d) => ({ ...d, organizationId })));
+      if (administratorId)
+        await tx.insert(memberships).values(
           created.map((d) => ({
             id: crypto.randomUUID(),
             organizationId,
@@ -91,9 +85,7 @@ export async function createTenant(input: unknown, administratorId?: string, cre
             status: "active" as const,
           })),
         );
-    await tx
-      .insert(moduleActivations)
-      .values(
+      await tx.insert(moduleActivations).values(
         moduleRegistry.map((module, index) => ({
           organizationId,
           moduleId: module.id,
@@ -101,12 +93,10 @@ export async function createTenant(input: unknown, administratorId?: string, cre
           config: { departmentId: created[index].id },
         })),
       );
-    let invitationUrl: string | undefined;
-    if (!administratorId && creatorId) {
-      const token = randomBytes(32).toString("base64url");
-      await tx
-        .insert(invitations)
-        .values({
+      let invitationUrl: string | undefined;
+      if (!administratorId && creatorId) {
+        const token = randomBytes(32).toString("base64url");
+        await tx.insert(invitations).values({
           organizationId,
           departmentId: created[0].id,
           role: "theater_admin",
@@ -114,21 +104,79 @@ export async function createTenant(input: unknown, administratorId?: string, cre
           createdBy: creatorId,
           expiresAt: new Date(Date.now() + 7 * 86400000),
         });
-      invitationUrl = `${applicationURL()}/register?invitation=${token}`;
-    }
-    return {
-      id: organizationId,
-      name: body.name,
-      slug: body.slug,
-      departments: created,
-      invitationUrl,
-    };
-  });
+        invitationUrl = `${applicationURL()}/register?invitation=${token}`;
+      }
+      return {
+        id: organizationId,
+        name: body.name,
+        slug: body.slug,
+        departments: created,
+        invitationUrl,
+      };
+    })
+    .catch((error: unknown) => {
+      if (
+        (error as { cause?: { code?: string }; code?: string }).cause?.code === "23505" ||
+        (error as { code?: string }).code === "23505"
+      )
+        throw new HttpError(
+          409,
+          "Diese Kennung ist bereits vergeben. Wähle eine andere Kennung oder öffne das vorhandene Theater.",
+        );
+      throw error;
+    });
   if (administratorId || creatorId) {
-    const { seedTenantDefaults } = await import("./defaults");
-    await seedTenantDefaults(tenant.id, administratorId || creatorId!);
+    await completeTenantSetup(tenant.id, administratorId || creatorId!);
   }
   return tenant;
+}
+
+export async function completeTenantSetup(organizationId: string, actorId: string) {
+  const [setting] = await controlDb
+    .select()
+    .from(tenantSettings)
+    .where(eq(tenantSettings.organizationId, organizationId))
+    .limit(1);
+  if (!setting) throw new HttpError(404, "Theater nicht gefunden.");
+  if (setting.status === "disabled")
+    throw new HttpError(409, "Gib das Theater zuerst wieder frei.");
+  if (setting.status === "active") return;
+  await controlDb
+    .update(tenantSettings)
+    .set({ status: "provisioning" })
+    .where(
+      and(
+        eq(tenantSettings.organizationId, organizationId),
+        eq(tenantSettings.status, setting.status),
+      ),
+    );
+  try {
+    const { seedTenantDefaults } = await import("./defaults");
+    await seedTenantDefaults(organizationId, actorId);
+    await controlDb
+      .update(tenantSettings)
+      .set({ status: "active", updatedAt: new Date() })
+      .where(
+        and(
+          eq(tenantSettings.organizationId, organizationId),
+          eq(tenantSettings.status, "provisioning"),
+        ),
+      );
+  } catch {
+    await controlDb
+      .update(tenantSettings)
+      .set({ status: "setup_failed", updatedAt: new Date() })
+      .where(
+        and(
+          eq(tenantSettings.organizationId, organizationId),
+          eq(tenantSettings.status, "provisioning"),
+        ),
+      );
+    throw new HttpError(
+      503,
+      "Das Theater wurde gespeichert, aber die Einrichtung ist noch nicht vollständig. Öffne es in der Verwaltung und wähle „Einrichtung fortsetzen“.",
+    );
+  }
 }
 export async function tenantConfiguration(context: Context, input: unknown) {
   const body = z
@@ -389,16 +437,14 @@ export async function tenantConfiguration(context: Context, input: unknown) {
     await assertProject(context, data.productionId);
   }
   const token = randomBytes(32).toString("base64url");
-  await db
-    .insert(invitations)
-    .values({
-      organizationId: context.organizationId,
-      departmentId: dep.id,
-      productionId: data.productionId || null,
-      role: data.role,
-      tokenHash: createHash("sha256").update(token).digest("hex"),
-      createdBy: context.user.id,
-      expiresAt: new Date(Date.now() + data.expiresInDays * 86400000),
-    });
+  await db.insert(invitations).values({
+    organizationId: context.organizationId,
+    departmentId: dep.id,
+    productionId: data.productionId || null,
+    role: data.role,
+    tokenHash: createHash("sha256").update(token).digest("hex"),
+    createdBy: context.user.id,
+    expiresAt: new Date(Date.now() + data.expiresInDays * 86400000),
+  });
   return { url: `${applicationURL()}/register?invitation=${token}` };
 }

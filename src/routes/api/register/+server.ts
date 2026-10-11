@@ -5,15 +5,18 @@ import { auth } from "@/platform/auth";
 import { identity } from "@/platform/context";
 import { acceptInvitation, invitationScope } from "@/modules/theater/invitations";
 import { throttle } from "@/platform/auth/throttle";
-import { route, readJson, HttpError } from "@/platform/http";
+import { route, HttpError } from "@/platform/http";
+import { readAuthInput, authFormResponse } from "@/platform/auth/form-request";
 import type { RequestHandler } from "@sveltejs/kit";
-export const POST: RequestHandler = ({ request }) =>
-  route(async () => {
+export const POST: RequestHandler = async ({ request }) => {
+  let invitation: string | undefined;
+  const response = await route(async () => {
     await throttle(request, "register", 5);
     const body = z
       .object({ invitation: z.string().min(32).max(100), existingAccount: z.boolean().optional() })
       .passthrough()
-      .parse(await readJson(request));
+      .parse(await readAuthInput(request));
+    invitation = body.invitation;
     await invitationScope(body.invitation);
     let userId: string;
     if (body.existingAccount) {
@@ -45,3 +48,5 @@ export const POST: RequestHandler = ({ request }) =>
       { status: 201 },
     );
   });
+  return authFormResponse(request, response, "register", invitation);
+};

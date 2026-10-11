@@ -70,6 +70,7 @@ export async function activeSubjects(
         organizationName: "",
         departmentName: "",
         grants,
+        activeDepartmentIds: [...departments],
         user: {
           id,
           name: identity.name,
@@ -78,6 +79,7 @@ export async function activeSubjects(
           status: "active" as const,
           departmentId: identity.departmentId,
           grants,
+          activeDepartmentIds: [...departments],
           permissions: allowedPermissions({ id, grants }, { departmentId: identity.departmentId }),
         },
       },

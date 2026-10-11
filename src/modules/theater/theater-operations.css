@@ -1,0 +1,421 @@
+.theater-view-picker {
+  display: none;
+}
+.theater-workspace .section-heading,
+.leadership-overview .section-heading,
+.trade-onboarding .section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.theater-workspace .section-heading h2,
+.theater-workspace .section-heading h3,
+.leadership-overview .section-heading h2,
+.leadership-overview .section-heading h3 {
+  margin: 0;
+}
+.theater-workspace .button-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.theater-workspace .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.theater-workspace .form-grid > .full {
+  grid-column: 1 / -1;
+}
+.collaboration-detail > .text-button {
+  min-height: 44px;
+  text-align: left;
+}
+.collaboration-list .empty {
+  padding: 28px 8px;
+}
+.collaboration-list .empty h3 {
+  font-size: 18px;
+}
+.trade-onboarding {
+  padding: 20px;
+}
+.trade-guide-intro {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.trade-guide-intro > div {
+  flex: 1;
+  min-width: 0;
+}
+.trade-guide-intro h3,
+.trade-guide-intro p {
+  margin: 0;
+}
+.trade-guide-intro p {
+  margin-top: 5px;
+}
+.trade-onboarding progress {
+  width: 100%;
+  height: 5px;
+  accent-color: var(--accent);
+  margin: 12px 0;
+  appearance: none;
+  border: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-soft);
+  color: var(--accent);
+}
+.trade-onboarding progress::-webkit-progress-bar {
+  background: var(--surface-soft);
+}
+.trade-onboarding progress::-webkit-progress-value {
+  background: var(--accent);
+  border-radius: 4px;
+}
+.trade-onboarding progress::-moz-progress-bar {
+  background: var(--accent);
+  border-radius: 4px;
+}
+.trade-onboarding > p,
+.trade-guide-copy {
+  max-width: 72ch;
+}
+.trade-guide-copy h4 {
+  margin: 24px 0 8px;
+}
+.trade-guide-actions,
+.collaboration-summary,
+.collaboration-row-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.trade-guide-actions {
+  margin-top: 20px;
+}
+.action-spacer {
+  flex: 1;
+}
+.trade-help-picker {
+  display: grid;
+  gap: 6px;
+  max-width: 440px;
+  margin: 20px 0;
+}
+.collaboration-workspace,
+.leadership-overview {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.collaboration-heading {
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.collaboration-heading p {
+  margin: 5px 0 0;
+}
+.collaboration-columns {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.75fr) minmax(0, 1.6fr);
+  gap: 20px;
+  align-items: start;
+}
+.collaboration-list,
+.collaboration-detail,
+.overview-layout > .panel,
+.overview-audience,
+.overview-productions {
+  padding: 20px;
+  min-width: 0;
+}
+.collaboration-list > label,
+.collaboration-response > label,
+.overview-productions > label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.collaboration-rows {
+  max-height: 70vh;
+  overflow-y: auto;
+  scrollbar-color: var(--border) var(--surface);
+}
+.collaboration-row {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 16px 12px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 0;
+}
+.collaboration-row:hover,
+.collaboration-row.active {
+  background: var(--surface-soft);
+}
+.collaboration-row-title {
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.collaboration-detail h3 {
+  font-size: 21px;
+  overflow-wrap: anywhere;
+}
+.collaboration-detail h4 {
+  margin: 28px 0 10px;
+}
+.collaboration-detail > .muted {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.collaboration-detail form {
+  margin-top: 20px;
+}
+.collaboration-detail textarea {
+  resize: vertical;
+}
+.preserve-lines {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 72ch;
+}
+.collaboration-back {
+  display: none;
+}
+.collaboration-attachments-heading {
+  margin-top: 28px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.collaboration-attachments-heading h4 {
+  margin: 0;
+}
+.collaboration-upload {
+  position: relative;
+}
+.collaboration-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+}
+.collaboration-upload:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.collaboration-files {
+  display: grid;
+  gap: 12px;
+}
+.collaboration-files article {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+.collaboration-files article > div {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+.collaboration-files article > div > span {
+  flex: 1;
+  min-width: 100px;
+}
+.collaboration-files img {
+  display: block;
+  max-width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+.collaboration-replies {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.collaboration-replies li {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.collaboration-replies li > div {
+  display: grid;
+  gap: 4px;
+}
+.collaboration-replies p {
+  margin: 9px 0 0;
+}
+.collaboration-response {
+  display: grid;
+  gap: 12px;
+}
+.collaboration-response button {
+  justify-self: start;
+}
+.overdue {
+  color: var(--coral, #a53c32);
+  font-weight: 600;
+}
+.overview-statement {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  padding: 8px 0;
+}
+.overview-statement > strong {
+  font-size: 24px;
+}
+.overview-statement > .small {
+  margin-left: auto;
+}
+.overview-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.overview-values {
+  display: grid;
+  gap: 0;
+  margin: 12px 0;
+  font-variant-numeric: tabular-nums;
+}
+.overview-values > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.overview-values dt {
+  color: var(--muted);
+}
+.overview-values dd {
+  margin: 0;
+  font-weight: 650;
+  text-align: right;
+}
+.overview-audience-values {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 24px;
+}
+.overview-audience-values > div {
+  flex-direction: column;
+  gap: 8px;
+}
+.overview-audience-values dd {
+  font-size: 22px;
+  text-align: left;
+}
+.overview-productions table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.overview-productions th,
+.overview-productions td {
+  padding: 14px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+.overview-productions .table-wrap {
+  overflow-x: auto;
+}
+.overview-productions table button {
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .collaboration-columns {
+    grid-template-columns: minmax(220px, 0.75fr) minmax(0, 1.6fr);
+    gap: 14px;
+  }
+  .overview-audience-values {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .theater-workspace > .segmented {
+    display: none;
+  }
+  .theater-view-picker {
+    display: grid;
+    gap: 6px;
+  }
+  .trade-guide-intro {
+    display: grid;
+    grid-template-columns: 23px minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+  }
+  .trade-guide-intro > .button {
+    grid-column: 2;
+    justify-self: start;
+    margin: 0;
+  }
+  .theater-workspace .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .trade-onboarding,
+  .collaboration-list,
+  .collaboration-detail,
+  .overview-layout > .panel,
+  .overview-audience,
+  .overview-productions {
+    padding: 16px;
+  }
+  .trade-guide-actions {
+    gap: 8px;
+  }
+  .trade-guide-actions .action-spacer {
+    display: none;
+  }
+  .collaboration-columns,
+  .overview-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .collaboration-workspace.has-detail .collaboration-list {
+    display: none;
+  }
+  .collaboration-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0;
+  }
+  .collaboration-detail > .section-heading {
+    align-items: start;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .collaboration-heading .button-row {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .overview-statement > .small {
+    margin-left: 0;
+    width: 100%;
+  }
+  .overview-audience > .section-heading {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .overview-productions .section-heading {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

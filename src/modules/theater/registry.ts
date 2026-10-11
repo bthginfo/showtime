@@ -18,7 +18,8 @@ export type Field = {
     | "record"
     | "members"
     | "budget"
-    | "department";
+    | "department"
+    | "performance";
   source?: RecordKind;
   options?: string[];
   required?: boolean;
@@ -429,6 +430,26 @@ export const moduleRegistry: ModuleManifest[] = [
     ),
   ]),
   mod("front-of-house", "Vorderhaus & Publikumsservice", "Vorderhaus", [
+    feature(
+      "audience-report",
+      "Besucher- und Kassenbericht",
+      [
+        {
+          key: "performanceId",
+          label: "Gespielte Vorstellung",
+          type: "performance",
+          required: true,
+        },
+        { ...number("offeredSeats", "Angebotene Plätze"), required: true },
+        { ...number("visitors", "Tatsächliche Besucherzahl"), required: true },
+        { ...number("paidTickets", "Bezahlte Karten"), required: true },
+        { ...number("complimentaryTickets", "Freikarten"), required: true },
+        { ...number("amountCents", "Karteneinnahmen (Cent)"), required: true },
+        note("notes", "Hinweise zur Erfassung"),
+      ],
+      "document.create",
+      true,
+    ),
     feature("briefing", "Veranstaltungsbriefing", [
       text("entry", "Einlasszeit"),
       text("staff", "Dienstbesetzung"),
@@ -535,7 +556,13 @@ export function validateFeature(moduleId: string, type: string, input: Record<st
       field.type === "number"
         ? field.key === "level"
           ? z.number().finite().min(-120).max(40)
-          : field.key === "amountCents"
+          : [
+                "amountCents",
+                "offeredSeats",
+                "visitors",
+                "paidTickets",
+                "complimentaryTickets",
+              ].includes(field.key)
             ? z.number().int().min(0).max(1_000_000_000)
             : z.number().finite().min(0).max(1_000_000_000)
         : field.type === "checkbox"
