@@ -2,6 +2,7 @@
   import { useTheaterTime } from "@/components/theater-time";
   const { localDate, weekStart, dateLabel } = useTheaterTime();
   import { initialState } from "@/shared/svelte-runtime";
+  import { memberCan } from "@/shared/access-policy";
 
   import { Check, Clock3, Trash2 } from "@lucide/svelte";
   import type { Member } from "@/shared/contracts";
@@ -11,7 +12,6 @@
   import {
     currentWorkingSchedule,
     defaultWorkingDays,
-    workingDayLabels,
     type WorkingTimeSchedule,
   } from "@/shared/working-time";
   import { useWorkspace } from "@/components/workspace-context";
@@ -51,11 +51,12 @@
   const workspaceStore = useWorkspace();
   let { workspace, action, busy } = $workspaceStore;
   $: ({ workspace, action, busy } = $workspaceStore);
-  let admin = workspace.user.role !== "user";
+  let admin =
+    memberCan(workspace.user, "personnel.manage") || memberCan(workspace.user, "time.team.manage");
   let saved = member.preferences?.workingTime;
   let configured = Boolean(saved?.schedules.length);
   let schedule = currentWorkingSchedule(saved, localDate()) || saved?.schedules.at(-1);
-  let weeklyHours = schedule ? numberDraft(schedule.weeklyMinutes / 60) : "";
+  let weeklyHours = schedule ? numberDraft(schedule.weeklyMinutes / 60) : numberDraft(39);
   const setWeeklyHours = (
     next: typeof weeklyHours | ((current: typeof weeklyHours) => typeof weeklyHours),
   ) => {
@@ -63,11 +64,6 @@
       typeof next === "function"
         ? (next as (current: typeof weeklyHours) => typeof weeklyHours)(weeklyHours)
         : next;
-  };
-  let days = schedule?.workingDays || [...defaultWorkingDays];
-  const setDays = (next: typeof days | ((current: typeof days) => typeof days)) => {
-    days =
-      typeof next === "function" ? (next as (current: typeof days) => typeof days)(days) : next;
   };
   let effectiveFrom = configured ? localDate() : weekStart();
   const setEffectiveFrom = (
@@ -131,7 +127,8 @@
     saved?.schedules.every((row) => row.effectiveFrom >= (deletingSchedule?.effectiveFrom || "")),
   );
 
-  $: admin = workspace.user.role !== "user";
+  $: admin =
+    memberCan(workspace.user, "personnel.manage") || memberCan(workspace.user, "time.team.manage");
   $: saved = member.preferences?.workingTime;
   $: configured = Boolean(saved?.schedules.length);
   $: schedule = currentWorkingSchedule(saved, localDate()) || saved?.schedules.at(-1);
@@ -164,12 +161,11 @@
         min: -100000,
         max: 100000,
       })!;
-      if (!days.length) throw new Error("Wähle mindestens einen Soll-Tag pro Woche.");
       await action("profile-update", undefined, {
         ...(member.id !== workspace.user.id ? { memberId: member.id } : {}),
         workingTime: {
           weeklyMinutes: Math.round(weekly * 60),
-          workingDays: days,
+          workingDays: schedule?.workingDays || [...defaultWorkingDays],
           effectiveFrom,
           openingBalanceSeconds: Math.round(opening * 3600),
           expectedVersion: saved?.version || 0,
@@ -182,8 +178,9 @@
   }}
 >
   <p class="small muted">
-    Die Anwesenheit wird mit deinen Sollstunden verglichen. Produktionsbuchungen werden dafür nicht
-    zusätzlich gezählt.
+    Deine Stunden sind innerhalb der Kalenderwoche von Montag bis Sonntag frei einteilbar. Das
+    Gesamtkonto enthält abgeschlossene Wochen und den Startsaldo. Produktionsstunden bleiben
+    separat.
   </p>
   <div class="form-grid">
     <label>
@@ -194,7 +191,7 @@
         max={168}
         step="any"
         required
-        placeholder="z. B. 40"
+        placeholder="z. B. 39"
         value={weeklyHours}
         on:input={(event) => setWeeklyHours(event.currentTarget.value)}
       />
@@ -211,30 +208,9 @@
       />
     </label>
   </div>
-  <fieldset class={styles.days}>
-    <legend>
-      Soll-Tage pro Woche · {days.length}
-      {days.length === 1 ? "Tag" : "Tage"}
-    </legend>
-    <div>
-      {#each [1, 2, 3, 4, 5, 6, 0] as day (day)}<label>
-          <input
-            type="checkbox"
-            checked={days.includes(day)}
-            on:input={(event) =>
-              setDays((previous) =>
-                event.currentTarget.checked
-                  ? [...previous, day]
-                  : previous.filter((value) => value !== day),
-              )}
-          />
-          {workingDayLabels[day]}
-        </label>{/each}
-    </div>
-  </fieldset>
   <p class="small muted">
-    Standard: 6 Tage, Montag bis Samstag. Deine Wochenstunden verteilen sich gleichmäßig auf die
-    ausgewählten Tage. Soll zählt nur bis einschließlich heute.
+    Es gibt kein tägliches Stundensoll. Beginnt das Konto oder ändert sich das Wochensoll mitten in
+    einer Woche, wird diese Übergangswoche nach sieben Kalendertagen anteilig gerechnet.
   </p>
   <label>
     Startsaldo in Stunden
@@ -252,8 +228,9 @@
     entstehen keine fehlenden Stunden. Eine Änderung des Startsaldos korrigiert den Gesamtstand.
   </p>
   <p class={styles.creditNote}>
-    Urlaub und Krank füllen die Sollzeit eines Soll-Tages auf. ABF, Ruhetag, halber freier Tag und
-    Feiertage erhalten keine automatische Gutschrift.
+    Persönliche ganztägige Einträge für Urlaub, Feiertag, Feiertagsausgleich und Krank mit oder ohne
+    Attest zählen zusätzlich zur Anwesenheit: damalige Wochenstunden ÷ 6, einmal pro Tag. ABF,
+    Ruhetag, halber freier Tag und reine Feiertagshinweise geben keine Gutschrift.
   </p>
   {#if saved && configured}<details class={styles.history}>
       <summary>
@@ -265,7 +242,7 @@
               <strong>Ab {dateLabel(row.effectiveFrom)}</strong>
               <span>
                 {hours(row.weeklyMinutes * 60)} h / Woche ·{" "}
-                {row.workingDays.map((day) => workingDayLabels[day]).join(", ")}
+                Montag bis Sonntag frei einteilbar
               </span>
             </div>
             {#if admin}<Button

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { useTheaterTime } from "@/components/theater-time";
   const { localDate, weekStart } = useTheaterTime();
-  import { memberCan } from "@/shared/access-policy";
+  import { memberCan, anyPermission } from "@/shared/access-policy";
   import { initialState } from "@/shared/svelte-runtime";
 
   import { useViewState } from "@/shared/view-state";
@@ -60,7 +60,7 @@
   const workspaceStore = useWorkspace();
   let { workspace, refresh, online, busy } = $workspaceStore;
   $: ({ workspace, refresh, online, busy } = $workspaceStore);
-  let selfBooking = workspace.user.role !== "superadmin";
+  let selfBooking = anyPermission(workspace.user, "time.own");
   let admin = memberCan(workspace.user, "time.team.read");
   const periodStore = useViewState<PeriodFilter>(workspace.user.id, "attendance", "period", () => ({
     season: seasonForDate(workspace.records.productions),
@@ -157,6 +157,7 @@
         .filter(Boolean)
         .sort()[0] || week;
     return timeDayMarkers({
+      timezone: workspace.timezone,
       events: workspace.records.events,
       calendarCategories: workspace.records.calendarCategories,
       userId: person,
@@ -199,7 +200,7 @@
     }
   };
 
-  $: selfBooking = workspace.user.role !== "superadmin";
+  $: selfBooking = anyPermission(workspace.user, "time.own");
   $: admin = memberCan(workspace.user, "time.team.read");
   $: drafts = (() => {
     try {
@@ -217,6 +218,7 @@
         .filter(Boolean)
         .sort()[0] || week;
     return timeDayMarkers({
+      timezone: workspace.timezone,
       events: workspace.records.events,
       calendarCategories: workspace.records.calendarCategories,
       userId: person,
@@ -260,9 +262,7 @@
             <Plus size={16}></Plus> Nachtragen
           </Button>{/if}
       </div>
-    </header>{:else}<PageHeader
-      title="Anwesenheit im Theater"
-      compact
+    </header>{:else}<PageHeader title="Anwesenheit im Theater" compact
       ><svelte:fragment slot="secondaryActions">{@render render_secondaryActions()}</svelte:fragment
       >
       {#if selfBooking}
@@ -286,7 +286,11 @@
     <WeekNavigator {week} onChange={selectWeek}></WeekNavigator>
     {#if admin}<label class="inline-label">
         Person
-        <select value={person} on:change={(event) => setPerson(event.currentTarget.value)}>
+        <select
+          aria-label="Person"
+          value={person}
+          on:change={(event) => setPerson(event.currentTarget.value)}
+        >
           {#each workspace.members.filter(isStaff) as member (member.id)}<option value={member.id}>
               {member.name}
               {member.status !== "active" ? " · ehemaliges Teammitglied" : ""}
@@ -295,7 +299,7 @@
       </label>{/if}
     <Badge>
       <DoorOpen size={13}></DoorOpen>
-      {hours(total)} h in dieser Woche
+      {hours(total)} h gebucht
     </Badge>
   </div>
   {#if selfBooking && drafts.length > 0}<div class="offline-banner">

@@ -3,7 +3,7 @@ import { calendarPresentation } from "@/shared/calendar-categories";
 import { shiftDate, value } from "@/shared/client-api";
 import { dateMatchesPeriod, type PeriodFilter } from "@/shared/period-filter";
 import { occurrences } from "@/modules/calendar/occurrences";
-import { localDay, startOfLocalDay } from "./rules";
+import { localDay, startOfLocalDay, THEATER_ZONE } from "./rules";
 
 export interface TimeDayMarker {
   date: string;
@@ -21,6 +21,7 @@ export function timeDayMarkers({
   from,
   to,
   period = {},
+  timezone = THEATER_ZONE,
 }: {
   events: DomainRecord[];
   calendarCategories?: DomainRecord[];
@@ -28,6 +29,7 @@ export function timeDayMarkers({
   from: string;
   to: string;
   period?: PeriodFilter;
+  timezone?: string;
 }): TimeDayMarker[] {
   const markers: TimeDayMarker[] = [];
   const seen = new Set<string>();
@@ -44,12 +46,13 @@ export function timeDayMarkers({
       continue;
     for (const occurrence of occurrences(
       event,
-      startOfLocalDay(from),
-      startOfLocalDay(shiftDate(to, 1)),
+      startOfLocalDay(from, timezone),
+      startOfLocalDay(shiftDate(to, 1), timezone),
+      timezone,
     )) {
       if (occurrence.end <= occurrence.start) continue;
-      const finalDay = localDay(new Date(occurrence.end.getTime() - 1));
-      let day = localDay(occurrence.start);
+      const finalDay = localDay(new Date(occurrence.end.getTime() - 1), timezone);
+      let day = localDay(occurrence.start, timezone);
       if (day < from) day = from;
       for (; day <= finalDay && day <= to; day = shiftDate(day, 1)) {
         const identity = `${event.id}:${day}`;

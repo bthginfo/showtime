@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { DomainRecord } from "../src/shared/contracts";
-import { visibleWorkingTime, type WorkingTimeSettings } from "../src/shared/working-time";
-import { calculateAttendanceBalance, signedHours } from "../src/modules/time-tracking/balance";
-import { startOfLocalDay } from "../src/modules/time-tracking/rules";
-import { shiftDate } from "../src/shared/client-api";
-import { profileUpdateSchema } from "../src/modules/profile/schema";
+import type { DomainRecord } from "@/shared/contracts";
+import type { WorkingTimeSettings } from "@/shared/working-time";
+import { calculateAttendanceBalance, balanceMonthRange } from "@/modules/time-tracking/balance";
+import { startOfLocalDay } from "@/modules/time-tracking/rules";
+import { shiftDate } from "@/shared/client-api";
 
+const H = 3600;
 const settings: WorkingTimeSettings = {
   version: 1,
-  openingBalanceSeconds: 7200,
+  openingBalanceSeconds: 2 * H,
   schedules: [
-    { effectiveFrom: "2026-10-05", weeklyMinutes: 42 * 60, workingDays: [1, 2, 3, 4, 5, 6] },
+    { effectiveFrom: "2026-10-05", weeklyMinutes: 15 * 60, workingDays: [1, 2, 3, 4, 5, 6] },
   ],
 };
 const record = (
@@ -28,12 +28,12 @@ const record = (
   version: 1,
   data: { userId: "mara", ...data },
 });
-const attendance = (id: string, date: string, hours: number) =>
-  record(id, "attendance", { date, durationSeconds: hours * 3600 });
-const absence = (id: string, date: string, category: string, extra = {}) =>
+const attendance = (date: string, hours: number) =>
+  record("attendance-" + date, "attendance", { date, durationSeconds: hours * H });
+const absence = (id: string, date: string, category: string, extra = {}, zone = "Europe/Berlin") =>
   record(id, "events", {
-    start: startOfLocalDay(date).toISOString(),
-    end: startOfLocalDay(shiftDate(date, 1)).toISOString(),
+    start: startOfLocalDay(date, zone).toISOString(),
+    end: startOfLocalDay(shiftDate(date, 1), zone).toISOString(),
     allDay: true,
     participantIds: ["mara"],
     category,
@@ -44,157 +44,279 @@ const calculate = (input: Partial<Parameters<typeof calculateAttendanceBalance>[
     userId: "mara",
     settings,
     attendance: [],
-    now: new Date("2026-10-07T12:00:00+02:00"),
+    from: "2026-10-05",
+    to: "2026-10-11",
+    includeOpeningBalance: false,
+    now: new Date("2026-10-12T12:00:00+02:00"),
     ...input,
   });
 
-describe("saved attendance balance and dated weekly targets", () => {
-  it("uses six target days, stops at today and keeps production work separate", () => {
+describe("flexible weekly attendance account", () => {
+  it.each([
+    [15, 2.5],
+    [10, -2.5],
+  ])("implements the supplied %s attendance hours example", (present, expected) => {
     const result = calculate({
-      attendance: [
-        attendance("mon", "2026-10-05", 8),
-        attendance("future", "2026-10-08", 20),
-        record("production", "time", { date: "2026-10-06", durationSeconds: 99 * 3600 }),
-        record("other", "attendance", {
-          userId: "nora",
-          date: "2026-10-06",
-          durationSeconds: 20 * 3600,
-        }),
-      ],
-    });
-    expect(result.targetSeconds).toBe(21 * 3600);
-    expect(result).toMatchObject({
-      attendanceSeconds: 8 * 3600,
-      targetSeconds: 21 * 3600,
-      openingBalanceSeconds: 2 * 3600,
-      balanceSeconds: -11 * 3600,
-      to: "2026-10-07",
-    });
-  });
-  it("caps paid absence to missing daily target and never credits the same day twice", () => {
-    const result = calculate({
-      attendance: [
-        attendance("mon", "2026-10-05", 8),
-        attendance("tue", "2026-10-06", 6),
-        attendance("wed", "2026-10-07", 2),
-      ],
-      events: [
-        absence("vacation", "2026-10-06", "vacation"),
-        absence("vacation-duplicate", "2026-10-06", "vacation"),
-        absence("sick", "2026-10-07", "sick"),
-      ],
+      attendance: [attendance("2026-10-08", present)],
+      events: [absence("holiday", "2026-10-08", "holiday")],
     });
     expect(result).toMatchObject({
-      attendanceSeconds: 16 * 3600,
-      creditSeconds: 6 * 3600,
-      targetSeconds: 21 * 3600,
-      balanceSeconds: 3 * 3600,
+      attendanceSeconds: present * H,
+      creditSeconds: 2.5 * H,
+      targetSeconds: 15 * H,
+      balanceSeconds: expected * H,
     });
   });
-  it("does not credit ABF, rest, half-free days, holidays or non-target Sundays", () => {
-    const result = calculate({
-      events: [
-        absence("abf", "2026-10-05", "abf"),
-        absence("rest", "2026-10-06", "rest"),
-        absence("half", "2026-10-07", "half-day-off"),
-        absence("holiday", "2026-10-07", "holiday"),
-        absence("sun", "2026-10-11", "vacation"),
-      ],
-      now: new Date("2026-10-11T23:00:00+02:00"),
-    });
-    expect(result.creditSeconds).toBe(0);
-    expect(result.targetSeconds).toBe(42 * 3600);
+  it.each([
+    [15, 9000],
+    [20, 12000],
+    [39, 23400],
+  ])("credits %s weekly hours using the fixed divisor six", (weekly, credit) => {
+    const profile = {
+      ...settings,
+      schedules: [{ ...settings.schedules[0], weeklyMinutes: weekly * 60 }],
+    };
+    expect(
+      calculate({ settings: profile, events: [absence("paid", "2026-10-11", "vacation")] })
+        .creditSeconds,
+    ).toBe(credit);
   });
-  it("requires approval for calendar absences linked to a leave request", () => {
-    const events = [
-      absence("approved", "2026-10-05", "vacation", { leaveId: "yes" }),
-      absence("pending", "2026-10-06", "vacation", { leaveId: "pending" }),
-      absence("missing", "2026-10-07", "sick", { leaveId: "missing" }),
+  it("allows all hours on Sunday without imposing stored legacy daily quotas", () => {
+    const profile = { ...settings, schedules: [{ ...settings.schedules[0], workingDays: [1] }] };
+    expect(
+      calculate({ settings: profile, attendance: [attendance("2026-10-11", 15)] }).balanceSeconds,
+    ).toBe(0);
+  });
+  it("recognizes all six paid categories and adds credits alongside attendance", () => {
+    const keys = [
+      "vacation",
+      "holiday",
+      "holiday-compensation",
+      "sick",
+      "sick-with-certificate",
+      "sick-without-certificate",
     ];
-    const result = calculate({
-      events,
-      leave: [
-        record("yes", "leave", { status: "approved" }),
-        record("pending", "leave", { status: "pending" }),
-      ],
+    const events = keys.map((key, i) => absence(key, shiftDate("2026-10-05", i), key));
+    expect(calculate({ events, attendance: [attendance("2026-10-05", 15)] })).toMatchObject({
+      creditSeconds: 15 * H,
+      balanceSeconds: 15 * H,
     });
-    expect(result.creditSeconds).toBe(7 * 3600);
   });
-  it("preserves older targets after a dated change and excludes opening balance from period views", () => {
-    const changed = {
+  it("counts different qualifying entries on one day only once", () => {
+    expect(
+      calculate({
+        events: [absence("a", "2026-10-08", "vacation"), absence("b", "2026-10-08", "holiday")],
+      }).creditSeconds,
+    ).toBe(2.5 * H);
+  });
+  it("excludes unassigned hints, partial days, cancelled entries and unpaid categories", () => {
+    const events = [
+      absence("hint", "2026-10-05", "holiday", { participantIds: [] }),
+      absence("partial", "2026-10-06", "sick", { allDay: false }),
+      absence("cancelled", "2026-10-07", "vacation", { cancelled: true }),
+      ...["abf", "rest", "half-day-off"].map((key, i) =>
+        absence(key, shiftDate("2026-10-08", i), key),
+      ),
+    ];
+    expect(calculate({ events }).creditSeconds).toBe(0);
+  });
+  it("requires approval for a linked leave credit", () => {
+    const event = absence("leave-event", "2026-10-08", "vacation", { leaveId: "leave" });
+    expect(calculate({ events: [event] }).creditSeconds).toBe(0);
+    expect(
+      calculate({ events: [event], leave: [record("leave", "leave", { status: "approved" })] })
+        .creditSeconds,
+    ).toBe(2.5 * H);
+  });
+  it("matches imported named definitions within their own trade and respects excluded keys", () => {
+    const definition = record("category", "calendarCategories", {
+      key: "imported-paid",
+      name: "Urlaub",
+    });
+    const event = absence("imported", "2026-10-08", "imported-paid");
+    expect(calculate({ events: [event], calendarCategories: [definition] }).creditSeconds).toBe(
+      2.5 * H,
+    );
+    expect(
+      calculate({
+        events: [event],
+        calendarCategories: [{ ...definition, departmentId: "lighting" }],
+      }).creditSeconds,
+    ).toBe(0);
+    expect(
+      calculate({
+        events: [absence("abf", "2026-10-08", "abf")],
+        calendarCategories: [{ ...definition, data: { key: "abf", name: "Urlaub" } }],
+      }).creditSeconds,
+    ).toBe(0);
+  });
+  it("prorates a midweek historical rate change by seven calendar days", () => {
+    const profile = {
       ...settings,
       schedules: [
         ...settings.schedules,
-        { effectiveFrom: "2026-10-12", weeklyMinutes: 36 * 60, workingDays: [1, 2, 3, 4, 5, 6] },
+        { ...settings.schedules[0], effectiveFrom: "2026-10-08", weeklyMinutes: 39 * 60 },
       ],
     };
-    const result = calculate({ settings: changed, now: new Date("2026-10-13T20:00:00+02:00") });
-    expect(result.targetSeconds).toBe(54 * 3600);
-    expect(
-      calculate({
-        settings: changed,
-        from: "2026-10-12",
-        to: "2026-10-18",
-        now: new Date("2026-10-13T20:00:00+02:00"),
-      }),
-    ).toMatchObject({
-      targetSeconds: 12 * 3600,
-      openingBalanceSeconds: 0,
-      balanceSeconds: -12 * 3600,
+    const result = calculate({
+      settings: profile,
+      events: [absence("old", "2026-10-07", "holiday"), absence("new", "2026-10-08", "holiday")],
+    });
+    expect(result.targetSeconds).toBe(Math.round(((3 * 15 + 4 * 39) * H) / 7));
+    expect(result.creditSeconds).toBe(9 * H);
+  });
+  it("prorates the account's first partial week and excludes days before it begins", () => {
+    const profile = {
+      ...settings,
+      schedules: [{ ...settings.schedules[0], effectiveFrom: "2026-10-08" }],
+    };
+    const result = calculate({
+      settings: profile,
+      attendance: [attendance("2026-10-05", 20), attendance("2026-10-08", 3)],
+      events: [absence("before", "2026-10-05", "holiday")],
+    });
+    expect(result).toMatchObject({
+      from: "2026-10-05",
+      to: "2026-10-11",
+      attendanceSeconds: 3 * H,
+      creditSeconds: 0,
+      targetSeconds: Math.round((15 * H * 4) / 7),
     });
   });
-  it("clips future parts of saved intervals, preserves pauses and avoids pre-contract deficits", () => {
+  it("sums only completed weeks plus the opening balance in the total account", () => {
     const result = calculate({
-      from: "2026-10-07",
-      attendance: [
-        record("not-yet-finished", "attendance", {
-          start: "2026-10-07T09:00:00+02:00",
-          end: "2026-10-07T17:00:00+02:00",
-          date: "2026-10-07",
-          pauseSeconds: 1800,
-          durationSeconds: 7.5 * 3600,
-        }),
+      from: undefined,
+      to: undefined,
+      includeOpeningBalance: true,
+      attendance: [attendance("2026-10-08", 16), attendance("2026-10-12", 45)],
+      events: [absence("holiday", "2026-10-08", "holiday")],
+    });
+    expect(result).toMatchObject({
+      to: "2026-10-11",
+      balanceSeconds: 5.5 * H,
+      inProgress: false,
+      completedWeekCount: 1,
+    });
+  });
+  it("keeps the opening balance when no first week has closed yet", () => {
+    const profile = {
+      ...settings,
+      schedules: [{ ...settings.schedules[0], effectiveFrom: "2026-10-12" }],
+    };
+    expect(
+      calculate({ settings: profile, from: undefined, to: undefined, includeOpeningBalance: true }),
+    ).toMatchObject({ targetSeconds: 0, balanceSeconds: 2 * H, completedWeekCount: 0 });
+  });
+  it("exposes the full ongoing weekly target, fulfilled hours and remaining hours separately", () => {
+    const result = calculate({
+      from: "2026-10-12",
+      to: "2026-10-18",
+      now: new Date("2026-10-14T12:00:00+02:00"),
+      attendance: [attendance("2026-10-12", 8)],
+      events: [
+        absence("today", "2026-10-14", "holiday"),
+        absence("future", "2026-10-15", "holiday"),
       ],
     });
     expect(result).toMatchObject({
-      attendanceSeconds: 2.5 * 3600,
-      targetSeconds: 7 * 3600,
-      openingBalanceSeconds: 0,
+      attendanceSeconds: 8 * H,
+      creditSeconds: 2.5 * H,
+      targetSeconds: 15 * H,
+      inProgress: true,
+    });
+    expect(result.targetSeconds - result.attendanceSeconds - result.creditSeconds).toBe(4.5 * H);
+  });
+  it("counts a saved booking fully today even when its end time is later, after pauses", () => {
+    const booking = record("today", "attendance", {
+      date: "2026-10-12",
+      start: "2026-10-12T10:00:00+02:00",
+      end: "2026-10-12T18:00:00+02:00",
+      pauseSeconds: H,
+      durationSeconds: 7 * H,
     });
     expect(
       calculate({
-        settings: {
-          ...settings,
-          schedules: [{ ...settings.schedules[0], effectiveFrom: "2026-11-02" }],
-        },
-      }),
-    ).toMatchObject({ targetSeconds: 0, openingBalanceSeconds: 0, balanceSeconds: 0 });
-    expect(signedHours(9000)).toBe("+2,5");
-    expect(signedHours(-3600)).toBe("−1");
+        from: "2026-10-12",
+        to: "2026-10-18",
+        now: new Date("2026-10-12T14:00:00+02:00"),
+        attendance: [booking],
+      }).attendanceSeconds,
+    ).toBe(7 * H);
   });
-  it("keeps colleague targets private for ordinary users and validates explicit update inputs", () => {
-    expect(visibleWorkingTime(settings, "mara", "nora", "user")).toBeUndefined();
-    expect(visibleWorkingTime(settings, "mara", "mara", "user")).toBe(settings);
-    expect(visibleWorkingTime(settings, "mara", "nora", "admin")).toBe(settings);
-    const update = {
-      effectiveFrom: "2026-10-05",
-      weeklyMinutes: 2400,
-      workingDays: [1, 2, 3, 4, 5, 6],
-      openingBalanceSeconds: 0,
-      expectedVersion: 0,
-    };
-    expect(profileUpdateSchema.safeParse({ memberId: "mara", workingTime: update }).success).toBe(
-      true,
+  it("does not count future days or production bookings as attendance", () => {
+    const production = record("production", "time", {
+      date: "2026-10-12",
+      durationSeconds: 99 * H,
+    });
+    expect(
+      calculate({
+        from: "2026-10-12",
+        to: "2026-10-18",
+        attendance: [attendance("2026-10-13", 20), production],
+        events: [absence("future", "2026-10-13", "holiday")],
+      }),
+    ).toMatchObject({ attendanceSeconds: 0, creditSeconds: 0 });
+  });
+  it("splits a midnight booking between its two calendar weeks", () => {
+    const booking = record("midnight", "attendance", {
+      start: "2026-10-11T22:00:00+02:00",
+      end: "2026-10-12T02:00:00+02:00",
+      durationSeconds: 4 * H,
+      pauseSeconds: 0,
+    });
+    expect(calculate({ attendance: [booking] }).attendanceSeconds).toBe(2 * H);
+    expect(
+      calculate({ from: "2026-10-12", to: "2026-10-18", attendance: [booking] }).attendanceSeconds,
+    ).toBe(2 * H);
+  });
+  it("expands a custom period to complete Monday–Sunday weeks", () => {
+    expect(
+      calculate({
+        from: "2026-10-08",
+        to: "2026-10-09",
+        attendance: [attendance("2026-10-11", 15)],
+      }),
+    ).toMatchObject({
+      from: "2026-10-05",
+      to: "2026-10-11",
+      targetSeconds: 15 * H,
+      balanceSeconds: 0,
+    });
+  });
+  it("assigns whole weeks to their Monday's month across month and year boundaries", () => {
+    expect(balanceMonthRange("2026-10")).toEqual({ from: "2026-10-05", to: "2026-11-01" });
+    expect(balanceMonthRange("2026-09")).toEqual({ from: "2026-09-07", to: "2026-10-04" });
+    expect(balanceMonthRange("2025-12")).toEqual({ from: "2025-12-01", to: "2026-01-04" });
+  });
+  it("includes November's first Sunday in October, but not October days in September's last week", () => {
+    const result = calculate({
+      ...balanceMonthRange("2026-10"),
+      now: new Date("2026-11-02T12:00:00+01:00"),
+      attendance: [attendance("2026-10-01", 10), attendance("2026-11-01", 15)],
+    });
+    expect(result).toMatchObject({
+      attendanceSeconds: 15 * H,
+      targetSeconds: 60 * H,
+      completedWeekCount: 4,
+    });
+  });
+  it("recalculates affected weeks after a booking edit or deletion", () => {
+    const events = [absence("credit", "2026-10-08", "holiday")];
+    expect(calculate({ events, attendance: [attendance("2026-10-08", 10)] }).balanceSeconds).toBe(
+      -2.5 * H,
     );
-    for (const input of [
-      { ...update, workingDays: [] },
-      { ...update, workingDays: [1, 1] },
-      { ...update, effectiveFrom: "2026-02-31" },
-      { ...update, weeklyMinutes: -1 },
-    ])
-      expect(profileUpdateSchema.safeParse({ workingTime: input }).success).toBe(false);
-    expect(profileUpdateSchema.safeParse({ memberId: "nora", accentPalette: "sky" }).success).toBe(
-      false,
+    expect(calculate({ events, attendance: [attendance("2026-10-08", 15)] }).balanceSeconds).toBe(
+      2.5 * H,
     );
+    expect(calculate({ events }).balanceSeconds).toBe(-12.5 * H);
+  });
+  it("uses the theater's local day at UTC midnight", () => {
+    const result = calculate({
+      timezone: "America/New_York",
+      now: new Date("2026-10-12T01:00:00Z"),
+      events: [absence("local-sunday", "2026-10-11", "holiday", {}, "America/New_York")],
+    });
+    expect(result.creditSeconds).toBe(2.5 * H);
+    expect(result.inProgress).toBe(true);
   });
 });

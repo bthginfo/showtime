@@ -1,9 +1,11 @@
 <script lang="ts">
   import { useTheaterTime } from "@/components/theater-time";
-  const { weekStart } = useTheaterTime();
+  const { weekStart, localDate } = useTheaterTime();
   import { initialState } from "@/shared/svelte-runtime";
 
-  import { ArrowRight, Clock3, DoorOpen } from "@lucide/svelte";
+  import { ArrowRight, CalendarCheck, Clock3, DoorOpen } from "@lucide/svelte";
+  import { calculateAttendanceBalance } from "../balance";
+  import { anyPermission } from "@/shared/access-policy";
   import type { DomainRecord } from "@/shared/contracts";
   import { hours, shiftDate, timeAllocations } from "@/shared/client-api";
   import { useWorkspace } from "@/components/workspace-context";
@@ -51,15 +53,33 @@
         ? (next as (current: DomainRecord | null) => DomainRecord | null)(booked)
         : next;
   };
-  let selfBooking = workspace.user.role !== "superadmin";
+  let selfBooking = anyPermission(workspace.user, "time.own");
   let week = weekStart();
   let until = shiftDate(week, 6);
+  $: weeklySettings = workspace.user.preferences?.workingTime;
+  $: weeklyAccount = weeklySettings?.schedules.length
+    ? calculateAttendanceBalance({
+        userId: workspace.user.id,
+        timezone: workspace.timezone,
+        settings: weeklySettings,
+        attendance: workspace.records.attendance,
+        events: workspace.records.events,
+        calendarCategories: workspace.records.calendarCategories,
+        leave: workspace.records.leave,
+        from: week,
+        to: until,
+        includeOpeningBalance: false,
+      })
+    : undefined;
+  $: weeklyCredit = weeklyAccount?.creditSeconds;
+  $: fulfilled = weeklyAccount ? weeklyAccount.attendanceSeconds + weeklyAccount.creditSeconds : 0;
+  $: remaining = weeklyAccount ? Math.max(0, weeklyAccount.targetSeconds - fulfilled) : 0;
   let totals = (() => {
     const sum = (records: DomainRecord[]) =>
       records
         .filter((row) => row.data.userId === workspace.user.id)
         .flatMap((row) => timeAllocations(row.data))
-        .filter((day) => day.date >= week && day.date <= until)
+        .filter((day) => day.date >= week && day.date <= until && day.date <= localDate())
         .reduce((total, day) => total + day.seconds, 0);
     return {
       attendance: sum(workspace.records.attendance || []),
@@ -67,7 +87,7 @@
     };
   })();
 
-  $: selfBooking = workspace.user.role !== "superadmin";
+  $: selfBooking = anyPermission(workspace.user, "time.own");
   $: week = weekStart();
   $: until = shiftDate(week, 6);
   $: totals = (() => {
@@ -75,7 +95,7 @@
       records
         .filter((row) => row.data.userId === workspace.user.id)
         .flatMap((row) => timeAllocations(row.data))
-        .filter((day) => day.date >= week && day.date <= until)
+        .filter((day) => day.date >= week && day.date <= until && day.date <= localDate())
         .reduce((total, day) => total + day.seconds, 0);
     return {
       attendance: sum(workspace.records.attendance || []),
@@ -98,7 +118,7 @@
       <div>
         <span class="eyebrow">DEINE AKTUELLE WOCHE</span>
         <p class="small muted">
-          Bereits gebuchte Zeiten · laufende Timer werden erst nach dem Stoppen gezählt.
+          Gebuchte Zeiten bis heute · laufende Timer zählen erst nach dem Buchen.
         </p>
       </div>
       <div>
@@ -113,9 +133,34 @@
           Produktionsstunden<strong>{hours(totals.work)} h</strong>
         </span>
       </div>
-      <div class="time-comparison-note">
-        <ArrowRight size={15}></ArrowRight>
-        <span>Du musst nicht jede Minute einer Produktion zuordnen.</span>
+      <div>
+        <CalendarCheck size={19} />
+        <span
+          >Tagesgutschriften<strong
+            >{weeklyCredit === undefined ? "–" : hours(weeklyCredit) + " h"}</strong
+          ></span
+        >
+      </div>
+      <div class={styles.weekProgress} role="group" aria-label="Erfüllung des Wochensolls">
+        {#if weeklyAccount}
+          <div class={styles.progressLabels}>
+            <span>Erfüllt <strong>{hours(fulfilled)} h</strong></span>
+            <span>Noch offen <strong>{hours(remaining)} h</strong></span>
+          </div>
+          <progress
+            max={Math.max(1, weeklyAccount.targetSeconds)}
+            value={Math.min(fulfilled, Math.max(1, weeklyAccount.targetSeconds))}
+            aria-label="Erfüllte Wochenstunden"
+          ></progress>
+          <p class="small muted">
+            Soll dieser Woche: {hours(weeklyAccount.targetSeconds)} h · Montag bis Sonntag frei einteilbar.
+            {weeklyAccount.transitionWeekCount > 0
+              ? "Übergangswoche mit anteiligem Soll."
+              : "Das Gesamtkonto enthält abgeschlossene Wochen."}
+          </p>
+        {:else}
+          <a href="/?module=settings">Wochenstunden festlegen <ArrowRight size={15} /></a>
+        {/if}
       </div>
     </section>
   {/if}

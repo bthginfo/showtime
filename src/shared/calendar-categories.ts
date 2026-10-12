@@ -7,6 +7,8 @@ export const defaultCalendarCategories = [
   { key: "preparation", name: "Vorbereitung", color: "#ac8235", allDay: false },
   { key: "absence", name: "Abwesenheit", color: "#77818e", allDay: true },
   { key: "sick", name: "Krank", color: "#b86d73", allDay: true },
+  { key: "sick-with-certificate", name: "Krank mit Attest", color: "#b86d73", allDay: true },
+  { key: "sick-without-certificate", name: "Krank ohne Attest", color: "#b86d73", allDay: true },
   { key: "abf", name: "ABF", color: "#8c74ad", allDay: true },
   { key: "rest", name: "Ruhetag", color: "#758f8a", allDay: true },
   {
@@ -17,6 +19,8 @@ export const defaultCalendarCategories = [
     blocksTime: false,
   },
   { key: "vacation", name: "Urlaub", color: "#5c92a8", allDay: true },
+  { key: "holiday", name: "Feiertag", color: "#758f8a", allDay: true },
+  { key: "holiday-compensation", name: "Feiertagsausgleich", color: "#758f8a", allDay: true },
 ] as const;
 
 const normalizedCategory = (name: string) =>

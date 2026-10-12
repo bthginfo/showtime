@@ -1,7 +1,7 @@
 <script lang="ts">
   import { useTheaterTime } from "@/components/theater-time";
   const { dateLabel, localDate, weekStart } = useTheaterTime();
-  import { memberCan } from "@/shared/access-policy";
+  import { memberCan, anyPermission } from "@/shared/access-policy";
   import { initialState } from "@/shared/svelte-runtime";
 
   import { useViewState } from "@/shared/view-state";
@@ -87,7 +87,7 @@
     workspace.user.id,
     scope,
     "person",
-    workspace.user.role === "superadmin"
+    !anyPermission(workspace.user, "time.own")
       ? workspace.members.find(isStaff)?.id || ""
       : workspace.user.id,
   );
@@ -210,6 +210,7 @@
         .filter(Boolean)
         .sort()[0] || week;
     return timeDayMarkers({
+      timezone: workspace.timezone,
       events: workspace.records.events,
       calendarCategories: workspace.records.calendarCategories,
       userId: person,
@@ -232,7 +233,7 @@
     setWeek(next);
     setPeriod(periodForWeek(period, next, workspace.records.productions));
   };
-  let canBookDay = workspace.user.role !== "superadmin" && person === workspace.user.id;
+  let canBookDay = anyPermission(workspace.user, "time.own") && person === workspace.user.id;
   let openBooking = (date = localDate()) => {
     setEditor(date);
   };
@@ -268,6 +269,7 @@
         .filter(Boolean)
         .sort()[0] || week;
     return timeDayMarkers({
+      timezone: workspace.timezone,
       events: workspace.records.events,
       calendarCategories: workspace.records.calendarCategories,
       userId: person,
@@ -287,7 +289,7 @@
   $: entries = selected?.entries || [];
   $: total = selected?.seconds || 0;
 
-  $: canBookDay = workspace.user.role !== "superadmin" && person === workspace.user.id;
+  $: canBookDay = anyPermission(workspace.user, "time.own") && person === workspace.user.id;
 
   $: effects.run(
     90,
@@ -305,8 +307,8 @@
     <ExportButton onClick={() => setExporting(true)}></ExportButton>
     {#if admin}<Button onClick={() => setCategoriesOpen(true)}>Tätigkeitsbereiche verwalten</Button
       >{/if}
-    {#if workspace.user.role !== "superadmin" && !online}<Button onClick={() => setDraftModal(true)}
-        >Ohne Internet vormerken</Button
+    {#if anyPermission(workspace.user, "time.own") && !online}<Button
+        onClick={() => setDraftModal(true)}>Ohne Internet vormerken</Button
       >{/if}
   {/snippet}
 
@@ -314,7 +316,7 @@
       <h2>Produktionsstunden</h2>
       <div class={styles.moduleActions}>
         <ActionMenu>{@render render_secondaryActions()}</ActionMenu>
-        {#if workspace.user.role !== "superadmin"}<Button
+        {#if anyPermission(workspace.user, "time.own")}<Button
             variant="primary"
             onClick={() => openBooking()}
           >
@@ -324,7 +326,7 @@
     </header>{:else}<PageHeader title="Produktionsstunden" compact
       ><svelte:fragment slot="secondaryActions">{@render render_secondaryActions()}</svelte:fragment
       >
-      {#if workspace.user.role !== "superadmin"}<Button
+      {#if anyPermission(workspace.user, "time.own")}<Button
           variant="primary"
           onClick={() => openBooking()}
         >
@@ -370,7 +372,7 @@
       </div>
     </section>
   </div>
-  {#if workspace.user.role !== "superadmin" && inbox.length > 0}<div class="offline-banner">
+  {#if anyPermission(workspace.user, "time.own") && inbox.length > 0}<div class="offline-banner">
       <div>
         <strong>{inbox.length} unzugeordnete Geräteentwürfe</strong>
         <p class="small">
@@ -399,7 +401,7 @@
         Verwerfen
       </Button>
     </div>{/if}
-  {#if workspace.user.role !== "superadmin" && drafts.length > 0}<div class="offline-banner">
+  {#if anyPermission(workspace.user, "time.own") && drafts.length > 0}<div class="offline-banner">
       <div>
         <strong>{drafts.length} lokale Zeitentwürfe</strong>
         <p class="small">
@@ -486,7 +488,7 @@
         Frühere Buchungen findest du im Wochenverlauf. Allgemeine Arbeit wie Besprechung oder
         Aufräumen lässt sich ohne Produktion buchen.
       </p>
-      {#if workspace.user.role !== "superadmin"}<Button onClick={() => openBooking()}
+      {#if anyPermission(workspace.user, "time.own")}<Button onClick={() => openBooking()}
           >Zeit nachtragen</Button
         >{/if}
     </section>{/if}

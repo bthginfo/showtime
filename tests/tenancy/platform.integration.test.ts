@@ -113,6 +113,71 @@ describe.skipIf(!enabled)("real Neon tenant isolation and event commands", () =>
       pools.controlSql.end(),
     ]);
   });
+  it("denies working-time changes and history deletion after a colleague leaves the lead's active trade", async () => {
+    const target = randomUUID();
+    const membershipId = randomUUID();
+    await auth`insert into app_user(id,name,email,username) values(${target},'QA Sollzeit Transfer',${target + "@qa.showtime.invalid"},${"qa-" + target})`;
+    await control`insert into tenant_members(organization_id,user_id,status) values(${a.organizationId},${target},'active')`;
+    await control`insert into memberships(id,organization_id,department_id,user_id,role,status) values(${membershipId},${a.organizationId},${a.departmentId},${target},'user','active')`;
+    const grants: Grant[] = [{ role: "team_lead", scope: "department", scopeId: a.departmentId }];
+    const lead: Context = {
+      ...a,
+      grants,
+      user: {
+        ...a.user,
+        grants,
+        permissions: allowedPermissions({ id: person, grants }, { departmentId: a.departmentId }),
+      },
+    };
+    const { updateProfile } = await import("@/modules/profile/service");
+    const { localDay } = await import("@/modules/time-tracking/rules");
+    const effectiveFrom = localDay(new Date());
+    const data = {
+      memberId: target,
+      workingTime: {
+        effectiveFrom,
+        weeklyMinutes: 900,
+        openingBalanceSeconds: 0,
+        expectedVersion: 0,
+      },
+    };
+    await run(lead, () => updateProfile(lead, data));
+    const readProfile = () =>
+      run(a, () =>
+        db.select().from(tables.tenantProfiles).where(op.eq(tables.tenantProfiles.userId, target)),
+      );
+    const [original] = await readProfile();
+    expect(original.workingTime?.version).toBe(1);
+    const [otherDepartment] = await run(a, () =>
+      db
+        .select()
+        .from(tables.departments)
+        .where(op.ne(tables.departments.id, a.departmentId))
+        .limit(1),
+    );
+    for (const status of ["pending", "disabled"] as const) {
+      await control`update memberships set status=${status} where id=${membershipId} and organization_id=${a.organizationId}`;
+      if (status === "disabled")
+        await control`insert into memberships(id,organization_id,department_id,user_id,role,status) values(${randomUUID()},${a.organizationId},${otherDepartment.id},${target},'user','active')`;
+      await expect(
+        run(lead, () =>
+          updateProfile(lead, {
+            ...data,
+            workingTime: { ...data.workingTime, weeklyMinutes: 1200, expectedVersion: 1 },
+          }),
+        ),
+      ).rejects.toMatchObject({ status: 403 });
+      await expect(
+        run(lead, () =>
+          updateProfile(lead, {
+            memberId: target,
+            workingTimeDelete: { effectiveFrom, expectedVersion: 1 },
+          }),
+        ),
+      ).rejects.toMatchObject({ status: 403 });
+      expect((await readProfile())[0].workingTime).toEqual(original.workingTime);
+    }
+  });
   it("activates a newly added trade once and rejects another tenant's department", async () => {
     const { tenantConfiguration } = await import("@/modules/theater/tenants");
     const [department] = await run(a, () =>

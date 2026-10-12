@@ -3,6 +3,8 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import type { Context } from "@/platform/context";
 import type { WorkingTimeSettings } from "@/shared/working-time";
 import { HttpError } from "@/platform/http";
+import { hasPermission, type Permission } from "@/platform/access";
+import { localDay } from "@/modules/time-tracking/rules";
 import { memberships, tenantProfiles } from "@/platform/db/schema";
 import { calculateAttendanceBalance } from "@/modules/time-tracking/balance";
 import { profileUpdateSchema } from "@/modules/profile/schema";
@@ -25,6 +27,7 @@ import { updateProfile } from "@/modules/profile/service";
 
 const admin = {
   user: { id: "owner", role: "admin" },
+  grants: [{ role: "personnel", scope: "department", scopeId: "makeup" }],
   departmentId: "makeup",
   organizationId: "theatre",
 } as Context;
@@ -84,17 +87,98 @@ function settingsOf(result: unknown) {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mock.requirePermission.mockImplementation((context: Context) => {
-    if (context.user.role === "user") throw new HttpError(403, "Admins vorbehalten");
+  mock.requirePermission.mockImplementation((context: Context, permission: Permission) => {
+    if (
+      !hasPermission({ id: context.user.id, grants: context.grants }, permission, {
+        departmentId: context.departmentId,
+      })
+    )
+      throw new HttpError(403, "Keine Berechtigung");
   });
 });
 
 describe("admin deletion of dated working-time schedules", () => {
+  it("allows an employee to adjust their own dated weekly target", async () => {
+    const state = database();
+    const employee = {
+      ...admin,
+      grants: [{ role: "employee", scope: "department", scopeId: "makeup" }],
+      user: { ...admin.user, role: "user" },
+    } as Context;
+    const effectiveFrom = localDay(new Date());
+    const result = await updateProfile(employee, {
+      workingTime: {
+        effectiveFrom,
+        weeklyMinutes: 15 * 60,
+        workingDays: [1, 2, 3, 4, 5, 6],
+        openingBalanceSeconds: 7200,
+        expectedVersion: 6,
+      },
+    });
+    expect(
+      settingsOf(result).schedules.some(
+        (row) => row.effectiveFrom === effectiveFrom && row.weeklyMinutes === 900,
+      ),
+    ).toBe(true);
+    expect(state.writes).toHaveLength(1);
+    expect(mock.requirePermission).not.toHaveBeenCalled();
+  });
+  it.each(["user", "superadmin"])(
+    "keeps an explicitly authorized own weekly profile editable across trades with legacy membership role %s",
+    async (role) => {
+      const state = database(fixture(), role);
+      const employee = {
+        ...admin,
+        departmentId: "lighting",
+        grants: [{ role: "employee", scope: "department", scopeId: "makeup" }],
+        user: { ...admin.user, role: "user" },
+      } as Context;
+      await updateProfile(employee, {
+        workingTime: {
+          effectiveFrom: localDay(new Date()),
+          weeklyMinutes: 900,
+          openingBalanceSeconds: 7200,
+          expectedVersion: 6,
+        },
+      });
+      expect(state.writes).toHaveLength(1);
+    },
+  );
+  it("rejects an employee changing somebody else's weekly target before querying", async () => {
+    database();
+    const employee = {
+      ...admin,
+      grants: [{ role: "employee", scope: "department", scopeId: "makeup" }],
+      user: { ...admin.user, role: "user" },
+    } as Context;
+    await expect(
+      updateProfile(employee, {
+        memberId: "other",
+        workingTime: {
+          effectiveFrom: localDay(new Date()),
+          weeklyMinutes: 900,
+          workingDays: [1, 2, 3, 4, 5, 6],
+          openingBalanceSeconds: 0,
+          expectedVersion: 6,
+        },
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(mock.transaction).not.toHaveBeenCalled();
+  });
+  it("allows a department team lead to delete a colleague's historical target", async () => {
+    const state = database();
+    const lead = {
+      ...admin,
+      grants: [{ role: "team_lead", scope: "department", scopeId: "makeup" }],
+    } as Context;
+    await updateProfile(lead, { ...deletion(), memberId: "colleague" });
+    expect(state.writes).toHaveLength(1);
+  });
   it("deletes an old own rate and recalculates using the preceding surviving rate", async () => {
     const previous = fixture();
     const state = database(previous, "admin");
     const result = await updateProfile(admin, deletion());
-    expect(mock.requirePermission).toHaveBeenCalledWith(admin,"personnel.manage");
+    expect(mock.requirePermission).not.toHaveBeenCalled();
     expect(settingsOf(result)).toEqual({
       ...previous,
       version: 7,
@@ -131,7 +215,7 @@ describe("admin deletion of dated working-time schedules", () => {
     const query = new PgDialect().sqlToQuery(
       state.conditions[0] as Parameters<PgDialect["sqlToQuery"]>[0],
     );
-    expect(query.params).toEqual(["colleague", "makeup", "theatre"]);
+    expect(query.params).toEqual(["colleague", "makeup", "theatre", "active"]);
     expect(mock.revalidate).toHaveBeenCalledWith("member:colleague", { expire: 0 });
     expect(state.writes).toHaveLength(1);
   });
@@ -147,8 +231,8 @@ describe("admin deletion of dated working-time schedules", () => {
       to: "2026-07-01",
       now: new Date("2026-07-02T12:00:00Z"),
     });
-    expect(balance.from).toBe("2026-07-01");
-    expect(balance.targetSeconds).toBe(19200);
+    expect(balance.from).toBe("2026-06-29");
+    expect(balance.targetSeconds).toBe(Math.round((32 * 3600 * 5) / 7));
   });
 
   it("retains the version and start balance after deleting the last entry, allowing a new first start", async () => {
@@ -172,7 +256,11 @@ describe("admin deletion of dated working-time schedules", () => {
 
   it("rejects normal-user deletion, even on their own profile, before accessing the database", async () => {
     database();
-    const user = { ...admin, user: { ...admin.user, role: "user" as const } };
+    const user = {
+      ...admin,
+      grants: [{ role: "employee", scope: "department", scopeId: "makeup" }],
+      user: { ...admin.user, role: "user" as const },
+    } as Context;
     await expect(updateProfile(user, deletion())).rejects.toMatchObject({ status: 403 });
     expect(mock.transaction).not.toHaveBeenCalled();
   });

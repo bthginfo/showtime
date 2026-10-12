@@ -1,6 +1,6 @@
 <script lang="ts">
   import { useTheaterTime } from "@/components/theater-time";
-  const { dateLabel, weekStart } = useTheaterTime();
+  const { dateLabel, weekStart, localDate } = useTheaterTime();
   import { LinkedText } from "@/components/linked-text";
   import { ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2 } from "@lucide/svelte";
   import type { DomainRecord } from "@/shared/contracts";
@@ -105,6 +105,17 @@
               {dateLabel(value(record.data, "end"), true)}
               {#if num(record.data, "pauseSeconds") > 0}
                 · {Math.round(num(record.data, "pauseSeconds") / 60)} min Pause
+              {/if}
+            </span>{/if}
+          {#if to > localDate()}<span class="small muted">
+              {#if kind === "time"}
+                {from > localDate()
+                  ? "Zukünftige Produktionsbuchung · zählt noch nicht zu den bisherigen Produktionsstunden."
+                  : "Anteile ab morgen zählen später zu den Produktionsstunden."}
+              {:else}
+                {from > localDate()
+                  ? "Zukünftige Buchung · zählt noch nicht zum Zeitkonto."
+                  : "Anteile ab morgen zählen später."}
               {/if}
             </span>{/if}
           {#if seconds !== num(record.data, "durationSeconds")}<span class="small muted">

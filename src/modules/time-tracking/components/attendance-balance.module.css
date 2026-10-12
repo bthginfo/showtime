@@ -39,7 +39,7 @@
 .header select {
   width: auto;
   max-width: 125px;
-  min-height: 40px;
+  min-height: 44px;
   padding: 8px;
   font-size: 13px;
   margin: 0;
@@ -88,16 +88,37 @@
   min-width: 0;
   margin: 4px 0 0;
   padding: 8px;
-  min-height: 40px;
+  min-height: 44px;
   font-size: 13px;
 }
 .details {
   font-size: 11px;
   color: var(--muted);
 }
+.creditDescription {
+  max-width: 72ch;
+}
+.currentWeek {
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.currentWeekValues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  justify-content: space-between;
+}
+.currentWeekValues strong {
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+}
 .details summary {
   cursor: pointer;
-  min-height: 32px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   color: var(--text);

@@ -42,7 +42,8 @@
   const workspaceStore = useWorkspace();
   let { workspace, busy } = $workspaceStore;
   $: ({ workspace, busy } = $workspaceStore);
-  let admin = memberCan(workspace.user, "personnel.manage");
+  let admin =
+    memberCan(workspace.user, "personnel.manage") || memberCan(workspace.user, "time.team.manage");
   let person = isStaff(workspace.user)
     ? workspace.user.id
     : workspace.members.find(isStaff)?.id || "";
@@ -64,7 +65,8 @@
       ? workspace.user
       : workspace.members.find((row) => row.id === person);
 
-  $: admin = memberCan(workspace.user, "personnel.manage");
+  $: admin =
+    memberCan(workspace.user, "personnel.manage") || memberCan(workspace.user, "time.team.manage");
   $: member =
     person === workspace.user.id
       ? workspace.user

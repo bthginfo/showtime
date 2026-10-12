@@ -4,6 +4,63 @@
 .mobileLabel {
   display: none;
 }
+.comparison:global(.time-comparison) {
+  grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
+}
+.comparison > div:nth-child(4) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.comparison > div:nth-child(4) > span {
+  overflow-wrap: anywhere;
+}
+.weekProgress {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.progressLabels {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 24px;
+}
+.progressLabels strong {
+  display: inline;
+  font-size: 15px;
+  margin: 0 0 0 6px;
+  letter-spacing: 0;
+}
+.weekProgress progress {
+  width: 100%;
+  height: 8px;
+  border: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  accent-color: var(--accent);
+}
+.weekProgress progress::-webkit-progress-bar {
+  background: var(--surface-soft);
+}
+.weekProgress progress::-webkit-progress-value {
+  background: var(--accent);
+}
+.weekProgress progress::-moz-progress-bar {
+  background: var(--accent);
+}
+@media (max-width: 1050px) {
+  .comparison:global(.time-comparison) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .comparison > div:first-child,
+  .comparison > div:nth-child(4) {
+    grid-column: 1 / -1;
+  }
+}
 @media (max-width: 760px) {
   .timers:global(.dual-timers) {
     gap: 8px;
@@ -24,7 +81,8 @@
     display: none;
   }
   .comparison > div:nth-child(2),
-  .comparison > div:nth-child(3) {
+  .comparison > div:nth-child(3),
+  .comparison > div:nth-child(4) {
     font-size: 11px;
     gap: 8px;
   }

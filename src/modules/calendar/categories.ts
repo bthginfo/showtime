@@ -77,8 +77,14 @@ export async function normalizeEventCategory(context: Context, data: RecordData,
   if (!category) throw new HttpError(400, "Bitte wähle eine vorhandene Kalenderkategorie.");
   data.allDay = category.data.allDay === true;
   if (data.allDay) {
-    data.start = startOfLocalDay(localDay(String(data.start))).toISOString();
-    data.end = startOfLocalDay(localDay(String(data.end))).toISOString();
+    data.start = startOfLocalDay(
+      localDay(String(data.start), context.timezone),
+      context.timezone,
+    ).toISOString();
+    data.end = startOfLocalDay(
+      localDay(String(data.end), context.timezone),
+      context.timezone,
+    ).toISOString();
   }
   return String(category.data.name);
 }

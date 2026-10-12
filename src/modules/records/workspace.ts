@@ -10,7 +10,7 @@ import {
   tenantProfiles,
   moduleActivations,
 } from "@/platform/db/schema";
-import { can, availableScopes, type Context } from "@/platform/context";
+import { availableScopes, type Context } from "@/platform/context";
 import {
   recordKinds,
   listValue,
@@ -102,6 +102,18 @@ export async function getWorkspace(context: Context, exportKind?: RecordKind): P
     .filter((g) => g.scope === "production")
     .map((g) => g.scopeId!)
     .filter(Boolean);
+  const profileScope = context.grants.filter((grant) =>
+    (["personnel.read", "time.team.read"] as const).some((permission) =>
+      hasPermission({ id: context.user.id, grants: [grant] }, permission, {
+        departmentId: grant.scope === "department" ? grant.scopeId || "" : undefined,
+      }),
+    ),
+  );
+  const allProfiles = profileScope.some((grant) => grant.scope === "tenant");
+  const profileDepartments = profileScope
+    .filter((grant) => grant.scope === "department")
+    .map((grant) => grant.scopeId!)
+    .filter(Boolean);
   const totals = await db
     .select({
       productionId: records.productionId,
@@ -136,7 +148,26 @@ export async function getWorkspace(context: Context, exportKind?: RecordKind): P
         .where(
           and(
             eq(tenantProfiles.organizationId, context.organizationId),
-            can(context, "personnel.read") ? undefined : eq(tenantProfiles.userId, context.user.id),
+            allProfiles
+              ? undefined
+              : profileDepartments.length
+                ? or(
+                    eq(tenantProfiles.userId, context.user.id),
+                    inArray(
+                      tenantProfiles.userId,
+                      db
+                        .select({ userId: memberships.userId })
+                        .from(memberships)
+                        .where(
+                          and(
+                            eq(memberships.organizationId, context.organizationId),
+                            inArray(memberships.departmentId, profileDepartments),
+                            eq(memberships.status, "active"),
+                          ),
+                        ),
+                    ),
+                  )
+                : eq(tenantProfiles.userId, context.user.id),
           ),
         )
         .limit(1000),

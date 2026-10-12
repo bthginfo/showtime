@@ -2,7 +2,8 @@ import { revalidateTag } from "@/platform/cache";
 import { db } from "@/platform/db";
 import { and, eq, sql } from "drizzle-orm";
 import { memberships, profilePreferences,tenantProfiles } from "@/platform/db/schema";
-import { requirePermission, type Context } from "@/platform/context";
+import { type Context } from "@/platform/context";
+import { hasPermission } from "@/platform/access";
 import { HttpError } from "@/platform/http";
 import { scheduleLiveChange } from "@/platform/realtime";
 import { invalidateTeam } from "@/modules/records/workspace";
@@ -16,7 +17,17 @@ export async function updateProfile(context: Context, input: RecordData) {
   const data = profileUpdateSchema.parse(input);
   if (data.workingTime || data.workingTimeDelete) {
     const targetId = data.memberId || context.user.id;
-    requirePermission(context,"personnel.manage");
+    const managesTeam = (["personnel.manage", "time.team.manage"] as const).some(permission =>
+      hasPermission({ id: context.user.id, grants: context.grants }, permission, { departmentId: context.departmentId }),
+    );
+    if (data.workingTimeDelete || targetId !== context.user.id) {
+      if (!managesTeam) throw new HttpError(403, "Für diese Sollzeit-Änderung brauchst du Teamzeit- oder Personalrechte.");
+    } else if (!managesTeam && !context.grants.some(grant => hasPermission(
+      { id: context.user.id, grants: [grant] }, "time.own", {
+        departmentId: grant.scope === "department" ? grant.scopeId || undefined : undefined,
+        productionId: grant.scope === "production" ? grant.scopeId || undefined : undefined,
+      },
+    ))) throw new HttpError(403, "Für dein Wochensoll brauchst du eigene Zeitbuchungsrechte.");
     const change = data.workingTime || data.workingTimeDelete!;
     const profile = await db.transaction(async (tx) => {
       const [membership] = await tx
@@ -27,10 +38,11 @@ export async function updateProfile(context: Context, input: RecordData) {
             eq(memberships.userId, targetId),
             eq(memberships.departmentId, context.departmentId),
             eq(memberships.organizationId, context.organizationId),
+            eq(memberships.status, "active"),
           ),
         )
         .limit(1);
-      if (!membership || membership.role === "superadmin")
+      if (!membership || (membership.role === "superadmin" && targetId !== context.user.id))
         throw new HttpError(
           403,
           "Wochenstunden können nur für Teammitglieder deiner Abteilung gepflegt werden.",
@@ -61,7 +73,7 @@ export async function updateProfile(context: Context, input: RecordData) {
         };
       } else {
         const update = data.workingTime!;
-        if (previous?.schedules.length && update.effectiveFrom < localDay(new Date()))
+        if (previous?.schedules.length && update.effectiveFrom < localDay(new Date(), context.timezone))
           throw new HttpError(
             400,
             "Neue Wochenstunden gelten frühestens heute. Frühere Sollzeiten bleiben erhalten.",

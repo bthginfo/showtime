@@ -1,7 +1,7 @@
 export interface WorkingTimeSchedule {
   effectiveFrom: string;
   weeklyMinutes: number;
-  /** JavaScript weekdays: Sunday = 0, Monday = 1. */
+  /** Legacy stored weekdays; flexible weekly accounts do not impose daily quotas. */
   workingDays: number[];
 }
 

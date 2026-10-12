@@ -7,7 +7,7 @@
   import { useWorkspace } from "@/components/workspace-context";
   import { Button } from "@/components/ui";
   import { hours, shiftDate } from "@/shared/client-api";
-  import { calculateAttendanceBalance, signedHours } from "../balance";
+  import { calculateAttendanceBalance, signedHours, balanceMonthRange } from "../balance";
   import { isoWeek } from "../history";
   import styles from "./attendance-balance.module.css";
   import {
@@ -85,16 +85,11 @@
   };
   let today = localDate();
   let validMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
-  let monthEnd = validMonth
-    ? new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 0))
-        .toISOString()
-        .slice(0, 10)
-    : today;
   let range =
     period === "week"
       ? { from: week, to: shiftDate(week, 6) }
       : period === "month"
-        ? { from: `${validMonth ? month : today.slice(0, 7)}-01`, to: monthEnd }
+        ? balanceMonthRange(validMonth ? month : today.slice(0, 7))
         : period === "custom"
           ? { from, to }
           : {};
@@ -105,6 +100,7 @@
     settings && configured && !invalidRange
       ? calculateAttendanceBalance({
           userId: selected,
+          timezone: workspace.timezone,
           settings,
           attendance: workspace.records.attendance,
           events: workspace.records.events,
@@ -115,8 +111,20 @@
         })
       : undefined;
   let seconds = balance?.balanceSeconds || 0;
-  let status = seconds > 0 ? "Plusstunden" : seconds < 0 ? "Minusstunden" : "Ausgeglichen";
-  let tone = seconds > 0 ? styles.positive : seconds < 0 ? styles.negative : "";
+  let status = balance?.inProgress
+    ? "Vorläufiger Saldo"
+    : seconds > 0
+      ? "Plusstunden"
+      : seconds < 0
+        ? "Minusstunden"
+        : "Ausgeglichen";
+  let tone = balance?.inProgress
+    ? ""
+    : seconds > 0
+      ? styles.positive
+      : seconds < 0
+        ? styles.negative
+        : "";
   const breakdown = true;
 
   $: selected = person || workspace.user.id;
@@ -129,16 +137,11 @@
   $: week = selectedWeek || ownWeek;
   $: today = localDate();
   $: validMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
-  $: monthEnd = validMonth
-    ? new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 0))
-        .toISOString()
-        .slice(0, 10)
-    : today;
   $: range =
     period === "week"
       ? { from: week, to: shiftDate(week, 6) }
       : period === "month"
-        ? { from: `${validMonth ? month : today.slice(0, 7)}-01`, to: monthEnd }
+        ? balanceMonthRange(validMonth ? month : today.slice(0, 7))
         : period === "custom"
           ? { from, to }
           : {};
@@ -149,6 +152,7 @@
     settings && configured && !invalidRange
       ? calculateAttendanceBalance({
           userId: selected,
+          timezone: workspace.timezone,
           settings,
           attendance: workspace.records.attendance,
           events: workspace.records.events,
@@ -159,8 +163,41 @@
         })
       : undefined;
   $: seconds = balance?.balanceSeconds || 0;
-  $: status = seconds > 0 ? "Plusstunden" : seconds < 0 ? "Minusstunden" : "Ausgeglichen";
-  $: tone = seconds > 0 ? styles.positive : seconds < 0 ? styles.negative : "";
+  $: status = balance?.inProgress
+    ? "Vorläufiger Saldo"
+    : seconds > 0
+      ? "Plusstunden"
+      : seconds < 0
+        ? "Minusstunden"
+        : "Ausgeglichen";
+  $: tone = balance?.inProgress
+    ? ""
+    : seconds > 0
+      ? styles.positive
+      : seconds < 0
+        ? styles.negative
+        : "";
+  $: currentWeekBalance =
+    settings && configured
+      ? calculateAttendanceBalance({
+          userId: selected,
+          settings,
+          timezone: workspace.timezone,
+          attendance: workspace.records.attendance,
+          events: workspace.records.events,
+          calendarCategories: workspace.records.calendarCategories,
+          leave: workspace.records.leave,
+          from: weekStart(),
+          to: shiftDate(weekStart(), 6),
+          includeOpeningBalance: false,
+        })
+      : undefined;
+  $: currentFulfilled = currentWeekBalance
+    ? currentWeekBalance.attendanceSeconds + currentWeekBalance.creditSeconds
+    : 0;
+  $: currentRemaining = currentWeekBalance
+    ? Math.max(0, currentWeekBalance.targetSeconds - currentFulfilled)
+    : 0;
 </script>
 
 {#if true}
@@ -170,11 +207,11 @@
           <dd>{hours(balance.attendanceSeconds)} h</dd>
         </div>
         <div>
-          <dt>Urlaub / Krank</dt>
+          <dt>Tagesgutschriften</dt>
           <dd>{hours(balance.creditSeconds)} h</dd>
         </div>
         <div>
-          <dt>Sollzeit</dt>
+          <dt>Sollstunden</dt>
           <dd>{hours(balance.targetSeconds)} h</dd>
         </div>
         {#if period === "total"}<div>
@@ -269,20 +306,65 @@
           </div>
           <p class={styles.range}>
             {balance.from > balance.to
-              ? `Beginnt am ${dateLabel(balance.from)}`
+              ? period === "total"
+                ? "Noch keine abgeschlossene Woche"
+                : "Noch keine auswertbare Woche"
               : `${dateLabel(balance.from)} – ${dateLabel(balance.to)}`}
           </p>
           {#if compact}<details class={styles.details}>
               <summary>Berechnung anzeigen</summary>
               {@render render_breakdown()}
-              <p>Nur gespeicherte Anwesenheit; Sollzeit zählt bis heute.</p>
+              <p>
+                Abgeschlossene Wochen aus Anwesenheit plus Tagesgutschriften minus Wochensoll, dazu
+                der Startsaldo.
+              </p>
             </details>{:else}
             {@render render_breakdown()}
-            <p class="small muted">
-              Sollzeiten zählen bis einschließlich heute. Urlaub und Krank füllen höchstens die noch
-              fehlende Tages-Sollzeit auf; Anwesenheit wird dabei nicht doppelt gezählt.
+            <p class={`small muted ${styles.creditDescription}`}>
+              {period === "total"
+                ? "Gesamt enthält abgeschlossene Wochen und den Startsaldo."
+                : balance.inProgress
+                  ? "Die laufende Woche ist noch offen; dieser Saldo ist vorläufig."
+                  : "Abgeschlossene Kalenderwochen von Montag bis Sonntag."}
+              {period === "month"
+                ? " Zum Monat gehören die Wochen, deren Montag in diesem Monat liegt."
+                : ""}
             </p>
           {/if}
+          {#if balance.transitionWeekCount > 0}<p class="small muted">
+              Übergangswoche: Beginn oder Änderungen werden anteilig berücksichtigt.
+            </p>{/if}
+          {#if (period === "total" || balance.inProgress) && currentWeekBalance}
+            <div class={styles.currentWeek} aria-label="Laufende Woche">
+              <strong>Laufende Woche</strong>
+              <div class={styles.currentWeekValues}>
+                <span>Erfüllt <strong>{hours(currentFulfilled)} h</strong></span>
+                <span>Noch offen <strong>{hours(currentRemaining)} h</strong></span>
+              </div>
+              <p class="small muted">
+                Soll dieser Woche: {hours(currentWeekBalance.targetSeconds)} h · Frei einteilbar von Montag
+                bis Sonntag.
+              </p>
+              {#if currentWeekBalance.transitionWeekCount > 0}<p class="small muted">
+                  Übergangswoche mit anteiligem Soll.
+                </p>{/if}
+            </div>
+          {/if}
+          {#if !compact}<details class={styles.details}>
+              <summary>So wird gerechnet</summary>
+              <p class={styles.creditDescription}>
+                Anwesenheit nach Pausen plus Tagesgutschriften minus Wochensoll. Urlaub, Feiertag,
+                Feiertagsausgleich und Krank mit oder ohne Attest zählen bei persönlichen
+                ganztägigen Einträgen mit den damaligen Wochenstunden ÷ 6 zusätzlich zur
+                Anwesenheit; pro Datum einmal.
+              </p>
+              <p class={styles.creditDescription}>
+                Heute gespeicherte Anwesenheit zählt vollständig, auch bei späterer Endzeit.
+                Zukünftige Tage und laufende Timer zählen noch nicht. Übergangswochen werden nach
+                sieben Kalendertagen anteilig berechnet. Produktionsstunden bleiben separat; eine
+                wöchentliche Freigabe ist nicht erforderlich.
+              </p>
+            </details>{/if}
         {/if}{/if}
     {/if}
   </section>
