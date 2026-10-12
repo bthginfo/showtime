@@ -115,6 +115,7 @@
     font-size: 15px;
     line-height: 1.45;
     font-weight: 600;
+    hyphens: auto;
   }
   .tile-description {
     color: var(--muted);
