@@ -85,7 +85,7 @@
       <p class="small muted">
         {onBookDay
           ? "Wähle einen Tag, um Zeiten nachzutragen. Freie Tage trägst du über „Tag kennzeichnen“ ein."
-          : "ABF, Ruhetag und Abwesenheiten bleiben Kalenderkennzeichen ohne Stunden."}
+          : "Kalenderkennzeichen sind keine Anwesenheitsbuchungen. Bezahlte Ganztage zählen separat als Tagesgutschrift."}
       </p>
     </div>
     {#if canMark}<Button onClick={() => setDay(defaultDay)}>
