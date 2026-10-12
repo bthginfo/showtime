@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tradeDisplay } from "../src/shared/trade-display";
+import { tradeDisplay, tradeCurrentDisplay } from "../src/shared/trade-display";
 import type { Workspace } from "../src/shared/contracts";
 import type { Planning } from "../src/modules/theater/types";
 
@@ -21,6 +21,20 @@ const planning = {
 } as unknown as Planning;
 
 describe("readable references in shared trade views", () => {
+  it("does not present stale or unverified managed fields as an active approval", () => {
+    const field = { key: "release", managed: "approval" as const };
+    expect(tradeCurrentDisplay(true, field, workspace, planning, false)).toBe(
+      "Freigabe noch erforderlich",
+    );
+    expect(tradeCurrentDisplay("approved", field, workspace, planning)).toBe(
+      "Freigabe noch erforderlich",
+    );
+  });
+  it("shows an active managed approval only with the fresh verified proof", () => {
+    const field = { key: "release", managed: "approval" as const };
+    expect(tradeCurrentDisplay(true, field, workspace, planning, true)).toBe("Ja");
+    expect(tradeCurrentDisplay("approved", field, workspace, planning, true)).toBe("Freigegeben");
+  });
   it("uses accessible names for scalar and multiple references", () => {
     expect(tradeDisplay("member-a", { key: "owner", type: "member" }, workspace, planning)).toBe(
       "Leitung Maske",

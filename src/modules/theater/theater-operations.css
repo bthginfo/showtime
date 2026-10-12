@@ -29,6 +29,24 @@ details.planning-filters .filters {
 .workplace-switch .badge {
   font-size: 11px;
 }
+.workplace-context {
+  border: 0;
+  background: transparent;
+}
+.workplace-switch > div,
+.workplace-context strong {
+  min-width: 0;
+}
+.workplace-switch strong,
+.workplace-context strong {
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  line-height: 1.4;
+}
+.workplace-switch:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
 /* Common task disclosure: secondary work stays available without filling the page. */
 .theater-workspace .surface.task-disclosure {
   padding: 0;
@@ -100,9 +118,13 @@ details.planning-filters .filters {
 }
 .feature-choices > h2 {
   margin: 0;
+  scroll-margin-top: 96px;
 }
 .feature-records {
   padding-top: 8px;
+}
+.feature-records h2 {
+  scroll-margin-top: 96px;
 }
 .catalog-section > .button {
   justify-self: start;
@@ -261,6 +283,68 @@ details.planning-filters .filters {
 }
 .theater-workspace .card-grid .button-row {
   margin-top: 16px;
+}
+.theater-workspace .trade-record-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+}
+.theater-workspace .trade-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.theater-workspace .trade-entry > .section-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  margin: 0;
+}
+.trade-entry h3 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.4;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+.trade-entry .section-heading .badge {
+  flex-shrink: 0;
+}
+.theater-workspace .trade-entry p {
+  margin: 0;
+  line-height: 1.55;
+}
+.theater-workspace .trade-record-grid .trade-entry .detail-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin: 4px 0;
+}
+.trade-entry .detail-grid > div {
+  min-width: 0;
+}
+.trade-entry .detail-grid dd {
+  overflow-wrap: anywhere;
+}
+.trade-entry-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.trade-entry-actions > .button {
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+}
+.record-pagination {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
+}
+.record-pagination > .button {
+  min-height: 44px;
+  max-width: 100%;
 }
 .theater-workspace .filters label {
   flex: 1 1 160px;

@@ -1,7 +1,9 @@
 <script lang="ts">
   import { afterNavigate } from "$app/navigation";
+  import { tick } from "svelte";
   import MoreRecords from "./more-records.svelte";
   import ScopePicker from "./scope-picker.svelte";
+  import { workplaceSwitchPolicy } from "@/shared/workplace-switch";
   import { clearPrivateBrowserData } from "@/shared/private-browser-data";
   import { initialState } from "@/shared/svelte-runtime";
 
@@ -111,6 +113,15 @@
   let nav = workplaceNavigation(workspace);
   $: nav = workplaceNavigation(workspace);
   let scopeOpen = false;
+  let scopeControl: HTMLButtonElement;
+  let menuControl: HTMLButtonElement;
+  async function closeScope() {
+    scopeOpen = false;
+    await tick();
+    if (scopeControl?.isConnected && !scopeControl.closest("[inert]")) scopeControl.focus();
+    else menuControl?.focus();
+  }
+  $: switchPolicy = workplaceSwitchPolicy(workspace);
   const queryStore = externalStore(
     subscribeLocation,
     () => location.search,
@@ -501,23 +512,31 @@
       >
         <X size={20}></X>
       </button>
-      <button
-        class="department-switch workplace-switch"
-        aria-label="Arbeitsbereich wechseln"
-        on:click={() => {
-          setMobileMenu(false);
-          scopeOpen = true;
-        }}
-      >
-        <span class="department-icon">
-          <Theater size={19}></Theater>
-        </span>
-        <div>
+      {#if switchPolicy.canSwitch}<button
+          bind:this={scopeControl}
+          class="department-switch workplace-switch"
+          aria-label={switchPolicy.canSwitchTheater ? "Arbeitsbereich wechseln" : "Gewerk wechseln"}
+          aria-haspopup="dialog"
+          aria-expanded={scopeOpen}
+          on:click={() => {
+            setMobileMenu(false);
+            scopeOpen = true;
+          }}
+        >
+          <span class="department-icon">
+            <Theater size={19}></Theater>
+          </span>
+          <div>
+            <strong>{workspace.department.name}</strong>
+            {#if switchPolicy.canSwitchTheater}<span class="small muted"
+                >{workspace.organization.name}</span
+              >{/if}
+          </div>
+          <Badge tone="green">Wechseln</Badge>
+        </button>{:else}<div class="department-switch workplace-context" aria-label="Dein Gewerk">
+          <span class="department-icon"><Theater size={19} /></span>
           <strong>{workspace.department.name}</strong>
-          <span class="small muted">{workspace.organization.name}</span>
-        </div>
-        <Badge tone="green">Wechseln</Badge>
-      </button>
+        </div>{/if}
       <nav aria-label="Hauptnavigation">
         {#each ["ARBEITSRAUM", "WISSEN & FUNDUS", "VERWALTUNG"] as group (group)}<div
             class="nav-group"
@@ -583,6 +602,7 @@
             </button>{/if}
           <button
             class="icon-button mobile-menu-button"
+            bind:this={menuControl}
             on:click={openMenu}
             aria-label="Menü öffnen"
           >
@@ -742,7 +762,9 @@
             description="Neue Aufgaben und wichtige Änderungen erscheinen hier."
           ></Empty>{/if}
       </Modal>{/if}
-    {#if scopeOpen}<Modal title="Arbeitsbereich wechseln" onClose={() => (scopeOpen = false)}
+    {#if scopeOpen && switchPolicy.canSwitch}<Modal
+        title={switchPolicy.canSwitchTheater ? "Arbeitsbereich wechseln" : "Gewerk wechseln"}
+        onClose={() => void closeScope()}
         ><ScopePicker
           compact
           initialOrganization={workspace.organization.id}

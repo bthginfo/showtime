@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
-import { identity, availableScopes, effectiveGrants } from "@/platform/context";
+import { identity, availableScopes, effectiveGrants, cookieValue } from "@/platform/context";
+import { currentRequest } from "@/platform/request";
 import { authDb } from "@/platform/db/connections";
 import { platformAdmins } from "@/platform/db/schema";
 import { route } from "@/platform/http";
@@ -17,9 +18,21 @@ export const GET: RequestHandler = () =>
       .from(platformAdmins)
       .where(eq(platformAdmins.userId, person.id))
       .limit(1);
-    return Response.json({
-      scopes,
-      platformAdmin: !!platform,
-      user: { id: person.id, name: person.name },
-    });
+    const selection = cookieValue(
+      currentRequest().request.headers.get("cookie") || "",
+      "showtime.scope",
+    );
+    const currentScope = scopes.find(
+      (scope) =>
+        scope.status === "active" && `${scope.organizationId}:${scope.departmentId}` === selection,
+    );
+    return Response.json(
+      {
+        scopes,
+        platformAdmin: !!platform,
+        currentOrganizationId: currentScope?.organizationId || null,
+        user: { id: person.id, name: person.name },
+      },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
   });

@@ -35,6 +35,7 @@ Der Name ist Showtime. Die bestehende Identität von DigitalMask wird weitergef�
 ## Product Principles
 
 - Die tägliche Facharbeit bestimmt den Einstieg; Zusatzrollen ersetzen den gewählten Arbeitsbereich nicht.
+- Normale Nutzer wechseln im Arbeitsbereich kein Theater. Ein einziges eigenes aktives Gewerk wird passiv gekennzeichnet; mehrere eigene aktive Gewerke im aktuellen Theater sind direkt wählbar. Ausschließlich das serverseitig verifizierte Flag `platformAdmin: true` ermöglicht eine Theaterauswahl.
 - Theaterdaten und private Inhalte bleiben an ihre aktuellen Zugehörigkeiten und Freigaben gebunden.
 - Menschen erkennen vor einer Änderung deren Wirkung und danach das gespeicherte Ergebnis.
 - Gemeinsame Abläufe verbinden alle Gewerke und verwenden deren verständliche Fachbegriffe.

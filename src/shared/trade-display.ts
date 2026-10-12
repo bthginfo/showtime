@@ -3,6 +3,16 @@ import type { Workspace } from "./contracts";
 import type { Planning } from "@/modules/theater/types";
 import { tradeChoiceLabel } from "./trade-labels";
 import { theaterLabel } from "./theater-time";
+export function tradeCurrentDisplay(
+  value: unknown,
+  field: Pick<Field, "key"> & Partial<Field>,
+  workspace: Workspace,
+  planning: Planning,
+  approvalVerified?: boolean,
+): string {
+  if (field.managed && !approvalVerified) return "Freigabe noch erforderlich";
+  return tradeDisplay(value, field, workspace, planning);
+}
 export function tradeDisplay(
   value: unknown,
   field: Pick<Field, "key"> & Partial<Field>,
