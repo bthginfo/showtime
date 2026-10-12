@@ -13,8 +13,9 @@
   export let planning: Planning;
   export let productionId = "";
   export let onChanged: () => Promise<void>;
+  export let initiallyExpanded = false;
   const store = useWorkspace();
-  let expanded = false,
+  let expanded = initiallyExpanded,
     step = 1,
     selected: string[] = [],
     days = 1,

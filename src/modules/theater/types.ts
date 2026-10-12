@@ -133,6 +133,8 @@ export type Configuration = {
   events: { id: string; type: string; status: string; attempts: number; availableAt: string }[];
 };
 export type TheaterRun = (action: string, data: RecordData) => Promise<RecordData>;
+export type ScheduleArea =
+  "" | "performances" | "shift" | "versions" | "works" | "seasons" | "phases" | "runs";
 export type Configure = (action: string, data: RecordData) => Promise<void>;
 export const roleLabels: Record<TheaterRole, string> = {
   employee: "Mitarbeitende",

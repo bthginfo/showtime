@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CalendarDays, ArrowRight, Clock3, Plus, MessageSquare, BookOpen } from "@lucide/svelte";
+  import { ArrowRight, Clock3, Plus } from "@lucide/svelte";
   import { useWorkspace } from "@/components/workspace-context";
   import { useTheaterTime } from "@/components/theater-time";
   import { PageHeader, Section, Button, Empty } from "@/components/ui";
@@ -13,6 +13,8 @@
   import { AttendanceBalanceCard } from "@/modules/time-tracking/components/attendance-balance";
   import { unreadNotifications } from "@/modules/notifications/unread";
   import DailyPriorities from "./daily-priorities.svelte";
+  import WorkTiles from "@/components/work-tiles.svelte";
+  import { homeWorkTiles } from "@/shared/workspace-tiles";
   export let navigate: (url: string) => void;
   const store = useWorkspace();
   const { localDate, dateLabel } = useTheaterTime();
@@ -68,16 +70,8 @@
   <p class="home-purpose">
     {guide?.purpose || "Deine Termine, Aufgaben und Arbeitsstände an einem Ort."}
   </p>
-  <nav class="home-shortcuts" aria-label="Schnelleinstieg für dein Gewerk">
-    <a href="/?module=theater&view=trade"
-      ><BookOpen size={18} /><span>Arbeitsstände</span><ArrowRight size={16} /></a
-    >
-    <a href="/?module=calendar"
-      ><CalendarDays size={18} /><span>Mein Kalender</span><ArrowRight size={16} /></a
-    >
-    <a href="/?module=theater&view=collaborations"
-      ><MessageSquare size={18} /><span>Abstimmungen</span><ArrowRight size={16} /></a
-    >
+  <nav aria-label="Schnelleinstieg für dein Gewerk">
+    <WorkTiles label="Schnelleinstieg" tiles={homeWorkTiles} />
   </nav>
   <div class="home-columns">
     <Section
@@ -204,25 +198,6 @@
     margin: -8px 0 0;
     line-height: 1.6;
   }
-  .home-shortcuts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px 24px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--border);
-  }
-  .home-shortcuts a {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 44px;
-    color: var(--text);
-    text-decoration: none;
-    font-weight: 500;
-  }
-  .home-shortcuts a:hover {
-    color: var(--accent);
-  }
   .home-columns {
     display: grid;
     align-items: start;
@@ -289,13 +264,6 @@
     .home-columns {
       grid-template-columns: minmax(0, 1fr);
       gap: 20px;
-    }
-    .home-shortcuts {
-      display: grid;
-      gap: 4px;
-    }
-    .home-shortcuts a > span {
-      flex: 1;
     }
     .home-row {
       padding: 16px 18px;

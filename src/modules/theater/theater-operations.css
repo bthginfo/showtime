@@ -1,6 +1,19 @@
 .theater-view-picker {
   display: none;
 }
+details.planning-filters {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+details.planning-filters > summary {
+  min-height: 44px;
+  padding: 12px 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+details.planning-filters .filters {
+  padding-top: 12px;
+}
 .workplace-switch {
   color: var(--text);
   text-align: left;
@@ -77,6 +90,103 @@
 }
 .trade-list-filters {
   margin-top: -8px;
+}
+.feature-choices,
+.feature-records,
+.catalog-section {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.feature-choices > h2 {
+  margin: 0;
+}
+.feature-records {
+  padding-top: 8px;
+}
+.catalog-section > .button {
+  justify-self: start;
+}
+.catalog-section h2 {
+  margin-bottom: 6px;
+}
+.catalog-section h2:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+.catalog-search {
+  display: grid;
+  gap: 6px;
+  max-width: 480px;
+}
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+.catalog-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+}
+.catalog-card > svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.catalog-card h3 {
+  font-size: 17px;
+  line-height: 1.4;
+  margin: 0;
+}
+.catalog-card p {
+  margin: 0;
+  line-height: 1.55;
+}
+.catalog-card-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.catalog-card-heading > svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.catalog-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  margin-top: auto;
+}
+.catalog-facts {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+.catalog-facts div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.catalog-facts dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.catalog-facts dd {
+  margin: 0;
+}
+.theater-more > .work-tiles {
+  margin-top: 12px;
 }
 @media (max-width: 760px) {
   .task-disclosure > summary {
@@ -651,7 +761,7 @@
   }
 }
 @media (max-width: 760px) {
-  .theater-workspace > .segmented {
+  .theater-workspace > .segmented:not(.resource-switch) {
     display: none;
   }
   .theater-view-picker {
