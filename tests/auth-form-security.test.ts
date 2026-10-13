@@ -59,7 +59,7 @@ describe("authentication without JavaScript", () => {
     expect(response.headers.get("Location")).toBe("/");
     expect(response.headers.getSetCookie()).toHaveLength(2);
     expect(response.headers.get("Cache-Control")).toContain("no-store");
-    expect(response.headers.get("Referrer-Policy")).toBe("no-referrer");
+    expect(response.headers.get("Referrer-Policy")).toBe("strict-origin");
     expect(response.body).toBeNull();
   });
 

@@ -6,7 +6,7 @@ import { authDb } from "@/platform/db/connections";
 import { session } from "@/platform/db/schema";
 import { HttpError, route } from "@/platform/http";
 import { throttle } from "@/platform/auth/throttle";
-import { readAuthInput, isAuthForm } from "@/platform/auth/form-request";
+import { readAuthInput, isAuthForm, authReferrerPolicy } from "@/platform/auth/form-request";
 import type { RequestHandler } from "@sveltejs/kit";
 async function mfaResponse(request: Request) {
   return route(async () => {
@@ -57,7 +57,7 @@ async function mfaResponse(request: Request) {
     const data = await result.json();
     const headers = new Headers({
       "Cache-Control": "private, no-store",
-      "Referrer-Policy": "no-referrer",
+      "Referrer-Policy": authReferrerPolicy,
     });
     const cookieParts = new Map(
       (request.headers.get("cookie") || "")
@@ -116,7 +116,7 @@ export const POST: RequestHandler = async ({ request }) => {
       : "/login/mfa?error=invalid" +
         (new URL(request.url).searchParams.get("method") === "backup" ? "&method=backup" : ""),
     "Cache-Control": "private, no-store",
-    "Referrer-Policy": "no-referrer",
+    "Referrer-Policy": authReferrerPolicy,
   });
   for (const cookie of response.headers.getSetCookie()) headers.append("Set-Cookie", cookie);
   return new Response(null, { status: 303, headers });

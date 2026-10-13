@@ -1,7 +1,12 @@
 const NextResponse = Response;
 import { auth } from "@/platform/auth";
 import { HttpError, route } from "@/platform/http";
-import { readAuthInput, authFormResponse, isAuthForm } from "@/platform/auth/form-request";
+import {
+  readAuthInput,
+  authFormResponse,
+  isAuthForm,
+  authReferrerPolicy,
+} from "@/platform/auth/form-request";
 import { authFeedback, loginInput } from "@/shared/auth-feedback";
 import { throttle } from "@/platform/auth/throttle";
 async function legacyPOST(request: Request) {
@@ -36,7 +41,7 @@ export const POST: RequestHandler = async ({ request }) => {
       const headers = new Headers({
         Location: "/login/mfa",
         "Cache-Control": "private, no-store",
-        "Referrer-Policy": "no-referrer",
+        "Referrer-Policy": authReferrerPolicy,
       });
       for (const cookie of response.headers.getSetCookie()) headers.append("Set-Cookie", cookie);
       return new Response(null, { status: 303, headers });

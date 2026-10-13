@@ -1,6 +1,10 @@
 import { HttpError, assertOrigin, readJson } from "@/platform/http";
 import type { AuthFormKind } from "@/shared/auth-form-feedback";
 
+// Keep paths, invitation tokens and query strings out of Referer without making
+// native POST origins opaque: SvelteKit must still validate the genuine origin.
+export const authReferrerPolicy = "strict-origin";
+
 export function isAuthForm(request: Request) {
   return (
     request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() ===
@@ -60,7 +64,7 @@ export function authFormResponse(
   const headers = new Headers({
     Location: destination.pathname + destination.search,
     "Cache-Control": "private, no-store",
-    "Referrer-Policy": "no-referrer",
+    "Referrer-Policy": authReferrerPolicy,
   });
   if (response.ok) {
     for (const cookie of response.headers.getSetCookie()) headers.append("Set-Cookie", cookie);

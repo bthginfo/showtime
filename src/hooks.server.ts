@@ -7,6 +7,7 @@ import { HttpError } from "./platform/http";
 import { cleanAuthLocation } from "./shared/auth-form-feedback";
 import { integrationRate } from "./modules/theater/integrations";
 import { requireMfa } from "./platform/auth/mfa";
+import { authReferrerPolicy } from "./platform/auth/form-request";
 
 const publicAPI =
   /^\/api\/(?:v1\/openapi\.json$|login|logout|register|reset-password|auth(?:\/|$)|cron$|calendar\/|realtime$|documents\/live$|events\/consume$|platform\/(?:(?:scopes|switch|support|health)$|tenants(?:\/|$)))/;
@@ -25,7 +26,7 @@ export const handle: Handle = async ({ event, resolve }) => {
       response.headers.set("Cache-Control", "private, no-store");
     if (response.status === 429) response.headers.set("Retry-After", "60");
     response.headers.set("X-Content-Type-Options", "nosniff");
-    response.headers.set("Referrer-Policy", authentication ? "no-referrer" : "same-origin");
+    response.headers.set("Referrer-Policy", authentication ? authReferrerPolicy : "same-origin");
     return response;
   };
   const cleanLocation = cleanAuthLocation(event.url);
