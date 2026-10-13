@@ -1,0 +1,250 @@
+.body {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 76rem;
+}
+.tabs {
+  margin-bottom: 1.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.desktopTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+}
+.desktopTabs button {
+  padding: 0.75rem 0.5rem;
+  min-height: 44px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.desktopTabs button:global(.active) {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.mobileSelect {
+  display: none;
+}
+.body h2 {
+  font-size: 1.3rem;
+  line-height: 1.35;
+}
+.body h3 {
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+.overview {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 1.25rem;
+}
+.section,
+.entry {
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+}
+.section p,
+.notice p {
+  max-width: 68ch;
+  line-height: 1.6;
+}
+.notice {
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--surface-soft);
+  border-radius: var(--radius);
+}
+.notice svg {
+  flex-shrink: 0;
+}
+.notice > div {
+  display: grid;
+  gap: 0.75rem;
+}
+.sectionHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+.wide {
+  grid-column: 1/-1;
+}
+.body fieldset {
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-width: 0;
+}
+.body legend {
+  font-weight: 600;
+  padding: 0 0.4rem;
+}
+.body label {
+  display: grid;
+  gap: 0.5rem;
+}
+.check {
+  display: flex !important;
+  align-items: start;
+  gap: 0.75rem !important;
+}
+.check input {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+}
+.body textarea {
+  resize: vertical;
+}
+.entryGrid,
+.securityGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+.securityGrid form {
+  display: grid;
+  gap: 1rem;
+}
+.securityGrid details {
+  padding: 1rem;
+  background: var(--surface-soft);
+  border-radius: var(--radius);
+}
+.securityGrid summary {
+  cursor: pointer;
+  min-height: 44px;
+  align-content: center;
+}
+.codes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  padding: 1rem;
+  list-style: none;
+  font-variant-numeric: tabular-nums;
+}
+.qr {
+  background: white;
+  border-radius: var(--radius);
+  max-width: 100%;
+  height: auto;
+}
+.wrap {
+  overflow-wrap: anywhere;
+}
+.empty {
+  display: grid;
+  gap: 1rem;
+  max-width: 40rem;
+  padding: 2rem 0;
+  color: var(--muted);
+}
+.empty h3 {
+  color: var(--text);
+}
+.loading {
+  display: grid;
+  gap: 1rem;
+}
+.loading span {
+  height: 5rem;
+  background: var(--surface-soft);
+  border-radius: var(--radius);
+}
+.body h2:focus,
+.body h3:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 6px;
+}
+.body :global(input),
+.body :global(select),
+.body :global(textarea) {
+  max-width: 100%;
+  min-width: 0;
+}
+.entry p {
+  overflow-wrap: anywhere;
+}
+.body :global(.wide) {
+  grid-column: 1/-1;
+}
+@media (max-width: 760px) {
+  .desktopTabs {
+    display: none;
+  }
+  .mobileSelect {
+    display: grid;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .overview,
+  .securityGrid,
+  .entryGrid,
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+  .section,
+  .entry {
+    padding: 1.25rem;
+  }
+  .actions > :global(.button) {
+    flex: 1 1 auto;
+  }
+  .sectionHeading {
+    align-items: start;
+  }
+}
+
+.deletionCandidates {
+  display: grid;
+  gap: 0.75rem;
+}
+.deletionCandidate {
+  display: flex !important;
+  gap: 0.75rem !important;
+  align-items: start;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-height: 44px;
+}
+.deletionCandidate input {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+  margin-top: 0.1rem;
+}
+.deletionCandidate > span {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.deletionCandidate strong,
+.deletionCandidate span {
+  overflow-wrap: anywhere;
+}

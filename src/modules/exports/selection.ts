@@ -15,6 +15,7 @@ export function selectExportRecords(
     | "year"
     | "season"
     | "references"
+    | "calendarProductions"
   >,
 ): DomainRecord[] {
   if (input.teamOnly && input.kind !== "tasks")
@@ -34,7 +35,16 @@ export function selectExportRecords(
       return false;
     if (input.teamOnly && record.data.productionId) return false;
     if (input.generalOnly && (record.data.productionId || record.data.conversationId)) return false;
-    if (!recordMatchesPeriod(record, input, input.references?.productions || [])) return false;
+    if (
+      !recordMatchesPeriod(
+        record,
+        input,
+        record.kind === "events"
+          ? (input.calendarProductions ?? input.references?.productions ?? [])
+          : input.references?.productions || [],
+      )
+    )
+      return false;
     if (input.userIds !== undefined) {
       if (
         record.kind === "events" &&

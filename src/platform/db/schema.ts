@@ -22,8 +22,20 @@ export const user = pgTable("app_user", {
   image: text("image"),
   username: text("username").unique(),
   displayUsername: text("display_username"),
+  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const twoFactor = pgTable("auth_two_factor", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  secret: text("secret").notNull(),
+  backupCodes: text("backup_codes").notNull(),
+  verified: boolean("verified").notNull().default(true),
+  failedVerificationCount: integer("failed_verification_count").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
 });
 export const profilePreferences = pgTable("profile_preferences", {
   userId: text("user_id")
@@ -67,6 +79,7 @@ export const session = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
+    mfaVerifiedAt: timestamp("mfa_verified_at", { withTimezone: true }),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),

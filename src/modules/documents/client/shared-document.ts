@@ -1,4 +1,5 @@
-import {scopedBrowserKey} from "@/shared/browser-scope";
+import { scopedBrowserKey } from "@/shared/browser-scope";
+import { deletePrivateDatabase } from "@/shared/private-browser-data";
 import * as Y from "yjs";
 import { IndexeddbPersistence } from "y-indexeddb";
 import type { DocumentSession, DocumentState } from "../contracts";
@@ -322,14 +323,43 @@ export class SharedDocument {
       error instanceof DocumentRequestError && [401, 403, 404].includes(error.status);
     this.change({
       status: forbidden ? "forbidden" : navigator.onLine ? "error" : "offline",
-      pending: !!this.pending.length,
+      pending: forbidden ? false : !!this.pending.length,
       error: forbidden
-        ? "Du hast keinen Zugriff mehr auf dieses Dokument. Deine noch nicht übertragenen Änderungen bleiben auf diesem Gerät."
+        ? "Du hast keinen Zugriff mehr auf dieses Dokument. Die lokale Dokumentkopie wird entfernt."
         : error instanceof Error
           ? error.message
           : "Die Verbindung konnte nicht hergestellt werden.",
     });
-    if (forbidden) this.disconnect();
+    if (forbidden) {
+      this.disconnect();
+      this.pending = [];
+      this.doc.transact(() => {
+        for (const value of this.doc.share.values()) {
+          if (value instanceof Y.Map) value.clear();
+          else if (
+            value instanceof Y.Text ||
+            value instanceof Y.Array ||
+            value instanceof Y.XmlFragment
+          )
+            value.delete(0, value.length);
+        }
+      }, REMOTE);
+      const database = scopedBrowserKey(`digitalmask-document:${this.userId}:${this.fileId}`);
+      void (async () => {
+        await this.persistence?.destroy();
+        if (!(await deletePrivateDatabase(database)))
+          this.change({
+            error:
+              "Zugriff entzogen. Schließe andere Showtime-Tabs und entferne die lokalen Kopien unter Datenschutz & Sicherheit.",
+          });
+      })().catch(() =>
+        this.change({
+          error:
+            "Zugriff entzogen. Die lokale Entfernung ist noch offen; prüfe Datenschutz & Sicherheit.",
+        }),
+      );
+      this.change({ session: null, localReady: false });
+    }
   }
   private active() {
     return document.visibilityState === "visible" && document.hasFocus() && navigator.onLine;

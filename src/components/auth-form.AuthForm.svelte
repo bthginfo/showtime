@@ -66,13 +66,16 @@
     setBusy(true);
     const form = new FormData(event.currentTarget);
     try {
-      await post(register ? "/api/register" : "/api/login", {
-        username: form.get("username"),
-        password: form.get("password"),
-        ...(register ? { name: form.get("name"), invitation: form.get("invitation") || "" } : {}),
-      });
+      const result = await post<{ twoFactorRedirect?: boolean }>(
+        register ? "/api/register" : "/api/login",
+        {
+          username: form.get("username"),
+          password: form.get("password"),
+          ...(register ? { name: form.get("name"), invitation: form.get("invitation") || "" } : {}),
+        },
+      );
       if (register) setDone(true);
-      else router.replace("/");
+      else router.replace(result.twoFactorRedirect ? "/login/mfa" : "/");
     } catch (e) {
       setError(
         e instanceof TypeError

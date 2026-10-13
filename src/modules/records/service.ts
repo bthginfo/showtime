@@ -1,3 +1,5 @@
+import { safeRecordColumns, safeRecordData } from "@/modules/privacy/read-projection";
+import { nonClinicalPayload } from "@/modules/privacy/model";
 import { privateRowReadable, guestOnly } from "@/shared/access-policy";
 import { collaborationOpen, collaborationContributor } from "@/shared/collaboration";
 import { and, eq, ne, or, sql, inArray } from "drizzle-orm";
@@ -70,13 +72,21 @@ export async function assertRead(
       throw new HttpError(403, "Keine Berechtigung für diese Zeitbuchung.");
     return;
   }
+  if (row.kind === "events") {
+    if (guestOnly(context.user)) await assertProject(context, row.data.productionId, tx);
+    if (!privateRowReadable(context.user, row, context.departmentId))
+      throw new HttpError(403, "Dieser Kalender ist für dich nicht freigegeben.");
+    return;
+  }
   await assertProject(context, row.kind === "productions" ? row.id : row.data.productionId, tx);
   if (row.kind === "files") {
-    await assertRead(
+    const parent = await findRecord(
       context,
-      await findRecord(context, String(row.data.recordId || row.parentId), undefined, tx),
+      String(row.data.recordId || row.parentId),
+      undefined,
       tx,
     );
+    await assertAttachmentRead(context, parent, tx);
     return;
   }
   if (row.kind === "conversations") await assertConversation(context, row.id, tx);
@@ -87,6 +97,37 @@ export async function assertRead(
   }
   if (!privateRowReadable(context.user, row, context.departmentId))
     throw new HttpError(403, "Dieser Eintrag ist privat.");
+}
+/** Calendar visibility alone never grants access to a production's attachments. */
+export async function assertAttachmentRead(
+  context: Context,
+  parent: typeof records.$inferSelect,
+  tx: Transaction | typeof db = db,
+  removal = false,
+) {
+  if (!removal && parent.kind === "actors") {
+    const { assertPortraitRights } = await import("@/modules/privacy/portrait-rights");
+    await assertPortraitRights(parent, tx);
+  }
+  if (
+    !removal &&
+    parent.kind === "events" &&
+    (parent.data.privacyNeutral ||
+      (parent.data.allDay &&
+        [
+          "absence",
+          "vacation",
+          "holiday",
+          "holiday-compensation",
+          "abf",
+          "rest",
+          "half-day-off",
+        ].includes(String(parent.data.category))))
+  )
+    throw new HttpError(403, "Persönliche Abwesenheiten verwenden keine Dokumentanlagen.");
+  if (parent.kind === "events")
+    await assertProject(context, parent.productionId || parent.data.productionId, tx);
+  await assertRead(context, parent, tx);
 }
 export function assertWrite(
   context: Context,
@@ -174,11 +215,16 @@ async function validateRelations(
     throw new HttpError(403, "Lege diese Übergabe im Bereich Zusammenarbeit an.");
   // A booking remains correctable after a production assignment is withdrawn.
   // Retaining an existing reference does not grant access to that production.
-  const preservedBooking = (kind === "time" || kind === "attendance") && previousData;
+  const preservedBooking = ["time", "attendance", "events"].includes(kind) && previousData;
   const production =
     preservedBooking && data.productionId === previousData.productionId
       ? undefined
-      : await assertProject(context, data.productionId, tx);
+      : kind === "events" &&
+          data.productionId &&
+          !guestOnly(context.user) &&
+          can(context, "schedule.read")
+        ? await findRecord(context, String(data.productionId), "productions", tx)
+        : await assertProject(context, data.productionId, tx);
   const maskPlan = kind === "maskPlans" ? maskPlanValue(data) : undefined;
   let eventTitle = textValue(data.title);
   let conversation: typeof records.$inferSelect | undefined;
@@ -251,7 +297,7 @@ async function validateRelations(
   );
   if (fileIds.length) {
     const assets = await tx
-      .select({ data: records.data })
+      .select({ data: safeRecordData(context) })
       .from(records)
       .where(
         and(
@@ -267,7 +313,7 @@ async function validateRelations(
       throw new HttpError(404, "Eine verknüpfte Datei wurde nicht gefunden.");
     const linkedIds = Array.from(new Set(assets.map((file) => String(file.data.recordId))));
     const linkedRecords = await tx
-      .select()
+      .select(safeRecordColumns(context))
       .from(records)
       .where(
         and(eq(records.organizationId, context.organizationId), inArray(records.id, linkedIds)),
@@ -275,7 +321,7 @@ async function validateRelations(
     if (linkedRecords.length !== linkedIds.length)
       throw new HttpError(404, "Ein verknüpfter Eintrag wurde nicht gefunden.");
     for (const linked of linkedRecords) {
-      await assertRead(context, linked, tx);
+      await assertAttachmentRead(context, linked, tx);
       if (linked.data.conversationId && linked.data.conversationId !== data.conversationId)
         throw new HttpError(400, "Private Chatdateien bleiben im zugehörigen Chat.");
     }
@@ -321,7 +367,7 @@ async function validateRelations(
     const selected = listValue(data.participantIds);
     if (selected.length) {
       const candidates = await tx
-        .select()
+        .select(safeRecordColumns(context))
         .from(records)
         .where(
           and(
@@ -395,6 +441,11 @@ export async function saveRecord(
     transaction?: Transaction;
   } = {},
 ) {
+  if (!nonClinicalPayload(input))
+    throw new HttpError(
+      400,
+      "Medizinische Gründe und Dokumente sind auf dieser Infrastruktur gesperrt. Verwende eine neutrale Abwesenheit mit separater Zeitgutschrift.",
+    );
   let eventQueued = false;
   const write = async (tx: Transaction) => {
     await acquireWorkflowLock(context, kind, tx);
@@ -442,7 +493,7 @@ export async function saveRecord(
       if (existing?.data.linkedMemberId) data.linkedMemberId = existing.data.linkedMemberId;
       if (!existing) {
         const people = await tx
-          .select({ data: records.data })
+          .select({ data: safeRecordData(context) })
           .from(records)
           .where(and(eq(records.departmentId, context.departmentId), eq(records.kind, "people")));
         if (people.some((person) => personNameKey(person.data.name) === personNameKey(data.name)))
@@ -518,7 +569,7 @@ export async function saveRecord(
       );
     if ((kind === "time" || kind === "attendance") && data.idempotencyKey) {
       const [duplicate] = await tx
-        .select()
+        .select(safeRecordColumns(context))
         .from(records)
         .where(
           and(
@@ -717,7 +768,7 @@ export async function saveRecord(
     if (kind === "events" && listValue(data.participantIds).length) {
       await emit(tx, context, "ServiceChangedV1", {
         userIds: listValue(data.participantIds),
-        title: existing ? "Dienst geändert" : "Neuer Dienst",
+        title: "Kalenderänderung",
         body: related.eventTitle,
         link: "/?module=calendar",
         recordId: row.id,
@@ -830,7 +881,7 @@ export async function deleteRecord(
       await tx.delete(resourceBookings).where(eq(resourceBookings.activityId, id));
     }
     const attachments = await tx
-      .select()
+      .select(safeRecordColumns(context))
       .from(records)
       .where(
         and(

@@ -16,6 +16,7 @@ import {
   Package,
   Search,
   Settings2,
+  ShieldCheck,
   Theater,
   Users,
   WifiOff,
@@ -81,6 +82,7 @@ export const nav: {
   { id: "exports", label: "Exporte", icon: Download, group: "VERWALTUNG" },
   { id: "help", label: "Hilfe & Feedback", icon: CircleHelp, group: "VERWALTUNG" },
   { id: "settings", label: "Einstellungen", icon: Settings2, group: "VERWALTUNG" },
+  { id: "privacy", label: "Datenschutz & Sicherheit", icon: ShieldCheck, group: "VERWALTUNG" },
 ];
 export { default as WorkspaceShell } from "./workspace-shell.WorkspaceShell.svelte";
 export { default as ExportsModule } from "./workspace-shell.ExportsModule.svelte";

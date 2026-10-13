@@ -1,7 +1,7 @@
 const NextResponse = Response;
 import { auth } from "@/platform/auth";
 import { HttpError, route } from "@/platform/http";
-import { readAuthInput, authFormResponse } from "@/platform/auth/form-request";
+import { readAuthInput, authFormResponse, isAuthForm } from "@/platform/auth/form-request";
 import { authFeedback, loginInput } from "@/shared/auth-feedback";
 import { throttle } from "@/platform/auth/throttle";
 async function legacyPOST(request: Request) {
@@ -25,5 +25,22 @@ async function legacyPOST(request: Request) {
 }
 
 import type { RequestHandler } from "@sveltejs/kit";
-export const POST: RequestHandler = async ({ request }) =>
-  authFormResponse(request, await legacyPOST(request), "login");
+export const POST: RequestHandler = async ({ request }) => {
+  const response = await legacyPOST(request);
+  if (response.ok && isAuthForm(request)) {
+    const body = await response
+      .clone()
+      .json()
+      .catch(() => ({}));
+    if (body.twoFactorRedirect) {
+      const headers = new Headers({
+        Location: "/login/mfa",
+        "Cache-Control": "private, no-store",
+        "Referrer-Policy": "no-referrer",
+      });
+      for (const cookie of response.headers.getSetCookie()) headers.append("Set-Cookie", cookie);
+      return new Response(null, { status: 303, headers });
+    }
+  }
+  return authFormResponse(request, response, "login");
+};

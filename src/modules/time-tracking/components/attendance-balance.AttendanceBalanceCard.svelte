@@ -354,9 +354,10 @@
               <summary>So wird gerechnet</summary>
               <p class={styles.creditDescription}>
                 Anwesenheit nach Pausen plus Tagesgutschriften minus Wochensoll. Urlaub, Feiertag,
-                Feiertagsausgleich und Krank mit oder ohne Attest zählen bei persönlichen
-                ganztägigen Einträgen mit den damaligen Wochenstunden ÷ 6 zusätzlich zur
-                Anwesenheit; pro Datum einmal.
+                Feiertagsausgleich sowie neutrale Abwesenheiten mit ausdrücklich gesetzter
+                Tagesgutschrift zählen bei persönlichen ganztägigen Einträgen mit den damaligen
+                Wochenstunden ÷ 6 zusätzlich zur Anwesenheit; pro Datum einmal. Medizinische Gründe
+                werden hier nicht erfasst.
               </p>
               <p class={styles.creditDescription}>
                 Heute gespeicherte Anwesenheit zählt vollständig, auch bei späterer Endzeit.

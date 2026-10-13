@@ -1,3 +1,4 @@
+import { safeRecordColumns, safeRecordData } from "@/modules/privacy/read-projection";
 import { activeSubjects } from "../worker-subjects";
 import { privateRowReadable, anyPermission } from "@/shared/access-policy";
 import { projectVisible } from "@/modules/records/repository";
@@ -5,7 +6,7 @@ import { assertRead } from "@/modules/records/service";
 import { publishEvents } from "./transport";
 import { handleTheaterEvent } from "@/modules/theater/events";
 import { after } from "@/platform/request";
-import { and, eq, lte, sql, or, ne, inArray } from "drizzle-orm";
+import { and, eq, lte, sql, or, ne, inArray, getTableColumns } from "drizzle-orm";
 import { db, type Transaction } from "@/platform/db";
 import { outbox, records, audit, memberships, eventReceipts } from "@/platform/db/schema";
 import type { Context } from "@/platform/context";
@@ -66,7 +67,10 @@ export async function processEvents(eventId?: string) {
   const changedDepartments = new Set<string>();
   const due = await db.transaction(async (tx) => {
     const list = await tx
-      .select()
+      .select({
+        ...getTableColumns(outbox),
+        payload: sql<RecordData>`showtime_safe_event_payload(${outbox.type},${outbox.payload})`,
+      })
       .from(outbox)
       .where(
         and(
@@ -161,7 +165,7 @@ export async function processEvents(eventId?: string) {
           const subjects = await activeSubjects(event.organizationId, event.departmentId, tx);
           const [source] = event.payload.recordId
             ? await tx
-                .select()
+                .select(safeRecordColumns())
                 .from(records)
                 .where(eq(records.id, String(event.payload.recordId)))
                 .limit(1)

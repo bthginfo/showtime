@@ -10,7 +10,14 @@ export async function finalizeRecordDeletion(departmentId: string, payload: Reco
   if (!operationId || !recordId) return;
   await db.transaction(async (tx) => {
     const [operation] = await tx
-      .select()
+      .select({
+        id: recordOperations.id,
+        organizationId: recordOperations.organizationId,
+        departmentId: recordOperations.departmentId,
+        userId: recordOperations.userId,
+        expiresAt: recordOperations.expiresAt,
+        undoneAt: recordOperations.undoneAt,
+      })
       .from(recordOperations)
       .where(
         and(

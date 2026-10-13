@@ -2,6 +2,7 @@ import { getTableColumns } from "drizzle-orm";
 import { pageTimestamp } from "@/platform/db/page-timestamp";
 import { and, eq, desc, sql, ne, isNull, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { safeScheduleColumns } from "@/modules/privacy/snapshot-projection";
 import { planningSnapshot, snapshotIdentity } from "./snapshot";
 import { decodePosition, encodePosition } from "@/platform/pagination";
 import { collectionPage, collections, planningWindow, type PlanningWindow } from "./collections";
@@ -246,6 +247,12 @@ export async function theaterWorkspace(
 }
 export async function saveTradeItem(context: Context, input: unknown) {
   const body = inputSchema.parse(input);
+  const { nonClinicalPayload } = await import("@/modules/privacy/model");
+  if (!nonClinicalPayload(body.data))
+    throw new HttpError(
+      400,
+      "Medizinische Angaben sind auf dieser Infrastruktur gesperrt. Beschreibe nur den fachlichen Arbeitsauftrag.",
+    );
   const { feature, data } = validateFeature(body.moduleId, body.type, body.data);
   await assertProject(context, body.productionId);
   const [activation] = await db
@@ -1324,7 +1331,7 @@ export async function scheduleAction(context: Context, input: unknown) {
       sql`select pg_advisory_xact_lock(hashtext(${context.organizationId + ":schedule"}))`,
     );
     const versions = await db
-      .select()
+      .select(safeScheduleColumns())
       .from(scheduleVersions)
       .orderBy(desc(scheduleVersions.version))
       .limit(1);
@@ -1346,7 +1353,7 @@ export async function scheduleAction(context: Context, input: unknown) {
     const publish = body.action === "schedule-publish";
     if (publish) requirePermission(context, "schedule.publish");
     const [version] = await db
-      .select()
+      .select(safeScheduleColumns())
       .from(scheduleVersions)
       .where(eq(scheduleVersions.id, body.id || ""))
       .limit(1)
@@ -1366,7 +1373,7 @@ export async function scheduleAction(context: Context, input: unknown) {
         ...(publish ? { publishedAt: new Date(), publishedBy: context.user.id } : {}),
       })
       .where(eq(scheduleVersions.id, version.id))
-      .returning();
+      .returning(safeScheduleColumns());
     if (publish) {
       await emit(db as never, context, "SchedulePublishedV1", {
         recordId: version.id,

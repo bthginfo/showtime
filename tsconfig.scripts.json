@@ -5,6 +5,7 @@
     "scripts/migrate-showtime.ts",
     "scripts/bootstrap-showtime.ts",
     "scripts/tenant-backup.ts",
+    "scripts/purge-expired-backups.ts",
     "scripts/import-digitalmask.ts",
     "scripts/seed-theater-demo.ts",
     "scripts/seed-theater-workflows.ts",

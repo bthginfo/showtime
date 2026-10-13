@@ -7,7 +7,7 @@ import { records } from "@/platform/db/schema";
 import type { Context } from "@/platform/context";
 import { HttpError } from "@/platform/http";
 import { findRecord, serialize } from "@/modules/records/repository";
-import { assertRead, assertWrite } from "@/modules/records/service";
+import { assertAttachmentRead, assertWrite } from "@/modules/records/service";
 import { invalidateWorkspace } from "@/modules/records/workspace";
 import { emit, scheduleEvents, auditChange } from "@/platform/events";
 import { listValue, type RecordKind } from "@/shared/contracts";
@@ -15,14 +15,20 @@ import { officeUpload } from "@/modules/documents/file-policy";
 import { analyzePortrait, type PortraitMetadata } from "./portrait-analysis";
 import { normalizeActorPortrait } from "./actor-portraits";
 import { acquireWorkflowLock } from "@/modules/workflows/locks";
+import { clinicalInput } from "@/modules/privacy/model";
 export async function uploadFile(
   context: Context,
   file: File,
   recordKind: RecordKind,
   recordId: string,
 ) {
+  if (clinicalInput(file.name))
+    throw new HttpError(
+      400,
+      "Medizinische Dokumente können auf dieser Infrastruktur nicht hochgeladen werden.",
+    );
   const linked = await findRecord(context, recordId, recordKind);
-  await assertRead(context, linked);
+  await assertAttachmentRead(context, linked);
   assertWrite(context, recordKind, linked, true);
   if (file.size <= 0 || file.size > 4_000_000)
     throw new HttpError(
@@ -67,7 +73,7 @@ export async function uploadFile(
     const result = await db.transaction(async (tx) => {
       await acquireWorkflowLock(context, recordKind, tx);
       const current = await findRecord(context, recordId, recordKind, tx, true);
-      await assertRead(context, current, tx);
+      await assertAttachmentRead(context, current, tx);
       assertWrite(context, recordKind, current, true);
       const [row] = await tx
         .insert(records)
@@ -130,7 +136,7 @@ export async function getFile(context: Context, id: string) {
   const row = await findRecord(context, id, "files");
   if (row.data.pendingDeletionOperation) throw new HttpError(404, "Die Datei wurde entfernt.");
   const linked = await findRecord(context, String(row.data.recordId), undefined);
-  await assertRead(context, linked);
+  await assertAttachmentRead(context, linked);
   const blob = await get(String(row.data.path), { access: "private" });
   if (!blob || blob.statusCode !== 200) throw new HttpError(404, "Die Datei wurde nicht gefunden.");
   return { row, blob };
@@ -143,7 +149,7 @@ export async function deleteFile(context: Context, id: string) {
     row = await findRecord(context, id, "files", tx, true);
     if (row.data.pendingDeletionOperation)
       throw new HttpError(409, "Diese Datei wurde bereits entfernt.");
-    await assertRead(context, linked, tx);
+    await assertAttachmentRead(context, linked, tx, true);
     assertWrite(context, linked.kind, linked, true);
     const field = linked.kind === "messages" ? "attachmentIds" : "imageIds";
     const data = { ...linked.data, [field]: listValue(linked.data[field]).filter((x) => x !== id) };

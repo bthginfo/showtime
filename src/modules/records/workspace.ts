@@ -23,6 +23,7 @@ import { serialize, projectVisible } from "./repository";
 import { activeSubjects } from "@/platform/worker-subjects";
 import { hasPermission } from "@/platform/access";
 import { scheduleLiveChange } from "@/platform/realtime";
+import { reducedCalendarProductions } from "@/shared/calendar-references";
 export function invalidateWorkspace(departmentId: string, broadcast = true) {
   if (broadcast) scheduleLiveChange(departmentId);
 }
@@ -63,6 +64,29 @@ export async function getWorkspace(context: Context, exportKind?: RecordKind): P
   if (exportKind) {
     const ids = Object.values(grouped)
       .flat()
+      .filter(
+        (r) =>
+          r.kind !== "events" ||
+          !(
+            r.data.privacyNeutral ||
+            (r.data.allDay &&
+              [
+                "absence",
+                "vacation",
+                "holiday",
+                "holiday-compensation",
+                "abf",
+                "rest",
+                "half-day-off",
+              ].includes(String(r.data.category)))
+          ),
+      )
+      .filter(
+        (r) =>
+          r.kind !== "events" ||
+          !r.data.productionId ||
+          refs.projectIds.has(String(r.data.productionId)),
+      )
       .map((r) => r.id);
     grouped.files = [];
     for (let offset = 0; offset < ids.length; offset += 1000) {
@@ -219,6 +243,10 @@ export async function getWorkspace(context: Context, exportKind?: RecordKind): P
         : {}),
     }));
   return {
+    calendarProductions: reducedCalendarProductions(
+      refs.calendarProjects || refs.projects,
+      grouped.events,
+    ),
     timezone: context.timezone || "Europe/Berlin",
     pages,
     user: {

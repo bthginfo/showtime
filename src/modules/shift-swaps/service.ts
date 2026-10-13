@@ -1,3 +1,4 @@
+import { safeRecordColumns, safeRecordData } from "@/modules/privacy/read-projection";
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { db, type Transaction } from "@/platform/db";
 import { memberships, records } from "@/platform/db/schema";
@@ -77,7 +78,7 @@ function peopleForService(people: Staff[], service: Row, requesterId: string, pa
 
 async function planning(context: Context, tx: Transaction) {
   return tx
-    .select()
+    .select(safeRecordColumns(context))
     .from(records)
     .where(
       and(
@@ -229,7 +230,7 @@ export async function createShiftSwap(context: Context, input: unknown) {
       replacementParticipants(serialize(counter), data.partnerId, context.user.id);
     }
     const pending = await tx
-      .select({ data: records.data })
+      .select({ data: safeRecordData(context) })
       .from(records)
       .where(and(eq(records.departmentId, context.departmentId), eq(records.kind, "shiftSwaps")));
     const selectedReferences = [

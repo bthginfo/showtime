@@ -14,7 +14,11 @@ const mock = vi.hoisted(() => ({
 }));
 vi.mock("@/platform/db", () => ({ db: { transaction: mock.transaction } }));
 vi.mock("@/modules/records/repository", () => ({ findRecord: mock.find, serialize: vi.fn() }));
-vi.mock("@/modules/records/service", () => ({ assertRead: mock.read, assertWrite: mock.write }));
+vi.mock("@/modules/records/service", () => ({
+  assertRead: mock.read,
+  assertAttachmentRead: mock.read,
+  assertWrite: mock.write,
+}));
 vi.mock("@/modules/records/workspace", () => ({ invalidateWorkspace: mock.invalidate }));
 vi.mock("@/platform/events", () => ({
   emit: mock.emit,

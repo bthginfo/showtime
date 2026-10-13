@@ -1,3 +1,4 @@
+import type { ProductionPresentation } from "@/shared/calendar-references";
 import { PeriodPicker, periodExportFilters } from "@/components/period-picker";
 import {
   initialPeriod,
@@ -75,7 +76,7 @@ export function expandEvents(
   records: DomainRecord[],
   rangeStart: string,
   rangeEnd: string,
-  productions: DomainRecord[] = [],
+  productions: ProductionPresentation[] = [],
   categories?: DomainRecord[],
   member?: Member,
   zone = String(records[0]?.data.theaterTimezone || "Europe/Berlin"),

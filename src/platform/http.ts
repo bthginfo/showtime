@@ -46,6 +46,9 @@ export function route<T>(handler: () => Promise<T>) {
 }
 export function assertOrigin(request: Request) {
   const origin = request.headers.get("origin");
+  // Chromium's no-referrer native forms may send a null Origin. The browser-owned
+  // Fetch Metadata header still proves that this is a same-origin navigation.
+  if (origin === "null" && request.headers.get("sec-fetch-site") === "same-origin") return;
   if (origin && origin !== new URL(request.url).origin && origin !== applicationURL())
     throw new HttpError(403, "Diese Anfrage ist nicht zulässig.");
 }

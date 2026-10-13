@@ -18,6 +18,7 @@ export const GET: RequestHandler = ({ params }) =>
         ),
         members: workspace.members,
         references: workspace.records,
+        calendarProductions: workspace.calendarProductions,
         organization: context.organizationName,
         department: context.departmentName,
       });

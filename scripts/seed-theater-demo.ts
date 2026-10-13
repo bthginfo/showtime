@@ -169,6 +169,7 @@ try {
     intendance: "administration",
     theater_admin: "administration",
     personnel: "administration",
+    privacy_officer: "administration",
     costume_specialist: "costume",
     guest: "ensemble",
   };
@@ -179,6 +180,7 @@ try {
     "intendance",
     "theater_admin",
     "personnel",
+    "privacy_officer",
   ]);
   const specs: Omit<DemoAccount, "password" | "userId">[] = (
     Object.keys(roleDepartments) as TheaterRole[]

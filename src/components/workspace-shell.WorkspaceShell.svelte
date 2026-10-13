@@ -8,6 +8,7 @@
   import { initialState } from "@/shared/svelte-runtime";
 
   import TheaterModule from "@/modules/theater/theater-module.svelte";
+  import PrivacyModule from "@/modules/privacy/privacy-module.svelte";
   import { scopedBrowserKey } from "@/shared/browser-scope";
   import { BrandMark } from "./brand-mark";
   import {
@@ -408,7 +409,8 @@
 </script>
 
 {#if true}
-  {#snippet render_screen()}{#if activeModule === "theater"}{#key `${workspace.department.id}:${params.get("view") || ""}:${params.get("productionId") || ""}:${params.get("requestId") || ""}:${params.get("itemId") || ""}:${params.get("featureId") || ""}:${params.get("create") || ""}`}<TheaterModule
+  {#snippet render_screen()}{#if activeModule === "privacy"}<PrivacyModule
+      />{:else if activeModule === "theater"}{#key `${workspace.department.id}:${params.get("view") || ""}:${params.get("productionId") || ""}:${params.get("requestId") || ""}:${params.get("itemId") || ""}:${params.get("featureId") || ""}:${params.get("create") || ""}`}<TheaterModule
           initialView={params.get("view") || "trade"}
           productionId={params.get("productionId") || ""}
           requestId={params.get("requestId") || ""}

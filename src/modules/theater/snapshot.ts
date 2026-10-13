@@ -1,8 +1,10 @@
+import { safeRecordColumns, safeRecordData } from "@/modules/privacy/read-projection";
 import { and, eq, desc, sql } from "drizzle-orm";
 import { db } from "@/platform/db";
 import { records, performances, resourceBookings, scheduleVersions } from "@/platform/db/schema";
 import { HttpError } from "@/platform/http";
 import { planningWindow, type PlanningWindow } from "./collections";
+import { safeScheduleColumns } from "@/modules/privacy/snapshot-projection";
 export async function planningSnapshot(window: PlanningWindow) {
   const range = planningWindow(window),
     start = new Date(range.from),
@@ -29,7 +31,7 @@ export async function planningSnapshot(window: PlanningWindow) {
       )
       .limit(10001),
     db
-      .select()
+      .select(safeRecordColumns())
       .from(records)
       .where(
         and(
@@ -46,7 +48,7 @@ export async function planningSnapshot(window: PlanningWindow) {
       "Wähle einen kleineren Planzeitraum. Eine Version umfasst höchstens 10.000 Einträge je Bereich.",
     );
   const [previous] = await db
-    .select()
+    .select(safeScheduleColumns())
     .from(scheduleVersions)
     .where(eq(scheduleVersions.state, "published"))
     .orderBy(desc(scheduleVersions.version))

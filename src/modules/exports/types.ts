@@ -1,7 +1,13 @@
-import type { DomainRecord, Member, RecordKind } from "../../shared/contracts";
+import type {
+  CalendarProductionReference,
+  DomainRecord,
+  Member,
+  RecordKind,
+} from "../../shared/contracts";
 
 export type ExportFormat = "pdf" | "xlsx" | "csv" | "ics" | "json";
 export interface ExportInput {
+  calendarProductions?: CalendarProductionReference[];
   kind: string;
   format: ExportFormat;
   records: DomainRecord[];

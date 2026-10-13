@@ -1,3 +1,4 @@
+import { safeRecordColumns, safeRecordData } from "@/modules/privacy/read-projection";
 import { and, eq, ne, sql } from "drizzle-orm";
 import type { Transaction } from "@/platform/db";
 import type { Context } from "@/platform/context";
@@ -10,7 +11,7 @@ export async function syncCastPlanning(context: Context, productionId: string, t
     sql`select pg_advisory_xact_lock(hashtext(${context.organizationId + ":calendar"}))`,
   );
   const casts = await tx
-    .select()
+    .select(safeRecordColumns(context))
     .from(records)
     .where(and(eq(records.kind, "casting"), eq(records.productionId, productionId)));
   const actors = [...new Set(casts.map((c) => String(c.data.actorId || "")).filter(Boolean))];
@@ -25,7 +26,11 @@ export async function syncCastPlanning(context: Context, productionId: string, t
       ),
     );
   for (const show of shows) {
-    const [event] = await tx.select().from(records).where(eq(records.id, show.eventId)).limit(1);
+    const [event] = await tx
+      .select(safeRecordColumns(context))
+      .from(records)
+      .where(eq(records.id, show.eventId))
+      .limit(1);
     if (!event) continue;
     await assertPlanning(
       context,

@@ -26,6 +26,48 @@ const scopeFK = (t: any) =>
     columns: [t.organizationId, t.departmentId],
     foreignColumns: [departments.organizationId, departments.id],
   });
+export const privacyPolicies = pgTable("privacy_policies", {
+  organizationId: tenant().primaryKey(),
+  data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
+  publishedData: jsonb("published_data").$type<Record<string, unknown>>(),
+  version: integer("version").notNull().default(1),
+  updatedBy: text("updated_by").references(() => user.id),
+  updatedAt: updated(),
+});
+export const privacyEntries = pgTable(
+  "privacy_entries",
+  {
+    id: id(),
+    organizationId: tenant(),
+    kind: text("kind").notNull(),
+    ownerId: text("owner_id").references(() => user.id),
+    data: jsonb("data").$type<Record<string, unknown>>().notNull(),
+    status: text("status").notNull().default("open"),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    version: integer("version").notNull().default(1),
+    createdAt: created(),
+    updatedAt: updated(),
+  },
+  (t) => [
+    index("privacy_entries_tenant_kind").on(t.organizationId, t.kind),
+    foreignKey({
+      columns: [t.organizationId, t.ownerId],
+      foreignColumns: [tenantMembers.organizationId, tenantMembers.userId],
+    }),
+  ],
+);
+/** Content-free tombstones survive backup restoration; never store erased payloads here. */
+export const privacyErasureLedger = pgTable(
+  "privacy_erasure_ledger",
+  {
+    id: id(),
+    organizationId: tenant(),
+    recordId: text("record_id").notNull(),
+    requestId: text("request_id").notNull(),
+    erasedAt: created(),
+  },
+  (t) => [uniqueIndex("privacy_erasure_record").on(t.organizationId, t.recordId)],
+);
 /** Only deliberately forwarded support content is visible to platform operators. */
 export const supportRequests = pgTable(
   "support_requests",

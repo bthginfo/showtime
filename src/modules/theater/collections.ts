@@ -1,4 +1,4 @@
-import { and, eq, desc, lt, sql } from "drizzle-orm";
+import { and, eq, desc, lt, sql, getTableColumns } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/platform/db";
 import {
@@ -67,7 +67,12 @@ export async function collectionPage(
     permitted = (id: string | null) => !id || reference.projectIds.has(id);
   // Only a fixed server-side table registry is accepted. Tenant RLS applies to every page.
   const page: any[] = await db
-    .select()
+    .select({
+      ...getTableColumns(table),
+      ...(name === "scheduleVersions"
+        ? { snapshot: sql`showtime_safe_snapshot(${scheduleVersions.snapshot})` }
+        : {}),
+    })
     .from(table)
     .where(
       and(

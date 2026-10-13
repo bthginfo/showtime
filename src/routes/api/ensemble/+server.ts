@@ -25,6 +25,13 @@ async function legacyPOST(request: Request) {
               .min(1)
               .max(4),
             season: seasonSchema.optional(),
+            rights: z.object({
+              legalBasis: z.string().trim().min(1).max(4000),
+              noticeEvidence: z.string().trim().min(1).max(4000),
+              noticeDeliveredAt: z.iso.datetime({ offset: true }),
+              includePhotos: z.boolean().default(false),
+              license: z.string().trim().max(4000).default(""),
+            }),
           })
           .strict(),
         z.object({ actorIds: z.array(z.string().uuid()).min(1).max(4) }).strict(),
@@ -32,7 +39,7 @@ async function legacyPOST(request: Request) {
       .parse(await readJson(request));
     return NextResponse.json(
       "sourceIds" in input
-        ? await importEnsemble(context, input.sourceIds, input.season)
+        ? await importEnsemble(context, input.sourceIds, input.season, input.rights)
         : await repairActorPortraits(context, input.actorIds),
     );
   });

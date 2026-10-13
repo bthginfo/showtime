@@ -1,5 +1,6 @@
 import type { RecordData } from "./contracts";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import { nonClinicalPayload } from "@/modules/privacy/model";
 
 export class ApiFailure extends Error {
   constructor(
@@ -10,6 +11,28 @@ export class ApiFailure extends Error {
   }
 }
 export async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
+  if (
+    typeof options.body === "string" &&
+    ["POST", "PUT", "PATCH"].includes((options.method || "GET").toUpperCase())
+  ) {
+    let payload: RecordData | null = null;
+    try {
+      payload = JSON.parse(options.body);
+    } catch {
+      /* The server validates malformed JSON. */
+    }
+    if (
+      payload &&
+      (url.startsWith("/api/records/") ||
+        (url === "/api/theater" && payload.action === "save-item")) &&
+      !nonClinicalPayload(payload)
+    ) {
+      throw new ApiFailure(
+        "Medizinische Angaben sind gesperrt. Verwende eine neutrale Abwesenheit mit separater Gutschrift.",
+        400,
+      );
+    }
+  }
   let response: Response;
   try {
     response = await fetch(url, {
@@ -45,8 +68,9 @@ export async function api<T>(url: string, options: RequestInit = {}): Promise<T>
     );
   return data as T;
 }
-export const post = <T = unknown>(url: string, data: RecordData) =>
-  api<T>(url, { method: "POST", body: JSON.stringify(data) });
+export const post = <T = unknown>(url: string, data: RecordData) => {
+  return api<T>(url, { method: "POST", body: JSON.stringify(data) });
+};
 export const value = (data: RecordData, key: string) =>
   typeof data[key] === "string" ? (data[key] as string) : "";
 export const num = (data: RecordData, key: string) =>

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { ProductionPresentation } from "@/shared/calendar-references";
+
   import { useTheaterTime } from "@/components/theater-time";
   const { timezone } = useTheaterTime();
   import { ChevronRight, Pencil } from "@lucide/svelte";
@@ -39,7 +41,7 @@
     events: CalendarInstance[];
     day: string;
     members: Pick<Member, "id" | "name">[];
-    productions: DomainRecord[];
+    productions: ProductionPresentation[];
     canEdit?: (record: DomainRecord) => boolean;
     onOpen: (record: DomainRecord) => void;
     onEdit?: (record: DomainRecord) => void;

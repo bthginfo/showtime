@@ -1,0 +1,1 @@
+ALTER TABLE "privacy_policies" ADD COLUMN "published_data" jsonb;

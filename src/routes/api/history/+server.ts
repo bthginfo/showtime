@@ -1,9 +1,10 @@
 const NextResponse = Response;
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql, getTableColumns } from "drizzle-orm";
 import { db } from "@/platform/db";
 import { recordHistory } from "@/platform/db/schema";
-import { requireContext } from "@/platform/context";
-import { findRecord } from "@/modules/records/repository";
+import { requireContext, can } from "@/platform/context";
+import { findRecord, assertProject } from "@/modules/records/repository";
+import type { RecordData } from "@/shared/contracts";
 import { assertRead } from "@/modules/records/service";
 import { route } from "@/platform/http";
 async function legacyGET(request: Request) {
@@ -11,8 +12,13 @@ async function legacyGET(request: Request) {
     const context = await requireContext();
     const record = await findRecord(context, new URL(request.url).searchParams.get("id") || "");
     await assertRead(context, record);
+    if (record.kind === "events")
+      await assertProject(context, record.productionId || record.data.productionId);
     const versions = await db
-      .select()
+      .select({
+        ...getTableColumns(recordHistory),
+        data: sql<RecordData>`showtime_safe_record_data(${record.kind},${recordHistory.data},${record.departmentId},${context.user.id},${can(context, "time.team.read") ? context.departmentId : ""})`,
+      })
       .from(recordHistory)
       .where(eq(recordHistory.recordId, record.id))
       .orderBy(desc(recordHistory.version))

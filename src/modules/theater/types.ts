@@ -147,6 +147,7 @@ export const roleLabels: Record<TheaterRole, string> = {
   personnel: "Personalverwaltung",
   costume_specialist: "Kostüm / Maßdaten",
   guest: "Gast",
+  privacy_officer: "Datenschutzverwaltung",
 };
 export const stageLabels: Record<string, string> = {
   concept: "Konzept",

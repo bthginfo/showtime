@@ -54,6 +54,7 @@ try {
     await sql`select 1 from pg_policies where policyname='tenant_scope' and tablename='records'`;
   if (!secured) await sql.unsafe(fs.readFileSync("scripts/tenant-security.sql", "utf8"));
   await sql.unsafe(fs.readFileSync("scripts/tenant-upgrade.sql", "utf8"));
+  await sql.unsafe(fs.readFileSync("scripts/privacy-security.sql", "utf8"));
   runtime.BETTER_AUTH_SECRET ||= randomBytes(48).toString("hex");
   runtime.CRON_SECRET ||= randomBytes(32).toString("hex");
   runtime.BETTER_AUTH_URL ||=

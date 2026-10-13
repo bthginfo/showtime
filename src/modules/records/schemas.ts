@@ -190,6 +190,9 @@ export const schemas: Record<RecordKind, z.ZodType> = {
     durationMinutes: z.number().min(0).max(10000).default(0),
   }),
   actors: z.object({
+    importLegalBasis: note,
+    importNoticeEvidence: note,
+    importReviewedAt: z.string().max(50).default(""),
     name: title,
     contact: z.string().max(1000).default(""),
     hair: note,
@@ -242,6 +245,7 @@ export const schemas: Record<RecordKind, z.ZodType> = {
     season: z.union([seasonSchema, z.literal("")]).optional(),
   }),
   events: z.object({
+    creditUnit: z.enum(["none", "weekly-sixth"]).optional(),
     title: short.default(""),
     start: dateTime,
     end: dateTime,

@@ -7,7 +7,7 @@ import type { ExportInput } from "./types";
 export function eventDisplay(record: DomainRecord, input: ExportInput) {
   return calendarPresentation(
     record,
-    input.references?.productions ?? [],
+    input.calendarProductions ?? input.references?.productions ?? [],
     input.references?.calendarCategories ?? [],
   );
 }

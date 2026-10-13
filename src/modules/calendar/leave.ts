@@ -1,3 +1,4 @@
+import { safeRecordColumns, safeRecordData } from "@/modules/privacy/read-projection";
 import { and, eq, sql, inArray } from "drizzle-orm";
 import { addDays, parseISO, format } from "date-fns";
 import { db } from "@/platform/db";
@@ -34,7 +35,7 @@ export async function decideLeave(
       const next = addDays(parseISO(String(row.data.end)), 1);
       const end = startOfLocalDay(format(next, "yyyy-MM-dd"), context.timezone);
       const planning = await tx
-        .select()
+        .select(safeRecordColumns(context))
         .from(records)
         .where(
           and(

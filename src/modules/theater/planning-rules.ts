@@ -1,3 +1,4 @@
+import { safeRecordColumns, safeRecordData } from "@/modules/privacy/read-projection";
 import { and, eq, ne, inArray, sql } from "drizzle-orm";
 import { db, type Transaction } from "@/platform/db";
 import { records, tenantSettings, memberships, tradeItems } from "@/platform/db/schema";
@@ -97,7 +98,10 @@ export async function assertPlanning(
   const rules = (settings?.settings.workRules || {}) as Record<string, unknown>;
   const start = new Date(interval.start.getTime() - 32 * 86400000),
     end = new Date(interval.end.getTime() + 32 * 86400000);
-  const categories = await tx.select().from(records).where(eq(records.kind, "calendarCategories"));
+  const categories = await tx
+    .select(safeRecordColumns(context))
+    .from(records)
+    .where(eq(records.kind, "calendarCategories"));
   if (
     !actorIds.length &&
     data.blocksTime !== true &&
@@ -109,7 +113,7 @@ export async function assertPlanning(
   )
     return;
   const candidates = await tx
-    .select()
+    .select(safeRecordColumns(context))
     .from(records)
     .where(
       and(

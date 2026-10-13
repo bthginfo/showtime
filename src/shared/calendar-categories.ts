@@ -1,3 +1,4 @@
+import type { ProductionPresentation } from "@/shared/calendar-references";
 import { textValue, type DomainRecord, type RecordData } from "./contracts";
 
 export const defaultCalendarCategories = [
@@ -6,9 +7,6 @@ export const defaultCalendarCategories = [
   { key: "performance", name: "Vorstellung", color: "#ad698b", allDay: false },
   { key: "preparation", name: "Vorbereitung", color: "#ac8235", allDay: false },
   { key: "absence", name: "Abwesenheit", color: "#77818e", allDay: true },
-  { key: "sick", name: "Krank", color: "#b86d73", allDay: true },
-  { key: "sick-with-certificate", name: "Krank mit Attest", color: "#b86d73", allDay: true },
-  { key: "sick-without-certificate", name: "Krank ohne Attest", color: "#b86d73", allDay: true },
   { key: "abf", name: "ABF", color: "#8c74ad", allDay: true },
   { key: "rest", name: "Ruhetag", color: "#758f8a", allDay: true },
   {
@@ -59,7 +57,7 @@ export function calendarCategoryBlocksTime(key: string, categories: DomainRecord
 /** Uses cached workspace references; no database call for a label, legend or export. */
 export function calendarPresentation(
   event: DomainRecord,
-  productions: DomainRecord[] = [],
+  productions: ProductionPresentation[] = [],
   categories: DomainRecord[] = [],
 ) {
   const key = textValue(event.data.category, "service");

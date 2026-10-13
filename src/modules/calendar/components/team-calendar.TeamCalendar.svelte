@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { ProductionPresentation } from "@/shared/calendar-references";
+
   import { useTheaterTime } from "@/components/theater-time";
   const { timezone, localDate, instantDate } = useTheaterTime();
   import { ChevronRight, Plus } from "@lucide/svelte";
@@ -57,7 +59,7 @@
     canPlan: (person: string) => boolean;
     canEdit: (record: DomainRecord) => boolean;
     suspended: boolean;
-    productions: DomainRecord[];
+    productions: ProductionPresentation[];
     onOpen: (record: DomainRecord) => void;
     onEdit: (record: DomainRecord) => void;
     onCreate: (data: RecordData) => void;

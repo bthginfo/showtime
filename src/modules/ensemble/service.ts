@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { put, del } from "@vercel/blob";
 import { db } from "@/platform/db";
-import { records } from "@/platform/db/schema";
+import { records, privacyEntries } from "@/platform/db/schema";
 import { type Context, requireAdmin } from "@/platform/context";
 import { auditChange, scheduleEvents } from "@/platform/events";
 import { HttpError } from "@/platform/http";
@@ -14,6 +14,7 @@ import { importedActorData, matchActor } from "./matching";
 import { analyzePortrait, type PortraitMetadata } from "@/modules/files/portrait-analysis";
 import { normalizeActorPortrait } from "@/modules/files/actor-portraits";
 import { seasonForDate } from "@/shared/period-filter";
+import { requireMfa } from "@/platform/auth/mfa";
 
 const actorScope = (context: Context) =>
   and(eq(records.departmentId, context.departmentId), eq(records.kind, "actors"));
@@ -70,8 +71,26 @@ export async function importEnsemble(
   context: Context,
   sourceIds: string[],
   targetSeason = seasonForDate(),
+  rights?: {
+    legalBasis: string;
+    noticeEvidence: string;
+    noticeDeliveredAt: string;
+    includePhotos: boolean;
+    license: string;
+  },
 ) {
   requireAdmin(context);
+  await requireMfa();
+  if (
+    !rights?.legalBasis.trim() ||
+    !rights.noticeEvidence.trim() ||
+    !rights.noticeDeliveredAt ||
+    (rights.includePhotos && !rights.license.trim())
+  )
+    throw new HttpError(
+      400,
+      "Bitte bestätige Rechtsgrundlage, Informationsnachweis und Informationsdatum. Fotos benötigen zusätzlich einen Nutzungsnachweis.",
+    );
   const season = seasonSchema.parse(targetSeason);
   const list = await getEnsemble();
   const selected = list.filter((person) => sourceIds.includes(person.sourceId));
@@ -96,6 +115,7 @@ export async function importEnsemble(
         let portrait: StagedPortrait | undefined;
         const old = match.actor?.data;
         if (
+          rights.includePhotos &&
           person.imageUrl &&
           (old?.portraitSourceUrl !== person.imageUrl ||
             !listValue(old.imageIds).includes(String(old.portraitFileId)))
@@ -146,6 +166,13 @@ export async function importEnsemble(
           const actor = match.actor,
             id = actor?.id || crypto.randomUUID();
           const data = importedActorData(person, actor?.data, season);
+          data.importLegalBasis = rights.legalBasis;
+          data.importNoticeEvidence = rights.noticeEvidence;
+          data.importReviewedAt =
+            actor?.data.importLegalBasis === rights.legalBasis &&
+            actor?.data.importNoticeEvidence === rights.noticeEvidence
+              ? actor.data.importReviewedAt
+              : new Date().toISOString();
           // A simultaneous import may already have installed this photo while we were fetching.
           const usePortrait =
             portrait &&
@@ -213,6 +240,26 @@ export async function importEnsemble(
             created++;
           }
           await auditChange(tx, context, "actors.ensemble-imported", id);
+          await tx
+            .insert(privacyEntries)
+            .values({
+              organizationId: context.organizationId,
+              kind: "image",
+              ownerId: context.user.id,
+              status: rights.includePhotos ? "verified" : "review",
+              data: {
+                title: "Importnachweis: " + person.name,
+                actorId: id,
+                source: person.sourceUrl,
+                legalBasis: rights.legalBasis,
+                noticeDeliveredAt: rights.noticeDeliveredAt,
+                license: rights.license,
+                allowedUse: rights.includePhotos ? "internal" : "none",
+                evidence: rights.noticeEvidence,
+                expiresAt: "",
+                withdrawnAt: "",
+              },
+            });
         }
       });
     committed = true;

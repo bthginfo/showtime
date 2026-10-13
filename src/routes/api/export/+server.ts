@@ -2,7 +2,7 @@ import { z } from "zod";
 import { requireContext } from "@/platform/context";
 import { route, HttpError } from "@/platform/http";
 import { getWorkspace } from "@/modules/records/workspace";
-import { get } from "@vercel/blob";
+import { getFile } from "@/modules/files/service";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/platform/db";
 import { records } from "@/platform/db/schema";
@@ -80,6 +80,7 @@ async function legacyGET(request: Request) {
       year,
       season,
       references: workspace.records,
+      calendarProductions: workspace.calendarProductions,
     });
     if (userId)
       selected = selected.filter((r) =>
@@ -130,7 +131,13 @@ async function legacyGET(request: Request) {
       for (let offset = 0; offset < assets.length; offset += 4) {
         await Promise.all(
           assets.slice(offset, offset + 4).map(async (asset) => {
-            const blob = await get(String(asset.data.path), { access: "private" });
+            let blob;
+            try {
+              ({ blob } = await getFile(context, asset.id));
+            } catch (error) {
+              if (error instanceof HttpError && [403, 404].includes(error.status)) return;
+              throw error;
+            }
             if (blob?.statusCode === 200)
               images[asset.id] = new Uint8Array(await new Response(blob.stream).arrayBuffer());
           }),
@@ -148,6 +155,7 @@ async function legacyGET(request: Request) {
       to,
       view: query.get("view") || undefined,
       references: workspace.records,
+      calendarProductions: workspace.calendarProductions,
       images,
       teamOnly,
       generalOnly,

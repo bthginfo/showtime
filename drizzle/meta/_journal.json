@@ -141,6 +141,20 @@
       "when": 1791722441636,
       "tag": "0019_massive_reavers",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791842021659,
+      "tag": "0020_solid_lester",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791845023321,
+      "tag": "0021_warm_hydra",
+      "breakpoints": true
     }
   ]
 }

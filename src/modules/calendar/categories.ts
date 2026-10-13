@@ -6,6 +6,8 @@ import type { RecordData } from "@/shared/contracts";
 import { HttpError } from "@/platform/http";
 import { localDay, startOfLocalDay } from "@/modules/time-tracking/rules";
 import { calendarCategoryBehavior } from "@/shared/calendar-categories";
+import { clinicalInput } from "@/modules/privacy/model";
+import { calendarDayCreditCategory } from "@/modules/time-tracking/day-credits";
 
 export async function validateCalendarCategory(
   context: Context,
@@ -13,6 +15,11 @@ export async function validateCalendarCategory(
   tx: Transaction,
   existing?: typeof records.$inferSelect,
 ) {
+  if (
+    clinicalInput(String(data.name)) ||
+    /sick|krank|attest|medical|allerg/iu.test(String(data.key))
+  )
+    throw new HttpError(400, "Medizinische Kategorien sind auf dieser Infrastruktur gesperrt.");
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtext(${context.departmentId + ":calendar"}))`,
   );
@@ -75,6 +82,13 @@ export async function normalizeEventCategory(context: Context, data: RecordData,
     )
     .limit(1);
   if (!category) throw new HttpError(400, "Bitte wähle eine vorhandene Kalenderkategorie.");
+  if (String(data.category) !== "absence")
+    data.creditUnit = calendarDayCreditCategory(
+      { data, departmentId: context.departmentId } as any,
+      [{ data: category.data, departmentId: context.departmentId } as any],
+    )
+      ? "weekly-sixth"
+      : "none";
   data.allDay = category.data.allDay === true;
   if (data.allDay) {
     data.start = startOfLocalDay(

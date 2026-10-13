@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { calendarProductionReferences } from "@/shared/calendar-references";
   import { useTheaterTime } from "@/components/theater-time";
   const { dateLabel, localDate, instantDate, weekStart, timezone } = useTheaterTime();
   import { keyboardEvents } from "@/shared/interaction-actions";
@@ -128,7 +129,7 @@
   );
   let scope = `calendar:${productionId || "all"}`;
   const periodStore = useViewState<PeriodFilter>(workspace.user.id, scope, "period", () =>
-    initialPeriod(workspace.records.productions, productionId),
+    initialPeriod(calendarProductionReferences(workspace), productionId),
   );
   let period: PeriodFilter = $periodStore;
   $: period = $periodStore;
@@ -208,7 +209,7 @@
   $: savedPersonalSelection = $savedPersonalSelectionStore;
   const setSavedPersonalSelection = savedPersonalSelectionStore.set;
   let staff = (() => sortCalendarStaff(workspace.members.filter(isActiveStaff)))();
-  let productions = (() => sortProductionsByPremiere(workspace.records.productions))();
+  let productions = (() => sortProductionsByPremiere(calendarProductionReferences(workspace)))();
   let visiblePeople = (() =>
     showAll
       ? staff.map((member) => member.id)
@@ -369,7 +370,11 @@
     workspace.records.events.filter(
       (x) =>
         (!project || x.data.productionId === project) &&
-        recordMatchesPeriod(x, { season: period.season }, workspace.records.productions) &&
+        recordMatchesPeriod(
+          x,
+          { season: period.season },
+          calendarProductionReferences(workspace),
+        ) &&
         (!category || x.data.category === category) &&
         calendarEventSelected(x.data, visiblePeople, showAll),
     ))();
@@ -380,7 +385,7 @@
       filtered,
       expansionStart,
       expansionEnd,
-      workspace.records.productions,
+      calendarProductionReferences(workspace),
       workspace.records.calendarCategories,
       workspace.user,
       workspace.timezone,
@@ -490,7 +495,7 @@
   $: scope = `calendar:${productionId || "all"}`;
   $: categoryOptions = calendarCategories(workspace);
   $: staff = (() => sortCalendarStaff(workspace.members.filter(isActiveStaff)))();
-  $: productions = (() => sortProductionsByPremiere(workspace.records.productions))();
+  $: productions = (() => sortProductionsByPremiere(calendarProductionReferences(workspace)))();
   $: visiblePeople = (() =>
     showAll
       ? staff.map((member) => member.id)
@@ -506,7 +511,11 @@
     workspace.records.events.filter(
       (x) =>
         (!project || x.data.productionId === project) &&
-        recordMatchesPeriod(x, { season: period.season }, workspace.records.productions) &&
+        recordMatchesPeriod(
+          x,
+          { season: period.season },
+          calendarProductionReferences(workspace),
+        ) &&
         (!category || x.data.category === category) &&
         calendarEventSelected(x.data, visiblePeople, showAll),
     ))();
@@ -517,7 +526,7 @@
       filtered,
       expansionStart,
       expansionEnd,
-      workspace.records.productions,
+      calendarProductionReferences(workspace),
       workspace.records.calendarCategories,
       workspace.user,
       workspace.timezone,
@@ -801,7 +810,7 @@
         <PeriodPicker
           compact
           records={workspace.records.events}
-          productions={workspace.records.productions}
+          productions={calendarProductionReferences(workspace)}
           value={period}
           onChange={(next) => {
             setPeriod(next);
@@ -910,7 +919,7 @@
             month={teamSpan === "month"}
             {mobile}
             canPlan={(person) => admin || person === workspace.user.id}
-            productions={workspace.records.productions}
+            productions={calendarProductionReferences(workspace)}
             suspended={!!detail || !!editor}
             canEdit={(record) => canManageRecord(workspace.user, "events", record)}
             onOpen={setDetail}
@@ -1067,7 +1076,7 @@
               events={expanded}
               day={mobileDay}
               members={workspace.members}
-              productions={workspace.records.productions}
+              productions={calendarProductionReferences(workspace)}
               contextLabel={showAll
                 ? "Gesamtes Team"
                 : `${visiblePeople.length} ${visiblePeople.length === 1 ? "Kalender" : "Kalender ausgewählt"}`}

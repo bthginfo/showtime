@@ -10,17 +10,20 @@ import { HttpError } from "@/platform/http";
 import { serialize, projectVisible } from "./repository";
 import { privateRowReadable, guestOnly, centralKinds } from "@/shared/access-policy";
 import { listValue, contactsValue, type RecordKind, type DomainRecord } from "@/shared/contracts";
+import { reducedCalendarProductions } from "@/shared/calendar-references";
+import { safeRecordColumns, safeCategoryPredicate } from "@/modules/privacy/read-projection";
 export async function allRows(context: Context, kind: RecordKind) {
   const result: (typeof records.$inferSelect)[] = [];
   let cursor: PagePosition | null = null;
   do {
     const page = await db
-      .select({ ...getTableColumns(records), positionAt: pageTimestamp(records.createdAt) })
+      .select({ ...safeRecordColumns(context), positionAt: pageTimestamp(records.createdAt) })
       .from(records)
       .where(
         and(
           eq(records.organizationId, context.organizationId),
           eq(records.kind, kind),
+          safeCategoryPredicate(),
           cursor
             ? sql`(${records.createdAt},${records.id})<(${cursor[0]},${cursor[1]})`
             : undefined,
@@ -59,7 +62,15 @@ export async function readReferences(context: Context) {
   const personIds = new Set(
     projects.flatMap((p) => contactsValue(p.data.contacts).map((c) => c.personId || "")),
   );
-  return { projects, chats, projectIds, chatIds, actorIds, personIds };
+  return {
+    projects,
+    chats,
+    projectIds,
+    chatIds,
+    actorIds,
+    personIds,
+    calendarProjects: productions,
+  };
 }
 export type ReadReferences = Awaited<ReturnType<typeof readReferences>>;
 export function rowReadable(
@@ -81,6 +92,11 @@ export function rowReadable(
     return false;
   if (["time", "attendance", "timesheets"].includes(row.kind))
     return privateRowReadable(context.user, row, context.departmentId);
+  if (row.kind === "events") {
+    if (guestOnly(context.user) && row.productionId && !refs.projectIds.has(row.productionId))
+      return false;
+    return privateRowReadable(context.user, row, context.departmentId);
+  }
   if (row.kind === "productions") return refs.projectIds.has(row.id);
   if (row.productionId && !refs.projectIds.has(row.productionId)) return false;
   if (row.data.conversationId && !refs.chatIds.has(String(row.data.conversationId))) return false;
@@ -117,18 +133,19 @@ export async function recordPage(
     limit = Math.min(300, Math.max(1, options.limit || 200));
   const from = options.from ? z.iso.date().parse(options.from) : null,
     to = options.to ? z.iso.date().parse(options.to) : null;
-  if (options.productionId) {
+  if (options.productionId && kind !== "events") {
     const { assertProject } = await import("./repository");
     await assertProject(context, options.productionId);
   }
   if (from && to && to < from) throw new HttpError(400, "Ungültiger Zeitraum.");
   const page = await db
-    .select({ ...getTableColumns(records), positionAt: pageTimestamp(records.createdAt) })
+    .select({ ...safeRecordColumns(context), positionAt: pageTimestamp(records.createdAt) })
     .from(records)
     .where(
       and(
         eq(records.organizationId, context.organizationId),
         eq(records.kind, kind),
+        safeCategoryPredicate(),
         options.productionId ? eq(records.productionId, options.productionId) : undefined,
         cursor ? sql`(${records.createdAt},${records.id})<(${cursor[0]},${cursor[1]})` : undefined,
         ["categories", "calendarCategories"].includes(kind)
@@ -175,11 +192,32 @@ export async function recordPage(
     if (row.kind === "files") {
       if (row.data.pendingDeletionOperation) continue;
       const [parent] = await db
-        .select({ ...getTableColumns(records), positionAt: pageTimestamp(records.createdAt) })
+        .select({ ...safeRecordColumns(context), positionAt: pageTimestamp(records.createdAt) })
         .from(records)
         .where(eq(records.id, String(row.data.recordId)))
         .limit(1);
       if (!parent || !rowReadable(context, parent, refs)) continue;
+      if (
+        parent.kind === "events" &&
+        (parent.data.privacyNeutral ||
+          (parent.data.allDay &&
+            [
+              "absence",
+              "vacation",
+              "holiday",
+              "holiday-compensation",
+              "abf",
+              "rest",
+              "half-day-off",
+            ].includes(String(parent.data.category))))
+      )
+        continue;
+      if (
+        parent.kind === "events" &&
+        parent.productionId &&
+        !refs.projectIds.has(parent.productionId)
+      )
+        continue;
       readable.push({ ...serialize(row), data: { ...row.data, path: undefined } });
       continue;
     }
@@ -197,6 +235,14 @@ export async function recordPage(
   }
   return {
     records: readable.reverse(),
+    ...(kind === "events"
+      ? {
+          calendarProductions: reducedCalendarProductions(
+            refs.calendarProjects || refs.projects,
+            readable,
+          ),
+        }
+      : {}),
     nextCursor:
       page.length > limit
         ? encodePosition(

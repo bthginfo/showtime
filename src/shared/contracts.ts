@@ -83,6 +83,7 @@ export interface Member {
   grants?: import("@/platform/access").Grant[];
 }
 export interface Workspace {
+  calendarProductions?: CalendarProductionReference[];
   timezone?: string;
   currentModuleId?: string;
   pages?: Partial<Record<RecordKind, string | null>>;
@@ -104,6 +105,11 @@ export interface Workspace {
   timer: { id: string; data: RecordData } | null;
   attendanceTimer?: { id: string; data: RecordData } | null;
   projectHours: Record<string, number>;
+}
+/** Calendar labels are not permission to open a production's internal records. */
+export interface CalendarProductionReference {
+  id: string;
+  data: { title: string; color: string; season?: string; premiere?: string };
 }
 export interface ApiError {
   error: string;

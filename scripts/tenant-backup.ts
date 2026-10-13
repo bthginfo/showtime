@@ -10,6 +10,7 @@ type Archive = {
   environment: string;
   organizationId: string;
   createdAt: string;
+  expiresAt?: string | null;
   tables: Record<string, Row[]>;
   blobs: { path: string; mime: string; hash: string; bytes: string }[];
 };
@@ -46,6 +47,9 @@ const businessTables = [
   "api_access",
   "integration_receipts",
   "recovery_checks",
+  "privacy_policies",
+  "privacy_entries",
+  "privacy_erasure_ledger",
 ];
 function clients(environment: string) {
   if (!["development", "preview", "production"].includes(environment))
@@ -130,9 +134,34 @@ export async function backupTenant(
         });
       }
     });
+    const backupPolicy = (archive.tables.privacy_entries || []).find(
+      (row) =>
+        row.kind === "retention" &&
+        row.status === "verified" &&
+        (row.data as Row)?.group === "backups" &&
+        (row.data as Row)?.approvedAt &&
+        Number((row.data as Row)?.days) > 0,
+    );
+    archive.expiresAt = backupPolicy
+      ? new Date(
+          Date.parse(archive.createdAt) + Number((backupPolicy.data as Row).days) * 86400000,
+        ).toISOString()
+      : null;
     fs.mkdirSync(path.dirname(path.resolve(archivePath)), { recursive: true });
     fs.writeFileSync(archivePath, seal(archive, key), { flag: "wx" });
     const digest = createHash("sha256").update(fs.readFileSync(archivePath)).digest("hex");
+    const cataloguePath = `.local/backup-catalogue-${environment}.json`;
+    const catalogue = fs.existsSync(cataloguePath)
+      ? JSON.parse(fs.readFileSync(cataloguePath, "utf8"))
+      : [];
+    catalogue.push({
+      organizationId,
+      path: path.resolve(archivePath),
+      createdAt: archive.createdAt,
+      expiresAt: archive.expiresAt,
+      digest,
+    });
+    fs.writeFileSync(cataloguePath, JSON.stringify(catalogue, null, 2));
     await worker.begin(async (tx) => {
       await tx`select set_config('app.tenant_id',${organizationId},true)`;
       await tx`insert into recovery_checks(id,organization_id,kind,status,digest,record_count) values(${randomUUID()},${organizationId},'backup','verified',${digest},${Object.values(archive.tables).reduce((n, rows) => n + rows.length, 0)})`;
@@ -143,6 +172,8 @@ export async function backupTenant(
       counts: summary(archive.tables),
       files: archive.blobs.length,
       encrypted: true,
+      expiresAt: archive.expiresAt,
+      retentionPending: !archive.expiresAt,
     };
   } finally {
     await Promise.all([worker.end(), control.end(), auth.end()]);
@@ -164,6 +195,51 @@ export async function restoreTenant(
   const organizationId = randomUUID(),
     ids = new Map<string, string>([[archive.organizationId, organizationId]]);
   try {
+    // A backup is older than a later erasure decision. Replay the live, content-free
+    // ledger BEFORE copying blobs or activating the restored theater.
+    const ledger = await worker.begin(async (tx) => {
+      await tx`select set_config('app.tenant_id',${archive.organizationId},true)`;
+      return tx`select record_id from privacy_erasure_ledger where organization_id=${archive.organizationId}`;
+    });
+    const erased = new Set(ledger.map((row) => String(row.record_id)));
+    for (const row of archive.tables.privacy_erasure_ledger || [])
+      erased.add(String(row.record_id));
+    const removedFiles = new Set(
+      (archive.tables.records || [])
+        .filter(
+          (r) =>
+            r.kind === "files" &&
+            (erased.has(String(r.id)) || erased.has(String((r.data as Row)?.recordId))),
+        )
+        .map((r) => String(r.id)),
+    );
+    for (const id of removedFiles) erased.add(id);
+    archive.tables.records = (archive.tables.records || []).filter(
+      (r) => !erased.has(String(r.id)),
+    );
+    for (const table of ["record_history", "record_operations"])
+      archive.tables[table] = (archive.tables[table] || []).filter(
+        (r) => !erased.has(String(r.record_id)),
+      );
+    for (const table of ["collaborative_documents", "document_buffers", "document_updates"])
+      archive.tables[table] = (archive.tables[table] || []).filter(
+        (r) => !erased.has(String(r.file_id)),
+      );
+    archive.tables.outbox = (archive.tables.outbox || []).filter(
+      (r) =>
+        !erased.has(String((r.payload as Row)?.recordId)) &&
+        !erased.has(String((r.payload as Row)?.fileId)),
+    );
+    const retainedEvents = new Set(archive.tables.outbox.map((r) => r.id));
+    archive.tables.event_receipts = (archive.tables.event_receipts || []).filter((r) =>
+      retainedEvents.has(r.event_id),
+    );
+    const retainedPaths = new Set(
+      archive.tables.records
+        .filter((r) => r.kind === "files")
+        .map((r) => String((r.data as Row)?.path)),
+    );
+    archive.blobs = archive.blobs.filter((blob) => retainedPaths.has(blob.path));
     for (const rows of Object.values(archive.tables))
       for (const row of rows)
         if (typeof row.id === "string" && !ids.has(row.id)) ids.set(row.id, randomUUID());
@@ -227,6 +303,10 @@ export async function restoreTenant(
         rows.map((row) => remap(row) as Row),
       ]),
     );
+    for (const policy of tables.privacy_policies || []) {
+      policy.data = { ...(policy.data as Row), reviewedAt: "", publishedAt: "" };
+      policy.published_data = null;
+    }
     tables.organizations[0].name = name;
     tables.tenant_settings[0].slug = slug;
     tables.tenant_settings[0].status = "disabled";

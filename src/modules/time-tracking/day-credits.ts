@@ -28,6 +28,11 @@ const excluded = new Set(["abf", "rest", "ruhetag", "halfdayoff", "halberfreiert
 export function calendarDayCreditCategory(event: DomainRecord, categories: DomainRecord[]) {
   const key = normalized(event.data.category);
   if (excluded.has(key)) return false;
+  if (
+    (key === "absence" && event.data.creditUnit !== undefined) ||
+    event.data.privacyNeutral === true
+  )
+    return event.data.creditUnit === "weekly-sixth";
   if (credited.has(key)) return true;
   const definition = categories.find(
     (row) => row.data.key === event.data.category && row.departmentId === event.departmentId,

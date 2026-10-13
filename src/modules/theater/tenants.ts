@@ -24,6 +24,7 @@ import { outbox } from "@/platform/db/schema";
 import { roleKeys, canDelegate } from "@/platform/access";
 import { tenantInput } from "@/shared/tenant-management";
 import { workRuleProfilesInput } from "@/shared/work-rule-profiles";
+import { requireMfa } from "@/platform/auth/mfa";
 export async function requirePlatformAdmin() {
   const person = await identity();
   const [grant] = await authDb
@@ -32,6 +33,7 @@ export async function requirePlatformAdmin() {
     .where(eq(platformAdmins.userId, person.id))
     .limit(1);
   if (!grant) throw new HttpError(403, "Diese Aktion ist der Plattformadministration vorbehalten.");
+  await requireMfa();
   return person;
 }
 export async function createTenant(input: unknown, administratorId?: string, creatorId?: string) {

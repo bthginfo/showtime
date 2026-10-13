@@ -1,3 +1,4 @@
+import { safeRecordColumns, safeRecordData } from "@/modules/privacy/read-projection";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { fromZonedTime } from "date-fns-tz";
@@ -187,7 +188,7 @@ export async function leadershipOverview(
   const seasons = await db.select().from(theaterSeasons);
   const duties = projectIds.length
     ? await db
-        .select()
+        .select(safeRecordColumns(context))
         .from(records)
         .where(
           and(
@@ -203,7 +204,10 @@ export async function leadershipOverview(
   const windowStart = fromZonedTime(from + "T00:00:00", zone),
     lastDay = new Date(Date.parse(to + "T12:00Z") + 86400000).toISOString().slice(0, 10),
     windowEnd = fromZonedTime(lastDay + "T00:00:00", zone);
-  const categories = await db.select().from(records).where(eq(records.kind, "calendarCategories"));
+  const categories = await db
+    .select(safeRecordColumns(context))
+    .from(records)
+    .where(eq(records.kind, "calendarCategories"));
   const hours = plannedPersonHours(
     duties
       .filter((duty) => can(context, "schedule.read", duty.productionId || "", duty.departmentId))

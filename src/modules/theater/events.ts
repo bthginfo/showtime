@@ -1,3 +1,5 @@
+import { safeRecordColumns } from "@/modules/privacy/read-projection";
+import { safeScheduleColumns } from "@/modules/privacy/snapshot-projection";
 import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import {
@@ -96,7 +98,7 @@ export async function handleTheaterEvent(tx: Transaction, event: typeof outbox.$
     );
   if (event.type === "ProductionCreatedV1") {
     const [production] = await tx
-      .select()
+      .select(safeRecordColumns())
       .from(records)
       .where(eq(records.id, String(event.payload.recordId)))
       .limit(1);
@@ -157,7 +159,7 @@ export async function handleTheaterEvent(tx: Transaction, event: typeof outbox.$
   let productionIds: string[] = [];
   if (event.type === "SchedulePublishedV1") {
     const [version] = await tx
-      .select()
+      .select(safeScheduleColumns())
       .from(scheduleVersions)
       .where(eq(scheduleVersions.id, String(event.payload.recordId)))
       .limit(1);
@@ -179,7 +181,7 @@ export async function handleTheaterEvent(tx: Transaction, event: typeof outbox.$
   ) {
     if (event.type === "CastAssignmentChangedV1") {
       const [source] = await tx
-        .select()
+        .select(safeRecordColumns())
         .from(records)
         .where(eq(records.id, String(event.payload.recordId)))
         .limit(1);

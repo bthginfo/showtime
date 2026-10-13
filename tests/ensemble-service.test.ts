@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Context } from "../src/platform/context";
+import { privacyEntries } from "../src/platform/db/schema";
+vi.mock("../src/platform/auth/mfa", () => ({ requireMfa: vi.fn().mockResolvedValue(undefined) }));
 const mocks = vi.hoisted(() => ({
   db: { select: vi.fn(), transaction: vi.fn() },
   getEnsemble: vi.fn(),
@@ -32,7 +34,19 @@ vi.mock("../src/platform/events", () => ({
   scheduleEvents: mocks.schedule,
 }));
 vi.mock("../src/modules/files/portrait-analysis", () => ({ analyzePortrait: mocks.analyze }));
-import { ensemblePreview, importEnsemble } from "../src/modules/ensemble/service";
+import {
+  ensemblePreview,
+  importEnsemble as importEnsembleCommand,
+} from "../src/modules/ensemble/service";
+const testRights = {
+  legalBasis: "QA approved basis",
+  noticeEvidence: "QA notice evidence",
+  noticeDeliveredAt: "2026-10-01T00:00:00Z",
+  includePhotos: true,
+  license: "QA internal photo rights",
+};
+const importEnsemble = (context: Context, ids: string[], season?: string) =>
+  importEnsembleCommand(context, ids, season, testRights);
 const context = {
   departmentId: "maske",
   organizationId: "theatre",
@@ -96,6 +110,7 @@ describe("ensemble authorization and transactional update", () => {
       data: { recordId: "existing", recordKind: "actors", image: true, mime: "image/webp" },
     };
     const tx = {
+      insert: () => ({ values: async () => undefined }),
       execute: vi.fn(),
       select: () => ({
         from: () => ({
@@ -150,6 +165,11 @@ describe("ensemble authorization and transactional update", () => {
       },
     ];
     mocks.db.select.mockReturnValue({ from: () => ({ where: () => Promise.resolve(rows) }) });
+    Object.assign(rows[0].data, {
+      importLegalBasis: testRights.legalBasis,
+      importNoticeEvidence: testRights.noticeEvidence,
+      importReviewedAt: "2026-10-01T00:00:00Z",
+    });
     const update = vi.fn();
     let select = 0;
     mocks.db.transaction.mockImplementation(async (callback) =>
@@ -235,8 +255,9 @@ describe("ensemble authorization and transactional update", () => {
           }),
         }),
       }),
-      insert: () => ({
+      insert: (table: unknown) => ({
         values: (value: (typeof files)[number]) => {
+          if (table === privacyEntries) return Promise.resolve();
           files.push(value);
           return Promise.resolve();
         },

@@ -1,13 +1,18 @@
-import { and, eq,or,inArray } from "drizzle-orm";
+import { and, eq, or, inArray } from "drizzle-orm";
 import { db, type Transaction } from "@/platform/db";
 import { records } from "@/platform/db/schema";
-import { can,type Context } from "@/platform/context";
-import {listValue,type DomainRecord,type RecordKind} from "@/shared/contracts";
-import { centralKinds,guestOnly } from "@/shared/access-policy";
+import { can, type Context } from "@/platform/context";
+import { listValue, type DomainRecord, type RecordKind } from "@/shared/contracts";
+import { centralKinds, guestOnly } from "@/shared/access-policy";
 import { HttpError } from "@/platform/http";
+import { safeRecordColumns } from "@/modules/privacy/read-projection";
 export function serialize(row: typeof records.$inferSelect): DomainRecord {
-  const {positionAt: _positionAt,...record}=row as typeof row & {positionAt?:string};
-  return { ...record, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+  const { positionAt: _positionAt, ...record } = row as typeof row & { positionAt?: string };
+  return {
+    ...record,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
 }
 export async function findRecord(
   context: Context,
@@ -17,12 +22,12 @@ export async function findRecord(
   lock = false,
 ) {
   const query = tx
-    .select()
+    .select(safeRecordColumns(context))
     .from(records)
     .where(
       and(
         eq(records.id, id),
-        eq(records.organizationId,context.organizationId),
+        eq(records.organizationId, context.organizationId),
         kind ? eq(records.kind, kind) : undefined,
       ),
     )
@@ -34,11 +39,14 @@ export async function findRecord(
 export const projectVisible = (
   context: Context,
   production: DomainRecord | typeof records.$inferSelect,
-) => can(context,'production.read',production.id)&&(
-  context.grants.some(g=>g.scope==='production'&&g.scopeId===production.id)||
-  !guestOnly(context.user)&&(can(context,'production.read',production.id,'')||can(context,'production.manage',production.id)||!listValue(production.data.memberIds).length)||
-  listValue(production.data.memberIds).includes(context.user.id)
- );
+) =>
+  can(context, "production.read", production.id) &&
+  (context.grants.some((g) => g.scope === "production" && g.scopeId === production.id) ||
+    (!guestOnly(context.user) &&
+      (can(context, "production.read", production.id, "") ||
+        can(context, "production.manage", production.id) ||
+        !listValue(production.data.memberIds).length)) ||
+    listValue(production.data.memberIds).includes(context.user.id));
 export async function assertProject(
   context: Context,
   productionId: unknown,

@@ -9,27 +9,54 @@ import { auditChange } from "@/platform/events";
 import type { Context } from "@/platform/context";
 import { requirePlatformAdmin } from "@/modules/theater/tenants";
 import { route, readJson, HttpError } from "@/platform/http";
-export const GET: RequestHandler = () =>
+export const GET: RequestHandler = ({ request }) =>
   route(async () => {
-    await requirePlatformAdmin();
-    return Response.json(
-      await controlDb
-        .select({
-          id: supportRequests.id,
-          organizationId: supportRequests.organizationId,
-          theater: organizations.name,
-          title: supportRequests.title,
-          description: supportRequests.description,
-          type: supportRequests.type,
-          status: supportRequests.status,
-          version: supportRequests.version,
-          createdAt: supportRequests.createdAt,
-        })
-        .from(supportRequests)
-        .innerJoin(organizations, eq(organizations.id, supportRequests.organizationId))
-        .orderBy(desc(supportRequests.updatedAt))
-        .limit(300),
-    );
+    const operator = await requirePlatformAdmin();
+    const entries = await controlDb
+      .select({
+        id: supportRequests.id,
+        organizationId: supportRequests.organizationId,
+        theater: organizations.name,
+        title: supportRequests.title,
+        description: supportRequests.description,
+        type: supportRequests.type,
+        status: supportRequests.status,
+        version: supportRequests.version,
+        createdAt: supportRequests.createdAt,
+      })
+      .from(supportRequests)
+      .innerJoin(organizations, eq(organizations.id, supportRequests.organizationId))
+      .orderBy(desc(supportRequests.updatedAt))
+      .limit(300);
+    const theaterIds = [...new Set(entries.map((entry) => entry.organizationId))];
+    for (const organizationId of theaterIds) {
+      const [department] = await controlDb
+        .select({ id: departments.id })
+        .from(departments)
+        .where(eq(departments.organizationId, organizationId))
+        .limit(1);
+      if (!department) continue;
+      const context: Context = {
+        organizationId,
+        departmentId: department.id,
+        organizationName: "",
+        departmentName: "",
+        grants: [],
+        user: {
+          id: operator.id,
+          name: operator.name,
+          username: operator.username || "",
+          role: "user",
+          status: "active",
+        },
+      };
+      // This receipt is one request, under a fresh MFA session, solely for content
+      // deliberately forwarded by its author. No persistent private access grant.
+      await runWorkerScope(request, context, () =>
+        db.transaction((tx) => auditChange(tx, context, "support.forwarded-list.read")),
+      );
+    }
+    return Response.json(entries);
   });
 export const PATCH: RequestHandler = ({ request }) =>
   route(async () => {

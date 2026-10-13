@@ -49,6 +49,8 @@ export const permissions = [
   "modules.configure",
   "invitations.manage",
   "audit.read",
+  "privacy.read",
+  "privacy.manage",
 ] as const;
 export type Permission = (typeof permissions)[number];
 export const roleKeys = [
@@ -62,6 +64,7 @@ export const roleKeys = [
   "personnel",
   "costume_specialist",
   "guest",
+  "privacy_officer",
 ] as const;
 export type TheaterRole = (typeof roleKeys)[number];
 export type Grant = {
@@ -175,6 +178,8 @@ export const rolePermissions: Record<TheaterRole, readonly Permission[]> = {
     "collaboration.approve",
   ],
   theater_admin: [
+    "privacy.read",
+    "privacy.manage",
     "tenant.configure",
     "members.manage",
     "roles.assign",
@@ -204,6 +209,7 @@ export const rolePermissions: Record<TheaterRole, readonly Permission[]> = {
     "collaboration.comment",
     "collaboration.respond",
   ],
+  privacy_officer: ["privacy.read", "privacy.manage"],
 };
 export type AccessSubject = { id: string; grants: readonly Grant[] };
 export type ResourceScope = { departmentId?: string; productionId?: string; ownerId?: string };

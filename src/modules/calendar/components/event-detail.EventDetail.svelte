@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { calendarProductionReferences } from "@/shared/calendar-references";
   import { useTheaterTime } from "@/components/theater-time";
   const { dateLabel, instantDate, localDate } = useTheaterTime();
   import { LinkedText } from "@/components/linked-text";
@@ -76,7 +77,7 @@
   let current: any = workspace.records.events.find((row) => row.id === record.id) || record;
   let presentation = calendarPresentation(
     current,
-    workspace.records.productions,
+    calendarProductionReferences(workspace),
     workspace.records.calendarCategories,
   );
   let canEdit = canManageRecord(workspace.user, "events", current);
@@ -88,7 +89,7 @@
   $: current = workspace.records.events.find((row) => row.id === record.id) || record;
   $: presentation = calendarPresentation(
     current,
-    workspace.records.productions,
+    calendarProductionReferences(workspace),
     workspace.records.calendarCategories,
   );
   $: canEdit = canManageRecord(workspace.user, "events", current);
@@ -145,7 +146,9 @@
         <dd>
           {#if production}<RecordLink record={production} from={current} {onNavigate}>
               {value(production.data, "title")}
-            </RecordLink>{:else}{"Ohne Produktion"}{/if}
+            </RecordLink>{:else}{calendarProductionReferences(workspace).find(
+              (row) => row.id === current.data.productionId,
+            )?.data.title || "Ohne Produktion"}{/if}
         </dd>
       </div>
       <div>

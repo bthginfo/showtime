@@ -1,3 +1,4 @@
+import type { ProductionPresentation } from "@/shared/calendar-references";
 import { textValue, type DomainRecord, type RecordData } from "./contracts";
 
 export interface PeriodFilter {
@@ -15,7 +16,7 @@ export function seasonBounds(season?: string) {
   return { from: `${start}-08-01`, to: `${end}-08-01` };
 }
 
-export function seasonForDate(productions: DomainRecord[] = [], date = new Date()) {
+export function seasonForDate(productions: ProductionPresentation[] = [], date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Berlin",
     year: "numeric",
@@ -38,7 +39,10 @@ export function seasonKey(value: unknown) {
 }
 
 /** Global views start current; an opened historical production keeps its own context. */
-export function initialPeriod(productions: DomainRecord[] = [], productionId = ""): PeriodFilter {
+export function initialPeriod(
+  productions: ProductionPresentation[] = [],
+  productionId = "",
+): PeriodFilter {
   const production = productions.find((row) => row.id === productionId);
   return { season: textValue(production?.data.season) || seasonForDate(productions) };
 }
@@ -78,7 +82,7 @@ const yearOf = (value: unknown) => {
 };
 
 /** Period choices reuse workspace data. A production's saved season is authoritative. */
-export function recordYear(record: DomainRecord, productions: DomainRecord[] = []) {
+export function recordYear(record: DomainRecord, productions: ProductionPresentation[] = []) {
   if (["time", "attendance", "events", "leave"].includes(record.kind))
     return yearOf(record.data.date || record.data.start) || yearOf(record.createdAt);
   const production =
@@ -96,7 +100,7 @@ export function recordYear(record: DomainRecord, productions: DomainRecord[] = [
 export function recordMatchesPeriod(
   record: DomainRecord,
   filter: PeriodFilter,
-  productions: DomainRecord[] = [],
+  productions: ProductionPresentation[] = [],
 ) {
   if (record.kind === "actors") {
     const seasons = actorSeasons(record.data);
@@ -159,7 +163,7 @@ export function recordMatchesPeriod(
   return recordYear(record, productions) === filter.year;
 }
 
-export function periodOptions(records: DomainRecord[], productions: DomainRecord[] = []) {
+export function periodOptions(records: DomainRecord[], productions: ProductionPresentation[] = []) {
   const seasonLabels = new Map<string, string>();
   const addSeason = (label: string) => {
     const key = seasonKey(label) || label;

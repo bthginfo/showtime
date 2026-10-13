@@ -6,6 +6,7 @@ import { tenantTransaction } from "./platform/db/tenant";
 import { HttpError } from "./platform/http";
 import { cleanAuthLocation } from "./shared/auth-form-feedback";
 import { integrationRate } from "./modules/theater/integrations";
+import { requireMfa } from "./platform/auth/mfa";
 
 const publicAPI =
   /^\/api\/(?:v1\/openapi\.json$|login|logout|register|reset-password|auth(?:\/|$)|cron$|calendar\/|realtime$|documents\/live$|events\/consume$|platform\/(?:(?:scopes|switch|support|health)$|tenants(?:\/|$)))/;
@@ -16,6 +17,7 @@ class FailedResponse {
 export const handle: Handle = async ({ event, resolve }) => {
   const authentication =
     event.url.pathname === "/login" ||
+    event.url.pathname === "/login/mfa" ||
     event.url.pathname === "/register" ||
     /^\/api\/(?:login|register|reset-password|auth)(?:\/|$)/.test(event.url.pathname);
   const decorate = (response: Response) => {
@@ -35,6 +37,13 @@ export const handle: Handle = async ({ event, resolve }) => {
       const protectedAPI =
         event.url.pathname.startsWith("/api/") && !publicAPI.test(event.url.pathname);
       const context = protectedAPI ? await requireContext() : undefined;
+      if (
+        context &&
+        /^\/api\/platform\/(configuration|roles|members|invitations|modules)(?:\/|$)/.test(
+          event.url.pathname,
+        )
+      )
+        await requireMfa();
       // Commit the meter independently: rejected input must not refund an API request.
       if (context && requestScope.getStore()?.integration)
         await tenantTransaction(context, () => integrationRate(context));

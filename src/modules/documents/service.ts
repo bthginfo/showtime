@@ -8,7 +8,7 @@ import { HttpError } from "@/platform/http";
 import { liveConfigured } from "@/platform/realtime";
 import { liveRedis, permissionEpochKey } from "@/platform/realtime/redis";
 import { findRecord } from "@/modules/records/repository";
-import { assertRead, assertWrite } from "@/modules/records/service";
+import { assertAttachmentRead, assertWrite } from "@/modules/records/service";
 import { assertConversation } from "@/modules/chat/permissions";
 import { importDocument } from "./import";
 import { documentFormat } from "./contracts";
@@ -38,7 +38,7 @@ export async function documentAccess(context: Context, id: string) {
   const file = await findRecord(context, id, "files");
   if (file.data.pendingDeletionOperation) throw new HttpError(404, "Die Datei wurde entfernt.");
   const parent = await findRecord(context, String(file.data.recordId));
-  await assertRead(context, parent);
+  await assertAttachmentRead(context, parent);
   const format = documentFormat(file.data.mime);
   if (!format)
     throw new HttpError(400, "Gemeinsam bearbeiten kannst du Word, Excel, CSV und PDF-Notizen.");
@@ -145,7 +145,7 @@ export async function ensureSharedDocument(context: Context, id: string) {
             const update = Buffer.from(Y.encodeStateAsUpdate(document, vector)).toString("base64");
             const appended = await appendDocumentUpdate(
               {
-                organizationId:context.organizationId,
+                organizationId: context.organizationId,
                 fileId: id,
                 departmentId: context.departmentId,
                 userId: context.user.id,
@@ -203,7 +203,7 @@ export async function openDocument(context: Context, id: string, cookie: string)
       { code: "document_session_expired" },
     );
   const claims = {
-    organizationId:context.organizationId,
+    organizationId: context.organizationId,
     fileId: id,
     departmentId: context.departmentId,
     userId: context.user.id,

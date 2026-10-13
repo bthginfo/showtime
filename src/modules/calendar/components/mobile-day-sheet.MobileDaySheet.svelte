@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { ProductionPresentation } from "@/shared/calendar-references";
+
   import { useTheaterTime } from "@/components/theater-time";
   const { timezone } = useTheaterTime();
   import { ChevronLeft, ChevronRight, Plus, X } from "@lucide/svelte";
@@ -42,7 +44,7 @@
     events: CalendarInstance[];
     day: string;
     members: Pick<Member, "id" | "name">[];
-    productions: DomainRecord[];
+    productions: ProductionPresentation[];
     contextLabel: string;
     minDay: string;
     maxDay: string;

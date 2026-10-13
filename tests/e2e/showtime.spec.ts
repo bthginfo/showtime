@@ -1,9 +1,13 @@
-import { test, expect, request, type APIRequestContext, type Page } from "@playwright/test";
+import { privateRequestContext } from "./private-api";
+import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import * as Y from "yjs";
+import { totp } from "./mfa-helper";
+import { moduleRegistry, validateFeature } from "@/modules/theater/registry";
 const base = process.env.E2E_BASE_URL || "http://127.0.0.1:3100";
 test.describe.configure({ mode: "serial" });
+test.use({ trace: "off" });
 test.skip(
   !base.startsWith("http://127.0.0.1:3100"),
   "Synthetic acceptance data is restricted to Showtime development.",
@@ -26,8 +30,15 @@ async function json(api: APIRequestContext, url: string, data?: unknown, method 
   return body;
 }
 async function login(username: string, password: string) {
-  const api = await request.newContext({ baseURL: base, extraHTTPHeaders: { Origin: base } });
-  await json(api, "/api/login", { username, password });
+  const api = await privateRequestContext({ baseURL: base, extraHTTPHeaders: { Origin: base } });
+  const result = await json(api, "/api/login", { username, password });
+  const fixtureFile = process.env.SHOWTIME_E2E_ACCESS_FILE;
+  if (result.twoFactorRedirect && fixtureFile) {
+    const fixture = JSON.parse(fs.readFileSync(fixtureFile, "utf8"));
+    if (fixture.username !== username || !fixture.mfaSecret)
+      throw new Error("Synthetic MFA fixture required");
+    await json(api, "/api/auth/mfa", { action: "verify", code: totp(fixture.mfaSecret) });
+  }
   return api;
 }
 async function switchTo(api: APIRequestContext, target: typeof scope) {
@@ -45,7 +56,7 @@ async function member(label: string) {
   });
   const username = `qa-${key}-${label}`,
     password = `QA-${randomUUID()}`;
-  const registration = await request.newContext({
+  const registration = await privateRequestContext({
     baseURL: base,
     extraHTTPHeaders: { Origin: base },
   });
@@ -63,8 +74,18 @@ async function member(label: string) {
 }
 test.beforeAll(async () => {
   test.setTimeout(120000);
-  const access = JSON.parse(fs.readFileSync(".local/access-development.json", "utf8"));
+  const accessFile = process.env.SHOWTIME_E2E_ACCESS_FILE || ".local/access-development.json";
+  const access = JSON.parse(fs.readFileSync(accessFile, "utf8"));
   admin = await login(access.username, access.password);
+  if (process.env.SHOWTIME_E2E_ACCESS_FILE && !access.mfaSecret) {
+    const setup = await json(admin, "/api/auth/mfa", {
+      action: "enable",
+      password: access.password,
+    });
+    access.mfaSecret = new URL(setup.totpURI).searchParams.get("secret");
+    await json(admin, "/api/auth/mfa", { action: "verify", code: totp(access.mfaSecret) });
+    fs.writeFileSync(accessFile, JSON.stringify(access));
+  }
   const scopes = (await json(admin, "/api/platform/scopes", undefined, "GET")).scopes;
   scope = scopes.find(
     (s: { organizationId: string; departmentName: string }) =>
@@ -546,7 +567,7 @@ test("booked work and attendance can be edited and deleted through the interface
           : {}),
       },
     });
-    await page.goto(`/?module=time&record=${record.id}`);
+    await openWorkspace(page, `/?module=time&record=${record.id}`);
     const detail = page.getByRole("dialog").last();
     await expect(detail).toBeVisible();
     await detail.getByRole("button", { name: "Bearbeiten", exact: true }).click();
@@ -575,13 +596,21 @@ test("booked work and attendance can be edited and deleted through the interface
     expect(workspace.records[kind].some((r: { id: string }) => r.id === record.id)).toBe(false);
   }
 });
-test("keyboard navigation restores focus across search, mobile menus, calendars and document dialogs", async ({ page }) => {
-  await json(admin, "/api/actions", { action: "profile-update", data: { onboardingCompleted: true } });
+test("keyboard navigation restores focus across search, mobile menus, calendars and document dialogs", async ({
+  page,
+}) => {
+  await json(admin, "/api/actions", {
+    action: "profile-update",
+    data: { onboardingCompleted: true },
+  });
   await page.context().addCookies((await admin.storageState()).cookies);
   const errors: string[] = [];
   const warnings: string[] = [];
   page.on("pageerror", (error) => errors.push(error.name));
-  page.on("console", (message) => { if (message.type() === "warning" && message.text().includes("SvelteKit's router")) warnings.push("Router warning"); });
+  page.on("console", (message) => {
+    if (message.type() === "warning" && message.text().includes("SvelteKit's router"))
+      warnings.push("Router warning");
+  });
   await openWorkspace(page, "/");
   const searchTrigger = page.locator(".global-search-button");
   await searchTrigger.focus();
@@ -646,7 +675,9 @@ test("keyboard navigation restores focus across search, mobile menus, calendars 
   await openWorkspace(page, "/?module=chat");
   const attachments = page.getByRole("button", { name: "Anhänge und Dokumente", exact: true });
   await attachments.press("Enter");
-  await page.getByRole("button", { name: "Gemeinsames Dokument anlegen", exact: true }).press("Enter");
+  await page
+    .getByRole("button", { name: "Gemeinsames Dokument anlegen", exact: true })
+    .press("Enter");
   await expect(page.getByRole("textbox", { name: "Name", exact: true })).toBeFocused();
   await page.screenshot({ path: ".local/screens/warnings-document-focus.png" });
   await expect(attachments).toHaveAttribute("aria-expanded", "false");
@@ -665,20 +696,40 @@ test("keyboard navigation restores focus across search, mobile menus, calendars 
   expect(warnings).toEqual([]);
 });
 
-test("mask plan placement works with keyboard and pointer; embedded contacts submit with Enter", async ({ page }) => {
-  await json(admin, "/api/actions", { action: "profile-update", data: { onboardingCompleted: true } });
+test("mask plan placement works with keyboard and pointer; embedded contacts submit with Enter", async ({
+  page,
+}) => {
+  await json(admin, "/api/actions", {
+    action: "profile-update",
+    data: { onboardingCompleted: true },
+  });
   await page.context().addCookies((await admin.storageState()).cookies);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.name));
   const lanes = Array.from({ length: 5 }, (_, index) => ({
-    id: randomUUID(), label: "QA Spalte " + (index + 1), memberIds: [], staffNames: [],
+    id: randomUUID(),
+    label: "QA Spalte " + (index + 1),
+    memberIds: [],
+    staffNames: [],
   }));
   const plan = await json(admin, "/api/records/maskPlans", {
-    data: { productionId: production, title: marker + " Tastatur", windowMinutes: 90, stepMinutes: 5, lanes, blocks: [] },
+    data: {
+      productionId: production,
+      title: marker + " Tastatur",
+      windowMinutes: 90,
+      stepMinutes: 5,
+      lanes,
+      blocks: [],
+    },
   });
   await page.setViewportSize({ width: 900, height: 1000 });
-  await openWorkspace(page, `/?module=productions&productionId=${production}&tab=mask-plan&record=${plan.id}`);
-  const region = page.getByRole("region", { name: "Maskenplan-Zeittabelle, horizontal und vertikal scrollbar" });
+  await openWorkspace(
+    page,
+    `/?module=productions&productionId=${production}&tab=mask-plan&record=${plan.id}`,
+  );
+  const region = page.getByRole("region", {
+    name: "Maskenplan-Zeittabelle, horizontal und vertikal scrollbar",
+  });
   await expect(region).toHaveAttribute("tabindex", "0");
   await page.getByRole("button", { name: "Plan bearbeiten", exact: true }).press("Enter");
   const place = page.getByRole("button", { name: "Zeitblock platzieren", exact: true });
@@ -686,28 +737,45 @@ test("mask plan placement works with keyboard and pointer; embedded contacts sub
   expect(descriptionId).toBeTruthy();
   await expect(page.locator(`[id="${descriptionId}"]`)).toContainText("Zum Bearbeiten");
   await place.press("Enter");
-  const target = page.getByRole("button", { name: "Neuen Zeitblock platzieren bei QA Spalte 1", exact: true });
+  const target = page.getByRole("button", {
+    name: "Neuen Zeitblock platzieren bei QA Spalte 1",
+    exact: true,
+  });
   await target.focus();
   await target.press("Space");
   let editor = page.getByRole("dialog").last();
-  await expect(editor.getByRole("combobox", { name: "Personalspalte", exact: true })).toHaveValue(lanes[0].id);
+  await expect(editor.getByRole("combobox", { name: "Personalspalte", exact: true })).toHaveValue(
+    lanes[0].id,
+  );
   await editor.getByLabel("Tätigkeit / Zusatz (optional)").fill(marker + " Tastaturblock");
   await editor.getByRole("button", { name: "Übernehmen", exact: true }).press("Enter");
   await expect(page.locator("[data-mask-block]")).toHaveCount(1);
 
   await page.getByRole("button", { name: "Zeitblock platzieren", exact: true }).click();
-  const pointerTarget = page.getByRole("button", { name: "Neuen Zeitblock platzieren bei QA Spalte 2", exact: true });
+  const pointerTarget = page.getByRole("button", {
+    name: "Neuen Zeitblock platzieren bei QA Spalte 2",
+    exact: true,
+  });
   await pointerTarget.scrollIntoViewIfNeeded();
   await pointerTarget.click({ position: { x: 40, y: 320 } });
   editor = page.getByRole("dialog").last();
-  await expect(editor.getByRole("combobox", { name: "Personalspalte", exact: true })).toHaveValue(lanes[1].id);
+  await expect(editor.getByRole("combobox", { name: "Personalspalte", exact: true })).toHaveValue(
+    lanes[1].id,
+  );
   expect(Number(await editor.getByLabel("Minuten vor Beginn").inputValue())).toBeGreaterThan(30);
   await editor.getByLabel("Tätigkeit / Zusatz (optional)").fill(marker + " Mausblock");
   await editor.getByRole("button", { name: "Übernehmen", exact: true }).click();
   await expect(page.locator("[data-mask-block]")).toHaveCount(2);
   await page.screenshot({ path: ".local/screens/warnings-mask-plan.png", fullPage: true });
-  const saving = page.waitForResponse((response) => response.url().endsWith(`/api/records/maskPlans/${plan.id}`) && response.request().method() === "PATCH");
-  await page.getByRole("button", { name: "Speichern", exact: true }).filter({ visible: true }).click();
+  const saving = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/api/records/maskPlans/${plan.id}`) &&
+      response.request().method() === "PATCH",
+  );
+  await page
+    .getByRole("button", { name: "Speichern", exact: true })
+    .filter({ visible: true })
+    .click();
   const saved = await saving;
   expect(saved.ok()).toBeTruthy();
   expect((await saved.json()).data.blocks).toHaveLength(2);
@@ -720,7 +788,10 @@ test("mask plan placement works with keyboard and pointer; embedded contacts sub
   await contact.getByRole("button", { name: "Person anlegen", exact: true }).click();
   const personName = contact.getByLabel("Name *", { exact: true });
   await personName.fill(marker + " Kontakt");
-  const creating = page.waitForResponse((response) => response.url().endsWith("/api/records/people") && response.request().method() === "POST");
+  const creating = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/records/people") && response.request().method() === "POST",
+  );
   await personName.press("Enter");
   expect((await creating).ok()).toBeTruthy();
   await expect(contact.locator("strong").filter({ hasText: marker + " Kontakt" })).toBeVisible();
@@ -828,27 +899,64 @@ test("Office editors persist typed text and spreadsheet cells through the Svelte
   await page.getByRole("button", { name: "Schließen", exact: true }).click();
 });
 
-test("each of the twenty trades can persist its own typed workflow and publish a show report", async () => {
+test("each registered trade can persist its own typed workflow and publish a show report", async () => {
   const overview = await json(admin, `/api/theater?productionId=${production}`, undefined, "GET");
-  expect(overview.modules).toHaveLength(20);
+  expect(overview.modules.map((m: { moduleId: string }) => m.moduleId).sort()).toEqual(
+    moduleRegistry.map((module) => module.id).sort(),
+  );
   for (const [index, activation] of overview.modules.entries()) {
     await switchTo(admin, {
       organizationId: scope.organizationId,
       departmentId: activation.config.departmentId,
     });
-    const feature = activation.manifest.features[0],
+    const referenceTypes = [
+      "record",
+      "resource",
+      "budget",
+      "department",
+      "member",
+      "performance",
+      "trade",
+      "trades",
+    ];
+    const feature =
+        activation.manifest.features.find(
+          (f: { fields: { type: string; required?: boolean; managed?: string }[] }) =>
+            f.fields.every((field) => !field.required || !referenceTypes.includes(field.type)),
+        ) || activation.manifest.features[0],
       data: Record<string, unknown> = {};
     for (const field of feature.fields) {
-      if (["record", "resource", "budget", "department", "member"].includes(field.type)) continue;
+      if (field.managed) continue;
+      if (
+        [
+          "record",
+          "resource",
+          "budget",
+          "department",
+          "member",
+          "performance",
+          "trade",
+          "trades",
+        ].includes(field.type)
+      )
+        continue;
       data[field.key] =
         field.type === "datetime"
           ? new Date(Date.UTC(2029, 0, 2, 8 + index, field.key === "end" ? 30 : 0)).toISOString()
           : field.type === "date"
             ? "2029-01-02"
             : field.type === "number"
-              ? field.key === "pauseMinutes"
-                ? 0
-                : 100
+              ? ((
+                  {
+                    pauseMinutes: 0,
+                    level: 0,
+                    weeklyHours: 39,
+                    offeredSeats: 200,
+                    visitors: 100,
+                    paidTickets: 80,
+                    complimentaryTickets: 20,
+                  } as Record<string, number>
+                )[field.key] ?? 100)
               : field.type === "checkbox"
                 ? false
                 : field.type === "members"
@@ -857,17 +965,20 @@ test("each of the twenty trades can persist its own typed workflow and publish a
                     ? field.options[0]
                     : marker + " Fachinhalt";
     }
-    const item = await json(admin, "/api/theater", {
-      action: "save-item",
-      data: {
-        moduleId: activation.moduleId,
-        type: feature.id,
-        title: marker + " " + activation.manifest.label,
-        productionId: production,
-        status: "draft",
-        data,
-      },
-    });
+    validateFeature(activation.moduleId, feature.id, data);
+    const item = await test.step(activation.moduleId + " · " + feature.id, () =>
+      json(admin, "/api/theater", {
+        action: "save-item",
+        data: {
+          moduleId: activation.moduleId,
+          type: feature.id,
+          title: marker + " " + activation.manifest.label,
+          productionId: production,
+          status: "draft",
+          data,
+        },
+      }),
+    );
     expect(item.moduleId).toBe(activation.moduleId);
     expect(item.departmentId).toBe(activation.config.departmentId);
   }
@@ -974,7 +1085,11 @@ test("work, season and series references survive versioned production phase chan
   await page.context().addCookies((await admin.storageState()).cookies);
   await page.goto("/?module=theater");
   await page.getByRole("tab", { name: "Spielplan", exact: true }).click();
-  const phaseForm = page.locator("form").filter({ has: page.locator('select[name="recordId"]') });
+  await page.getByRole("button", { name: /^Produktionsphasen/ }).click();
+  await page.getByRole("button", { name: "Produktion zuordnen", exact: true }).click();
+  const phaseForm = page
+    .getByRole("dialog", { name: "Phase und Zuordnung ändern", exact: true })
+    .locator("form");
   await phaseForm.locator('select[name="recordId"]').selectOption(core.id);
   await expect(phaseForm.locator('select[name="workId"]')).toHaveValue(work.id);
   await expect(phaseForm.locator('select[name="seasonId"]')).toHaveValue(season.id);
@@ -982,7 +1097,7 @@ test("work, season and series references survive versioned production phase chan
   const savedInUI = page.waitForResponse(
     (response) => response.url().endsWith("/api/theater") && response.request().method() === "POST",
   );
-  await phaseForm.getByRole("button", { name: "Phase und Zuordnung speichern" }).click();
+  await phaseForm.getByRole("button", { name: "Speichern", exact: true }).click();
   expect((await savedInUI).status()).toBe(201);
   const afterUI = await json(admin, `/api/theater?productionId=${core.id}`, undefined, "GET");
   expect(

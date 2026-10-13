@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { calendarProductionReferences } from "@/shared/calendar-references";
   import { useTheaterTime } from "@/components/theater-time";
   const { localDate } = useTheaterTime();
   import { theaterDateTime, theaterInstant } from "@/shared/theater-time";
@@ -61,7 +62,7 @@
   let originalAllDay = record
     ? calendarPresentation(
         record,
-        workspace.records.productions,
+        calendarProductionReferences(workspace),
         workspace.records.calendarCategories,
       ).allDay
     : options.find((option) => option.key === initialCategory)?.allDay;
@@ -74,6 +75,7 @@
       typeof next === "function" ? (next as (current: typeof title) => typeof title)(title) : next;
   };
   let category = initialCategory;
+  let creditUnit = initial.creditUnit === "weekly-sixth";
   const setCategory = (next: typeof category | ((current: typeof category) => typeof category)) => {
     category =
       typeof next === "function"
@@ -167,7 +169,12 @@
         (isActiveStaff(member) || people.includes(member.id)),
     ),
   );
-  let productions = sortProductionsByPremiere(workspace.records.productions);
+  let productions = sortProductionsByPremiere([
+    ...workspace.records.productions,
+    ...calendarProductionReferences(workspace).filter(
+      (row) => !workspace.records.productions.some((full) => full.id === row.id),
+    ),
+  ]);
   let behavior = calendarCategoryBehavior(category, selected);
 
   $: initial = { ...defaults, ...record?.data };
@@ -176,7 +183,7 @@
   $: originalAllDay = record
     ? calendarPresentation(
         record,
-        workspace.records.productions,
+        calendarProductionReferences(workspace),
         workspace.records.calendarCategories,
       ).allDay
     : options.find((option) => option.key === initialCategory)?.allDay;
@@ -200,7 +207,12 @@
         (isActiveStaff(member) || people.includes(member.id)),
     ),
   );
-  $: productions = sortProductionsByPremiere(workspace.records.productions);
+  $: productions = sortProductionsByPremiere([
+    ...workspace.records.productions,
+    ...calendarProductionReferences(workspace).filter(
+      (row) => !workspace.records.productions.some((full) => full.id === row.id),
+    ),
+  ]);
   $: behavior = calendarCategoryBehavior(category, selected);
 </script>
 
@@ -238,6 +250,7 @@
             title: title.trim(),
             category,
             allDay,
+            ...(category === "absence" ? { creditUnit: creditUnit ? "weekly-sixth" : "none" } : {}),
             start: startDate.toISOString(),
             end: endDate.toISOString(),
             productionId: production,
@@ -323,6 +336,13 @@
     {#if allDay}<p class="event-all-day-note">
         <span style={styleString({ background: selected?.color })}></span>
         Ganztägig · keine Uhrzeiten nötig. Der letzte Tag ist eingeschlossen.
+      </p>{/if}
+    {#if allDay && category === "absence"}<label class="credit-choice"
+        ><input type="checkbox" bind:checked={creditUnit} />Tagesgutschrift berücksichtigen</label
+      >
+      <p class="small muted">
+        Je persönlichem Kalendertag ein Sechstel der damals gültigen Wochenstunden. Trage keinen
+        medizinischen Grund ein.
       </p>{/if}
     <div class="form-grid">
       {#if allDay}
