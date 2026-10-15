@@ -28,8 +28,8 @@
     {
       title: "Dein Theater und dein Gewerk",
       text: `${guide.purpose} Du arbeitest gerade in ${$store.workspace.organization.name} / ${$store.workspace.department.name}.`,
-      view: "administration",
-      cta: "Arbeitsbereich ansehen",
+      view: "trade",
+      cta: "Mein Gewerk öffnen",
     },
     {
       title: "Die passende Produktion wählen",

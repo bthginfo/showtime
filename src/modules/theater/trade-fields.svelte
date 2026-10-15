@@ -9,6 +9,7 @@
   import { theaterDateTime, theaterInstant } from "@/shared/theater-time";
   import { moduleById } from "./registry";
   import SelectionList from "@/components/selection-list.svelte";
+  import TradeReferencePicker from "./trade-reference-picker.svelte";
   import { primaryTradeFields } from "@/shared/trade-form-presentation";
   export let fields: Field[] = [];
   export let data: Record<string, unknown> = {};
@@ -16,6 +17,8 @@
   export let productionId = "";
   export let privateData = false;
   export let grouped = true;
+  export let moduleId = "";
+  export let featureId = "";
   export let update: (key: string, value: unknown) => void;
   const store = useWorkspace();
   $: workspace = $store.workspace;
@@ -42,6 +45,8 @@
     {productionId}
     {privateData}
     {update}
+    {moduleId}
+    {featureId}
     grouped={false}
   />
   <details class="form-disclosure full">
@@ -58,20 +63,33 @@
         {productionId}
         {privateData}
         {update}
+        {moduleId}
+        {featureId}
         grouped={false}
       />
     </div>
   </details>
 {:else}
   {#each fields as field (field.key)}
-    {#if field.type === "trades"}<SelectionList
+    {#if moduleId && featureId && ["trade", "trades", "record", "resource", "performance"].includes(field.type)}
+      {#key `${moduleId}:${featureId}:${productionId}:${field.key}`}<TradeReferencePicker
+          {moduleId}
+          type={featureId}
+          {field}
+          {productionId}
+          value={data[field.key]}
+          onChange={(value) => update(field.key, value)}
+        />{/key}
+    {:else if field.type === "trades"}<SelectionList
         label={field.label}
+        required={field.required || false}
         options={references(field).map((item) => ({ id: item.id, label: item.title }))}
         selected={choices(field.key)}
         onChange={(ids) => update(field.key, ids)}
       />
     {:else if field.type === "members"}<SelectionList
         label={field.label}
+        required={field.required || false}
         options={workspace.members
           .filter((member) => member.status === "active")
           .map((member) => ({ id: member.id, label: member.name }))}

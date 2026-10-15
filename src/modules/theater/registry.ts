@@ -611,7 +611,13 @@ export function validateFeature(moduleId: string, type: string, input: Record<st
         : field.type === "checkbox"
           ? z.boolean()
           : field.type === "members" || field.type === "trades"
-            ? z.array(z.string().min(1).max(100)).max(200)
+            ? z
+                .array(z.string().min(1).max(100))
+                .min(
+                  field.required ? 1 : 0,
+                  `Bitte wähle mindestens einen Eintrag für ${field.label}.`,
+                )
+                .max(200)
             : field.type === "select"
               ? z.enum(field.options! as [string, ...string[]])
               : field.type === "date"

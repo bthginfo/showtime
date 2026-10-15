@@ -8,7 +8,7 @@
     CheckCircle2,
     CircleAlert,
   } from "@lucide/svelte";
-  import { Button, ErrorMessage, Badge, Empty } from "@/components/ui";
+  import { Button, ErrorMessage, Badge, Empty, Modal } from "@/components/ui";
   import BarChart from "@/components/ui.BarChart.svelte";
   import { api, localDate, shiftDate, dateLabel } from "@/shared/client-api";
   import type { TheaterOverview } from "@/shared/theater-overview";
@@ -27,6 +27,36 @@
   export let pageTitle = "";
   export let onHelp: (() => void) | null = null;
   let customPeriod = false;
+  let blockedOpen = false,
+    blockedLoading = false,
+    blockedError = "",
+    blockedCursor: string | null = null;
+  let blocked: {
+    id: string;
+    title: string;
+    department: string;
+    production: string;
+    productionId: string | null;
+    moduleId: string;
+    type: string;
+  }[] = [];
+  async function loadBlocked(more = false) {
+    blockedOpen = true;
+    blockedLoading = true;
+    blockedError = "";
+    try {
+      const result = await api<{ entries: typeof blocked; nextCursor: string | null }>(
+        "/api/theater/blocked" +
+          (more && blockedCursor ? "?cursor=" + encodeURIComponent(blockedCursor) : ""),
+      );
+      blocked = more ? [...blocked, ...result.entries] : result.entries;
+      blockedCursor = result.nextCursor;
+    } catch (e) {
+      blockedError = (e as Error).message;
+    } finally {
+      blockedLoading = false;
+    }
+  }
   let from = shiftDate(localDate(), -30),
     to = shiftDate(localDate(), 30);
   let overview: TheaterOverview | null = null,
@@ -196,8 +226,11 @@
         >
         <a
           class:needs-attention={overview.blockedItems > 0}
-          href="/?module=theater&view=trade"
-          on:click={(event) => navigate(event, "/?module=theater&view=trade")}
+          href="#blockierte-arbeitsstaende"
+          on:click={(event) => {
+            event.preventDefault();
+            void loadBlocked();
+          }}
           ><strong>{number(overview.blockedItems)}</strong><span
             >Facheinträge blockiert<small
               >{overview.blockedItems
@@ -532,3 +565,50 @@
     </section>
   {/if}
 </section>
+{#if blockedOpen}<Modal title="Blockierte Arbeitsstände" wide onClose={() => (blockedOpen = false)}>
+    <div class="blocked-workspace">
+      <p class="muted">
+        Zugängliche Blockaden aus allen Gewerken. Öffne einen Arbeitsstand, um Zuständigkeit und
+        nächsten Schritt zu prüfen.
+      </p>
+      <ErrorMessage message={blockedError} />
+      <div class="catalog-grid">
+        {#each blocked as item (item.id)}<article class="catalog-card">
+            <p class="small muted">{item.department} · {item.production}</p>
+            <h3>{item.title}</h3>
+            <a
+              class="button secondary"
+              href={"/?" +
+                new URLSearchParams({
+                  module: "theater",
+                  view: "trade",
+                  itemId: item.id,
+                  featureId: item.type,
+                  ...(item.productionId ? { productionId: item.productionId } : {}),
+                })}>Arbeitsstand öffnen</a
+            >
+          </article>{/each}
+      </div>
+      {#if blockedLoading}<p role="status">
+          Blockierte Arbeitsstände werden geladen …
+        </p>{:else if !blocked.length && !blockedError}<p>
+          Keine Blockaden in dieser geladenen Seite.
+        </p>{/if}
+      {#if blockedCursor}<Button disabled={blockedLoading} onClick={() => void loadBlocked(true)}
+          >Weitere Blockaden laden</Button
+        >{/if}
+      {#if blockedError}<Button disabled={blockedLoading} onClick={() => void loadBlocked()}
+          >Erneut laden</Button
+        >{/if}
+    </div>
+  </Modal>{/if}
+
+<style>
+  .blocked-workspace {
+    display: grid;
+    gap: 20px;
+  }
+  .blocked-workspace p {
+    margin: 0;
+  }
+</style>

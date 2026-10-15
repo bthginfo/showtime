@@ -73,6 +73,7 @@
   <nav aria-label="Schnelleinstieg für dein Gewerk">
     <WorkTiles label="Schnelleinstieg" tiles={homeWorkTiles} />
   </nav>
+  <DailyPriorities {navigate} />
   <div class="home-columns">
     <Section
       title="Deine nächsten Termine"
@@ -174,7 +175,6 @@
           >{/each}
       </div>
     </Section>{/if}
-  <DailyPriorities {navigate} />
   {#if canTime}<details class="surface task-disclosure">
       <summary
         ><span class="home-time-title"><Clock3 size={18} />Meine Zeiten</span><span

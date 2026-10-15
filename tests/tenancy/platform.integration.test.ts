@@ -113,6 +113,183 @@ describe.skipIf(!enabled)("real Neon tenant isolation and event commands", () =>
       pools.controlSql.end(),
     ]);
   });
+  it("paginates and resolves global trade references without crossing tenant or production boundaries", async () => {
+    const { tradeReferences } = await import("@/modules/theater/references");
+    const prefix = "QA Referenz " + randomUUID().slice(0, 6);
+    const assetIds = Array.from({ length: 55 }, () => randomUUID());
+    const foreignId = randomUUID();
+    await run(a, async () => {
+      await db.insert(tables.tradeItems).values(
+        assetIds.map((id, index) => ({
+          id,
+          organizationId: a.organizationId,
+          departmentId: a.departmentId,
+          createdBy: person,
+          moduleId: "makeup",
+          type: "asset",
+          title: prefix + " " + index,
+          status: "draft",
+          productionId: index === 0 ? production : null,
+          data: { inventoryNumber: id, quantity: 10 },
+        })),
+      );
+    });
+    await run(b, () =>
+      db.insert(tables.tradeItems).values({
+        id: foreignId,
+        organizationId: b.organizationId,
+        departmentId: b.departmentId,
+        createdBy: person,
+        moduleId: "makeup",
+        type: "asset",
+        title: prefix + " fremd",
+        data: { inventoryNumber: foreignId, quantity: 10 },
+      }),
+    );
+    const query = {
+      moduleId: "makeup",
+      type: "preparation",
+      field: "assetId",
+      productionId: production,
+      q: prefix,
+    };
+    const first = await run(a, () => tradeReferences(a, query));
+    expect(first.entries).toHaveLength(50);
+    expect(first.nextCursor).toBeTruthy();
+    const second = await run(a, () =>
+      tradeReferences(a, { ...query, cursor: first.nextCursor, ids: [assetIds[0], foreignId] }),
+    );
+    expect(second.entries).toHaveLength(5);
+    expect(second.selected.map((row) => row.id)).toEqual([assetIds[0]]);
+    expect(new Set([...first.entries, ...second.entries].map((row) => row.id)).size).toBe(55);
+    await expect(
+      run(b, () =>
+        tradeReferences(b, { ...query, productionId: undefined, cursor: first.nextCursor }),
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    const withoutProduction = await run(a, () =>
+      tradeReferences(a, { ...query, productionId: undefined, ids: [assetIds[0]] }),
+    );
+    expect(withoutProduction.selected).toEqual([]);
+    await run(a, () =>
+      db
+        .update(tables.moduleActivations)
+        .set({ enabled: false })
+        .where(
+          op.and(
+            op.eq(tables.moduleActivations.organizationId, a.organizationId),
+            op.eq(tables.moduleActivations.moduleId, "makeup"),
+          ),
+        ),
+    );
+    try {
+      await expect(run(a, () => tradeReferences(a, query))).rejects.toMatchObject({ status: 403 });
+    } finally {
+      await run(a, () =>
+        db
+          .update(tables.moduleActivations)
+          .set({ enabled: true })
+          .where(
+            op.and(
+              op.eq(tables.moduleActivations.organizationId, a.organizationId),
+              op.eq(tables.moduleActivations.moduleId, "makeup"),
+            ),
+          ),
+      );
+    }
+    await run(a, () =>
+      db.delete(tables.tradeItems).where(op.inArray(tables.tradeItems.id, assetIds)),
+    );
+    await run(b, () => db.delete(tables.tradeItems).where(op.eq(tables.tradeItems.id, foreignId)));
+  });
+  it("finds older played performances for audience reports and omits future or cancelled choices", async () => {
+    const { tradeReferences } = await import("@/modules/theater/references");
+    const front = await run(a, () =>
+      db
+        .select()
+        .from(tables.moduleActivations)
+        .where(op.eq(tables.moduleActivations.moduleId, "front-of-house")),
+    );
+    const ctx = { ...a, departmentId: String(front[0].config.departmentId) };
+    const ids = [randomUUID(), randomUUID(), randomUUID()];
+    await run(a, async () => {
+      await db.insert(tables.records).values(
+        ids.map((id, index) => ({
+          id: "event-" + id,
+          organizationId: a.organizationId,
+          departmentId: ctx.departmentId,
+          createdBy: person,
+          kind: "events" as const,
+          productionId: production,
+          data: {
+            title: "QA Auswahlvorstellung",
+            start: new Date(Date.now() + (index === 1 ? 21 : -21) * 86400000).toISOString(),
+          },
+        })),
+      );
+      await db.insert(tables.performances).values(
+        ids.map((id, index) => ({
+          id,
+          organizationId: a.organizationId,
+          productionId: production,
+          eventId: "event-" + id,
+          curtainAt: new Date(Date.now() + (index === 1 ? 21 : -21) * 86400000),
+          status: index === 2 ? "cancelled" : "planned",
+        })),
+      );
+    });
+    const result = await run(ctx, () =>
+      tradeReferences(ctx, {
+        moduleId: "front-of-house",
+        type: "audience-report",
+        field: "performanceId",
+        productionId: production,
+      }),
+    );
+    expect(result.entries.map((row) => row.id)).toContain(ids[0]);
+    expect(result.entries.map((row) => row.id)).not.toContain(ids[1]);
+    expect(result.entries.map((row) => row.id)).not.toContain(ids[2]);
+    await run(a, () =>
+      db.delete(tables.performances).where(op.inArray(tables.performances.id, ids)),
+    );
+  });
+  it("records truthful stock and readiness statuses and rejects readiness for Intendanz", async () => {
+    const asset = await run(a, () =>
+      theater.saveTradeItem(a, {
+        moduleId: "makeup",
+        type: "asset",
+        title: "QA Bestandsstatus",
+        data: { inventoryNumber: randomUUID(), quantity: 10 },
+      }),
+    );
+    const movement = await run(a, () =>
+      theater.saveTradeItem(a, {
+        moduleId: "makeup",
+        type: "stock-movement",
+        title: "QA gebucht",
+        status: "draft",
+        data: { assetId: asset.id, movement: "consume", quantity: 2, reason: "QA Nachweis" },
+      }),
+    );
+    expect(movement.status).toBe("done");
+    const { readinessPolicy } = await import("@/modules/theater/operations");
+    await expect(
+      run(a, () =>
+        readinessPolicy(a, { productionId: production, required: ["intendance"], waivers: [] }),
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    const ready = await run(a, () =>
+      theater.saveTradeItem(a, {
+        moduleId: "makeup",
+        type: "readiness",
+        title: "QA offen",
+        productionId: production,
+        status: "ready",
+        data: { ready: false },
+      }),
+    );
+    expect(ready.status).toBe("draft");
+  });
   it("denies working-time changes and history deletion after a colleague leaves the lead's active trade", async () => {
     const target = randomUUID();
     const membershipId = randomUUID();

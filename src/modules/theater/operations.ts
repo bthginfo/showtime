@@ -279,7 +279,9 @@ export async function readinessPolicy(context: Context, input: unknown) {
   if (body.waivers.length && !can(context, "readiness.manage", body.productionId, ""))
     throw new HttpError(403, "Ausnahmen benötigen eine zuständige Leitung.");
   if (
-    body.required.some((id) => !moduleById(id)) ||
+    body.required.some(
+      (id) => !moduleById(id)?.features.some((feature) => feature.id === "readiness"),
+    ) ||
     body.waivers.some(
       (w) => !body.required.includes(w.moduleId) || Date.parse(w.expiresAt) <= Date.now(),
     )

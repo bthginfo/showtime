@@ -247,6 +247,10 @@ export async function theaterWorkspace(
 }
 export async function saveTradeItem(context: Context, input: unknown) {
   const body = inputSchema.parse(input);
+  // A stock movement posts an immutable ledger entry immediately, including legacy callers.
+  if (body.type === "stock-movement") body.status = "done";
+  if (body.type === "loan" && body.status === "draft") body.status = "review";
+  if (body.type === "readiness") body.status = body.data.ready === true ? "ready" : "draft";
   const { nonClinicalPayload } = await import("@/modules/privacy/model");
   if (!nonClinicalPayload(body.data))
     throw new HttpError(
@@ -258,7 +262,13 @@ export async function saveTradeItem(context: Context, input: unknown) {
   const [activation] = await db
     .select()
     .from(moduleActivations)
-    .where(and(eq(moduleActivations.moduleId, body.moduleId), eq(moduleActivations.enabled, true)))
+    .where(
+      and(
+        eq(moduleActivations.organizationId, context.organizationId),
+        eq(moduleActivations.moduleId, body.moduleId),
+        eq(moduleActivations.enabled, true),
+      ),
+    )
     .limit(1);
   if (!activation) throw new HttpError(403, "Dieses Modul ist nicht freigeschaltet.");
   if (body.performanceId) {

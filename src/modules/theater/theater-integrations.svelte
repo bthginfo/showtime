@@ -2,7 +2,6 @@
   import { useTheaterTime } from "@/components/theater-time";
   const { dateLabel } = useTheaterTime();
   import { adapterProfiles } from "@/shared/adapter-profiles";
-  import { onMount } from "svelte";
   import { Button, ErrorMessage } from "@/components/ui";
   import { api, post } from "@/shared/client-api";
   import { useWorkspace } from "@/components/workspace-context";
@@ -11,14 +10,20 @@
   export let planning: Planning;
   export let productionId = "";
   export let onChanged: () => Promise<void>;
+  export let initialModule = "";
+  export let initialFeature = "";
+  export let workspaceOnly = false;
   const store = useWorkspace();
   $: canAdmin = hasPermission(
     { id: $store.workspace.user.id, grants: $store.workspace.user.grants || [] },
     "tenant.configure",
     { departmentId: $store.workspace.department.id },
   );
-  let moduleId = $store.workspace.currentModuleId || "makeup",
-    type = planning.modules.find((m) => m.moduleId === moduleId)?.manifest.features[0]?.id || "",
+  let moduleId = initialModule || $store.workspace.currentModuleId || "makeup",
+    type =
+      initialFeature ||
+      planning.modules.find((m) => m.moduleId === moduleId)?.manifest.features[0]?.id ||
+      "",
     format = "csv",
     content = "",
     mapping: Record<string, string> = {},
@@ -46,8 +51,39 @@
     scopes: string[] = ["trade:read"],
     expires = 30,
     operationId = crypto.randomUUID();
-  $: manifest = planning.modules.find((m) => m.moduleId === moduleId)?.manifest;
+  $: manifest = availableModules.find((m) => m.moduleId === moduleId)?.manifest;
   $: feature = manifest?.features.find((f) => f.id === type) || manifest?.features[0];
+  $: canImport =
+    !!feature &&
+    !["stock-movement", "readiness", "qualification"].includes(feature.id) &&
+    hasPermission(
+      { id: $store.workspace.user.id, grants: $store.workspace.user.grants || [] },
+      feature.permission,
+      { departmentId: $store.workspace.department.id, productionId },
+    );
+  $: availableModules = planning.modules
+    .filter(
+      (m) =>
+        m.config.departmentId === $store.workspace.department.id ||
+        (!workspaceOnly && canAdmin) ||
+        (m.moduleId === "administration" &&
+          hasPermission(
+            { id: $store.workspace.user.id, grants: $store.workspace.user.grants || [] },
+            "budget.request",
+            { departmentId: $store.workspace.department.id, productionId },
+          )),
+    )
+    .map((m) =>
+      m.config.departmentId === $store.workspace.department.id || !workspaceOnly
+        ? m
+        : {
+            ...m,
+            manifest: {
+              ...m.manifest,
+              features: m.manifest.features.filter((f) => f.id === "purchase"),
+            },
+          },
+    );
   function template(profile: (typeof adapterProfiles)[number]) {
     if (!("moduleId" in profile)) return;
     moduleId = profile.moduleId;
@@ -77,7 +113,6 @@
     if (canAdmin)
       entries = (await api<{ entries: typeof entries }>("/api/integrations/access")).entries;
   }
-  onMount(() => void access().catch((e) => (error = e.message)));
   async function key() {
     busy = true;
     error = "";
@@ -189,29 +224,32 @@
 
 <div class="integration-workspace">
   <ErrorMessage message={error} />{#if notice}<p role="status" class="surface">{notice}</p>{/if}
-  <section class="surface">
-    <h2>Austauschprofile</h2>
-    <p>
-      Die Vorlagen beschreiben offene Showtime-Felder. Ein Produkt des Zielsystems wird mit dessen
-      tatsächlichem Datenvertrag zugeordnet.
-    </p>
-    {#each adapterProfiles as profile (profile.id)}<details>
-        <summary>{profile.label}</summary>
-        <p>{profile.note}</p>
-        <p class="small"><code>{profile.endpoint}</code> · Scope <code>{profile.scope}</code></p>
-        {#if "moduleId" in profile}<div class="button-row">
-            <Button disabled={busy} onClick={() => template(profile)}
-              >CSV-Spaltenvorlage laden</Button
-            ><a
-              class="button secondary"
-              download={"showtime-" + profile.id + ".csv"}
-              href={"data:text/csv;charset=utf-8," +
-                encodeURIComponent("\uFEFF" + profile.columns.join(";") + "\r\n")}
-              >Leere CSV-Vorlage herunterladen</a
-            >
-          </div>{:else}<a href="/?module=exports">Zeitnachweise exportieren</a>{/if}
-      </details>{/each}
-  </section>
+  <details class="surface task-disclosure">
+    <summary>Vorlagen für andere Systeme</summary>
+    <div class="disclosure-body">
+      <p>
+        Die Vorlagen beschreiben offene Showtime-Felder. Ein Produkt des Zielsystems wird mit dessen
+        tatsächlichem Datenvertrag zugeordnet.
+      </p>
+      {#each adapterProfiles.filter((profile) => !("moduleId" in profile) || availableModules.some((m) => m.moduleId === profile.moduleId && m.manifest.features.some((f) => f.id === profile.type))) as profile (profile.id)}<details
+        >
+          <summary>{profile.label}</summary>
+          <p>{profile.note}</p>
+          <p class="small"><code>{profile.endpoint}</code> · Scope <code>{profile.scope}</code></p>
+          {#if "moduleId" in profile}<div class="button-row">
+              <Button disabled={busy} onClick={() => template(profile)}
+                >CSV-Spaltenvorlage laden</Button
+              ><a
+                class="button secondary"
+                download={"showtime-" + profile.id + ".csv"}
+                href={"data:text/csv;charset=utf-8," +
+                  encodeURIComponent("\uFEFF" + profile.columns.join(";") + "\r\n")}
+                >Leere CSV-Vorlage herunterladen</a
+              >
+            </div>{:else}<a href="/?module=exports">Zeitnachweise exportieren</a>{/if}
+        </details>{/each}
+    </div>
+  </details>
   <section class="surface">
     <h2>Import & Export</h2>
     <p>
@@ -227,7 +265,7 @@
               planning.modules.find((m) => m.moduleId === moduleId)?.manifest.features[0]?.id || "";
             preview = null;
           }}
-          >{#each planning.modules as module (module.moduleId)}<option value={module.moduleId}
+          >{#each availableModules as module (module.moduleId)}<option value={module.moduleId}
               >{module.manifest.label}</option
             >{/each}</select
         ></label
@@ -250,79 +288,86 @@
         ><input type="checkbox" bind:checked={confirmed} />Geschützte Daten dieses Fachbereichs
         bewusst exportieren</label
       >{/if}
-    <label
-      >Importdatei (CSV/JSON, bis 100 Zeilen)<input
-        type="file"
-        accept=".csv,.json"
-        disabled={busy}
-        on:change={readFile}
-      /></label
-    ><label
-      >Dateiinhalt<textarea
-        bind:value={content}
-        on:input={() => (preview = null)}
-        maxlength="1000000"
-        rows="5"></textarea></label
-    >
-    {#if preview?.columns.length}<details>
-        <summary>Spaltenzuordnung anpassen</summary>
-        <div class="form-grid">
-          {#each [{ key: "title", label: "Titel" }, { key: "externalId", label: "Externe ID (optional)" }, ...(feature?.fields.filter((f) => !f.managed) || [])] as field (field.key)}<label
-              >{field.label}<select
-                value={Object.hasOwn(mapping, field.key) ? mapping[field.key] : field.key}
-                on:change={(e) => {
-                  mapping = { ...mapping, [field.key]: e.currentTarget.value };
-                  mappingDirty = true;
-                }}
-                ><option value="">Nicht zuordnen</option
-                >{#each preview.columns as column (column)}<option value={column}>{column}</option
-                  >{/each}</select
-              ></label
-            >{/each}
+    {#if canImport}<label
+        >Importdatei (CSV/JSON, bis 100 Zeilen)<input
+          type="file"
+          accept=".csv,.json"
+          disabled={busy}
+          on:change={readFile}
+        /></label
+      ><label
+        >Dateiinhalt<textarea
+          bind:value={content}
+          on:input={() => (preview = null)}
+          maxlength="1000000"
+          rows="5"></textarea></label
+      >
+      {#if preview?.columns.length}<details>
+          <summary>Spaltenzuordnung anpassen</summary>
+          <div class="form-grid">
+            {#each [{ key: "title", label: "Titel" }, { key: "externalId", label: "Externe ID (optional)" }, ...(feature?.fields.filter((f) => !f.managed) || [])] as field (field.key)}<label
+                >{field.label}<select
+                  value={Object.hasOwn(mapping, field.key) ? mapping[field.key] : field.key}
+                  on:change={(e) => {
+                    mapping = { ...mapping, [field.key]: e.currentTarget.value };
+                    mappingDirty = true;
+                  }}
+                  ><option value="">Nicht zuordnen</option
+                  >{#each preview.columns as column (column)}<option value={column}>{column}</option
+                    >{/each}</select
+                ></label
+              >{/each}
+          </div>
+        </details>{/if}
+      {#if mappingDirty}<p role="status">Zuordnung verändert. Prüfe die Vorschau erneut.</p>{/if}
+      <Button disabled={busy || !content} onClick={() => void exchange("preview")}
+        >Vorschau prüfen</Button
+      >{#if preview}<p>{preview.rows.length} Zeilen · {preview.errors.length} Fehler</p>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Zeile</th><th>Titel</th><th>Ergebnis</th></tr></thead><tbody
+              >{#each preview.rows as row (row.row)}<tr
+                  ><td>{row.row}</td><td>{row.title || "Titel fehlt"}</td><td
+                    >{preview.errors.find((e) => e.row === row.row)?.error || "Gültig"}</td
+                  ></tr
+                >{/each}</tbody
+            >
+          </table>
         </div>
-      </details>{/if}
-    {#if mappingDirty}<p role="status">Zuordnung verändert. Prüfe die Vorschau erneut.</p>{/if}
-    <Button disabled={busy || !content} onClick={() => void exchange("preview")}
-      >Vorschau prüfen</Button
-    >{#if preview}<p>{preview.rows.length} Zeilen · {preview.errors.length} Fehler</p>
-      <div class="table-scroll">
-        <table>
-          <thead><tr><th>Zeile</th><th>Titel</th><th>Ergebnis</th></tr></thead><tbody
-            >{#each preview.rows as row (row.row)}<tr
-                ><td>{row.row}</td><td>{row.title || "Titel fehlt"}</td><td
-                  >{preview.errors.find((e) => e.row === row.row)?.error || "Gültig"}</td
-                ></tr
-              >{/each}</tbody
-          >
-        </table>
-      </div>
-      <Button
-        variant="primary"
-        disabled={busy || !!preview.errors.length || mappingDirty}
-        onClick={() => void exchange("apply")}>Geprüften Import übernehmen</Button
-      >{/if}
+        <Button
+          variant="primary"
+          disabled={busy || !!preview.errors.length || mappingDirty}
+          onClick={() => void exchange("apply")}>Geprüften Import übernehmen</Button
+        >{/if}{:else}<p class="small muted">
+        {feature && ["stock-movement", "readiness", "qualification"].includes(feature.id)
+          ? "Diesen verbindlichen Vorgang erfasst du einzeln in der Fachansicht. Exportieren bleibt möglich."
+          : "Für den Import ist die Schreibberechtigung für diese Funktion erforderlich."}
+      </p>{/if}
   </section>
-  <section class="surface">
-    <h2>Showtechnik & CAD</h2>
-    <p>
-      MVR/GDTF-Metadaten lassen sich prüfen. Ergänze bei MVR den tatsächlichen DMX-Footprint vor dem
-      Patchimport. CAD-/Geräteoriginale und Medien werden als private, versionierte Anlagen am
-      Fachstand abgelegt.
-    </p>
-    <label
-      >MVR/GDTF zur Vorschau<input
-        type="file"
-        accept=".mvr,.gdtf"
-        disabled={busy}
-        on:change={showtech}
-      /></label
-    >
-    <p class="small muted">
-      Offene Austauschprofile für Ticketing, DATEV-nahe CSV/ASCII, Dienste, Geräte und Kalender sind
-      unter <a href="/schnittstellen">Schnittstellen</a> beschrieben.
-    </p>
-  </section>
-  {#if canAdmin}<section class="surface">
+  {#if ["lighting", "video", "stage", "design"].includes(moduleId)}<section class="surface">
+      <h2>Showtechnik & CAD</h2>
+      <p>
+        MVR/GDTF-Metadaten lassen sich prüfen. Ergänze bei MVR den tatsächlichen DMX-Footprint vor
+        dem Patchimport. CAD-/Geräteoriginale und Medien werden als private, versionierte Anlagen am
+        Fachstand abgelegt.
+      </p>
+      <label
+        >MVR/GDTF zur Vorschau<input
+          type="file"
+          accept=".mvr,.gdtf"
+          disabled={busy}
+          on:change={showtech}
+        /></label
+      >
+      <p class="small muted">
+        Offene Austauschprofile für Ticketing, DATEV-nahe CSV/ASCII, Dienste, Geräte und Kalender
+        sind unter <a href="/schnittstellen">Schnittstellen</a> beschrieben.
+      </p>
+    </section>
+  {/if}{#if canAdmin}<section class="surface">
+      <Button onClick={() => void access().catch((e) => (error = e.message))}
+        >API-Zugänge laden</Button
+      >
       <h2>Offene API</h2>
       <p>
         Zugänge gelten für deine aktuelle Theater-/Gewerkzuordnung und höchstens deine aktuellen

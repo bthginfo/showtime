@@ -6,13 +6,28 @@
   import { useWorkspace } from "@/components/workspace-context";
   import { api, post } from "@/shared/client-api";
   import type { TradeItem, Planning } from "./types";
-  import { hasPermission } from "@/platform/access";
+  import { tradeActions, tradeStatus } from "@/shared/trade-actions";
+  import SelectionList from "@/components/selection-list.svelte";
   import { tradeChoiceLabel } from "@/shared/trade-labels";
   import { moduleById } from "./registry";
   export let item: TradeItem;
   export let planning: Planning;
   export let onClose: () => void;
   export let onChanged: () => Promise<void>;
+  export let onEdit: (item: TradeItem) => void;
+  export let onOpen: (id: string) => Promise<void>;
+  export let onBack: (() => void) | undefined = undefined;
+  async function openReference(id: string) {
+    busy = true;
+    error = "";
+    try {
+      await onOpen(id);
+    } catch (e) {
+      error = (e as Error).message;
+    } finally {
+      busy = false;
+    }
+  }
   const store = useWorkspace();
   let current = item,
     busy = false,
@@ -27,6 +42,10 @@
       files: { id: string; data: Record<string, unknown> }[];
       nextBefore: number | null;
     } | null = null;
+  let loading = true,
+    notice = "",
+    followupId = "",
+    followupFingerprint = "";
   let left = 0,
     right = 0,
     upload: File | null = null,
@@ -36,12 +55,7 @@
     progress = 0;
   $: contract = moduleById(current.moduleId)?.features.find((f) => f.id === current.type);
   $: subject = { id: $store.workspace.user.id, grants: $store.workspace.user.grants || [] };
-  $: allowed =
-    !!contract &&
-    hasPermission(subject, contract.permission, {
-      departmentId: current.departmentId,
-      productionId: current.productionId || "",
-    });
+  $: actions = tradeActions(subject, current, contract, $store.workspace.department.id);
   $: a = detail?.history.find((h) => h.version === left);
   $: b = detail?.history.find((h) => h.version === right);
   const text = (value: unknown): string =>
@@ -53,6 +67,8 @@
           ? JSON.stringify(value)
           : tradeChoiceLabel(String(value));
   async function load(before?: number) {
+    loading = true;
+    error = "";
     try {
       const next = await api<{
         item: TradeItem;
@@ -75,6 +91,8 @@
       }
     } catch (e) {
       error = (e as Error).message;
+    } finally {
+      loading = false;
     }
   }
   onMount(() => void load());
@@ -97,13 +115,25 @@
     }
   }
   async function send() {
+    if (busy) return;
     busy = true;
     error = "";
     try {
+      const fingerprint = JSON.stringify({
+        id: current.id,
+        version: current.version,
+        targets: [...targets].sort(),
+        brief,
+        dueDate,
+      });
+      if (!followupId || fingerprint !== followupFingerprint) {
+        followupId = crypto.randomUUID();
+        followupFingerprint = fingerprint;
+      }
       await post("/api/theater/operations", {
         action: "followups",
         data: {
-          operationId: crypto.randomUUID(),
+          operationId: followupId,
           id: current.id,
           expectedVersion: current.version,
           targets,
@@ -113,6 +143,10 @@
       });
       targets = [];
       brief = "";
+      dueDate = "";
+      followupId = "";
+      followupFingerprint = "";
+      notice = "Aufträge gesendet. Die beteiligten Gewerke finden sie unter Abstimmungen.";
       await onChanged();
       await load();
     } catch (e) {
@@ -166,12 +200,29 @@
     theaterLabel(value, planning.timezone, withTime);
 </script>
 
-<Modal title={current.title} wide {onClose}
+<Modal
+  title={current.title}
+  wide
+  onClose={() => {
+    if (!busy) onClose();
+  }}
   ><div class="trade-detail">
     <p class="small muted">
-      {contract?.label} · <Badge>{tradeChoiceLabel(current.status)}</Badge>
+      {contract?.label} · <Badge>{tradeStatus(current) || tradeChoiceLabel(current.status)}</Badge>
     </p>
     <ErrorMessage message={error} />
+    {#if onBack}<Button disabled={busy} onClick={onBack}>Zurück zum Ausgangsstand</Button>{/if}
+    {#if notice}<p role="status">
+        {notice} <a href="/?module=theater&view=collaborations">Abstimmungen öffnen</a>
+      </p>{/if}
+    {#if loading}<p class="small muted" role="status">
+        Aktueller Stand und Verlauf werden geladen …
+      </p>{:else if error && !detail}<Button onClick={() => void load()}>Erneut laden</Button>{/if}
+    {#if actions.edit}<div class="button-row">
+        <Button variant="primary" disabled={busy || loading} onClick={() => onEdit(current)}
+          >Arbeitsstand bearbeiten</Button
+        >
+      </div>{/if}
     <section class="trade-current" aria-label="Aktuelle Angaben">
       {#if current.productionId}<p class="small muted">
           Produktion: {String(
@@ -187,13 +238,24 @@
               {field.key === "amountCents" ? field.label.replace("(Cent)", "(€)") : field.label}
             </dt>
             <dd>
-              {tradeCurrentDisplay(
-                current.data[field.key],
-                field,
-                $store.workspace,
-                planning,
-                current.approvalVerified,
-              )}
+              {#if ["trade", "trades"].includes(field.type)}
+                {#each Array.isArray(current.data[field.key]) ? (current.data[field.key] as string[]) : [String(current.data[field.key])] as id (id)}
+                  <button
+                    type="button"
+                    class="text-button trade-reference-link"
+                    disabled={busy}
+                    on:click={() => void openReference(id)}
+                    >{planning.items.find((i) => i.id === id)?.title ||
+                      "Verknüpften Arbeitsstand öffnen"}</button
+                  >
+                {/each}
+              {:else}{tradeCurrentDisplay(
+                  current.data[field.key],
+                  field,
+                  $store.workspace,
+                  planning,
+                  current.approvalVerified,
+                )}{/if}
             </dd>
           </div>{/each}
       </dl>
@@ -244,7 +306,7 @@
               disabled={busy}
               onClick={() => void load(detail?.nextBefore || undefined)}
               >Ältere Fassungen laden</Button
-            >{/if}{:else}<p class="muted">
+            >{/if}{:else if !loading && detail}<p class="muted">
             Für diesen Eintrag ist noch keine weitere Fassung gespeichert.
           </p>{/if}
       </div>
@@ -264,7 +326,7 @@
             >
             · {Math.ceil(Number(file.data.size) / 1000)} KB
           </p>{/each}
-        {#if allowed && !["archived", "cancelled"].includes(current.status)}<label
+        {#if actions.attach}<label
             >Datei wählen (bis 64 MB)<input
               type="file"
               disabled={busy}
@@ -285,18 +347,16 @@
             ></progress>{/if}{/if}
       </div>
     </details>
-    {#if allowed && current.type !== "stock-movement"}<details class="trade-extra">
+    {#if actions.successor}<details class="trade-extra">
         <summary>Weitere Aktionen</summary>
         <div class="trade-extra-body">
           <form class="form-grid" on:submit|preventDefault={() => void perform()}>
             <label
               >Aktion<select bind:value={action}
                 ><option value="successor">Nachfolgestand anlegen</option
-                >{#if ["archived", "cancelled"].includes(current.status)}<option value="restore"
-                    >Wiederherstellen</option
-                  >{:else}<option value="archive">Archivieren</option><option value="cancel"
-                    >Abbrechen</option
-                  >{/if}</select
+                >{#if actions.restore}<option value="restore">Wiederherstellen</option
+                  >{/if}{#if actions.archive}<option value="archive">Archivieren</option
+                  >{/if}{#if actions.cancel}<option value="cancel">Abbrechen</option>{/if}</select
               ></label
             ><label
               >Begründung<input
@@ -321,9 +381,7 @@
           </p>
         </div>
       </details>{/if}
-    {#if current.productionId && contract && !contract.private && hasPermission( subject, "collaboration.create", { departmentId: current.departmentId, productionId: current.productionId } )}<details
-        class="trade-extra"
-      >
+    {#if actions.followup}<details class="trade-extra">
         <summary>Aufträge an andere Gewerke</summary>
         <div class="trade-extra-body">
           <p>
@@ -331,26 +389,26 @@
             und Fachfassung bleiben zusammen.
           </p>
           <form on:submit|preventDefault={() => void send()}>
-            <fieldset class="form-multi">
-              <legend>Empfangende Gewerke</legend
-              >{#each planning.departments.filter((d) => d.id !== current.departmentId) as department (department.id)}<label
-                  class="check-label"
-                  ><input
-                    type="checkbox"
-                    checked={targets.includes(department.id)}
-                    on:change={(e) =>
-                      (targets = e.currentTarget.checked
-                        ? [...targets, department.id]
-                        : targets.filter((id) => id !== department.id))}
-                  />{department.name}</label
-                >{/each}
-            </fieldset>
+            <SelectionList
+              label="Empfangende Gewerke"
+              required
+              disabled={busy}
+              options={planning.departments
+                .filter((d) => d.id !== current.departmentId)
+                .map((d) => ({ id: d.id, label: d.name }))}
+              selected={targets}
+              onChange={(ids) => (targets = ids)}
+            />
             <label
-              >Änderungsauftrag<textarea bind:value={brief} minlength="3" maxlength="10000" required
-              ></textarea></label
-            ><label>Rückmeldung bis<input type="date" bind:value={dueDate} /></label><button
-              class="button primary"
-              disabled={busy || !targets.length}>Folgeaufträge senden</button
+              >Änderungsauftrag<textarea
+                disabled={busy}
+                bind:value={brief}
+                minlength="3"
+                maxlength="10000"
+                required></textarea></label
+            ><label>Rückmeldung bis<input disabled={busy} type="date" bind:value={dueDate} /></label
+            ><button class="button primary" disabled={busy || !targets.length}
+              >Folgeaufträge senden</button
             >
           </form>
         </div>
@@ -377,6 +435,13 @@
   }
   .trade-current p {
     margin: 0;
+  }
+  .trade-reference-link {
+    display: block;
+    min-height: 44px;
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
   .trade-extra {
     border-top: 1px solid var(--border);

@@ -607,6 +607,89 @@ export function extendFachContracts(modules: ModuleManifest[]) {
       ]);
     }
   }
+  const priorities: Record<string, Record<string, string[]>> = {
+    sound: {
+      channel: [
+        "actorId",
+        "characterId",
+        "assetId",
+        "channelNumber",
+        "frequencyMHz",
+        "backupAssetId",
+      ],
+      cue: ["sequence", "scene", "fileId", "trigger"],
+    },
+    costume: {
+      costume: ["actorId", "characterId", "assetId"],
+      "quick-change": [
+        "actorId",
+        "fromCostumeId",
+        "toCostumeId",
+        "assistantId",
+        "scene",
+        "seconds",
+      ],
+      measurements: ["actorId", "purpose", "heightCm", "chestCm", "waistCm", "hipCm"],
+    },
+    makeup: { preparation: ["actorId", "characterId", "assetId", "duration", "notes"] },
+    ensemble: {
+      availability: ["start", "end", "availability", "allowedFrom", "allowedTo"],
+      understudy: ["actorId", "characterId", "alternativeActorId"],
+    },
+    dance: { cast: ["actorId", "characterId", "alternativeActorId"] },
+    music: {
+      section: ["memberIds", "substituteIds", "qualification"],
+      service: ["scoreId", "qualification", "start", "end"],
+    },
+    stage: {
+      changeover: ["assetId", "drawingId", "participantIds", "scene", "duration"],
+      inspection: ["assetId", "resourceId", "result", "blockResource"],
+    },
+    video: { media: ["fileId", "codec", "resolution", "frameRate", "rightsUntil"] },
+    facilities: {
+      maintenance: ["assetId", "seriesId", "responsibleId", "nextService"],
+      incident: ["fault", "assetId", "resourceId", "blockResource", "responsibleId", "deadline"],
+    },
+    props: { "scene-prop": ["assetId", "scene", "preset", "resetChecked", "deadline"] },
+    direction: {
+      "rehearsal-report": [
+        "date",
+        "sceneId",
+        "observations",
+        "changes",
+        "responsibleId",
+        "deadline",
+      ],
+    },
+    dramaturgy: { programme: ["editionId", "copy", "editorId", "deadline"] },
+    marketing: { campaign: ["assetId", "channel", "deadline", "message"] },
+  };
+  for (const module of modules)
+    for (const feature of module.features) {
+      const keys = priorities[module.id]?.[feature.id];
+      if (keys)
+        for (const field of feature.fields) {
+          field.primary = keys.includes(field.key);
+          if (
+            !field.primary &&
+            !field.required &&
+            field.type === "text" &&
+            [
+              "actor",
+              "character",
+              "microphone",
+              "channel",
+              "routing",
+              "performer",
+              "costume",
+              "alternative",
+              "members",
+              "asset",
+            ].includes(field.key)
+          )
+            field.label = field.label + " (bisherige Freitextnotiz)";
+        }
+    }
   modules
     .find((m) => m.id === "disposition")!
     .features.push(

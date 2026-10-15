@@ -416,6 +416,7 @@
           requestId={params.get("requestId") || ""}
           itemId={params.get("itemId") || ""}
           featureId={params.get("featureId") || ""}
+          tradeModule={params.get("tradeModule") || ""}
           createEntry={params.get("create") === "1"}
         />{/key}{:else if activeModule === "today"}<TodayModule {navigate}
       ></TodayModule>{:else}{#if activeModule === "productions"}<ProductionsModule

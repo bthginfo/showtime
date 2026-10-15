@@ -41,7 +41,7 @@
   export let navigate: ViewProps["navigate"] = undefined as any;
   export let onStartTour: ViewProps["onStartTour"] = undefined as any;
   export let initialGuide: ViewProps["initialGuide"] = undefined as any;
-  let tab: string = "guides";
+  let tab: string = initialGuide === "trade" ? "trade" : "guides";
   const setTab = (next: typeof tab | ((current: typeof tab) => typeof tab)) => {
     tab = typeof next === "function" ? (next as (current: typeof tab) => typeof tab)(tab) : next;
   };

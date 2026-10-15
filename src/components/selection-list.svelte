@@ -9,6 +9,11 @@
   export let name = "";
   export let max = 200;
   export let disabled = false;
+  export let required = false;
+  let searchInput: HTMLInputElement;
+  $: searchInput?.setCustomValidity(
+    required && !selected.length ? `Bitte wähle mindestens einen Eintrag für ${label}.` : "",
+  );
   let search = "",
     limit = 8;
   const id = createId();
@@ -29,11 +34,16 @@
 </script>
 
 <fieldset class="selection-list full" {disabled}>
-  <legend>{label}<span class="selection-count">{selected.length} ausgewählt</span></legend>
-  {#if options.length > 8}<label class="selection-search" for={id}>
+  <legend
+    >{label}{required ? " · Pflichtauswahl" : ""}<span class="selection-count"
+      >{selected.length} ausgewählt</span
+    ></legend
+  >
+  {#if options.length > 8 || required}<label class="selection-search" for={id}>
       <Search size={16} aria-hidden="true" />
       <input
         {id}
+        bind:this={searchInput}
         aria-label={`${label} durchsuchen`}
         placeholder="Suchen …"
         bind:value={search}

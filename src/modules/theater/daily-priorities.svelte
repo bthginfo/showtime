@@ -8,11 +8,51 @@
   import { collaborationOpen } from "@/shared/collaboration";
   import { theaterLabel } from "@/shared/theater-time";
   import type { Planning } from "./types";
+  import WorkTiles from "@/components/work-tiles.svelte";
+  import { tradeStatus } from "@/shared/trade-actions";
+  import { tradeChoiceLabel } from "@/shared/trade-labels";
   export let navigate: (url: string) => void;
   const store = useWorkspace();
   let items: Planning["items"] = [],
-    error = "";
+    error = "",
+    partial = false;
   $: workspace = $store.workspace;
+  $: attention = items
+    .filter(
+      (item) =>
+        item.moduleId === workspace.currentModuleId &&
+        !["workspace", "collaboration"].includes(item.type) &&
+        !["done", "ready", "approved", "archived", "cancelled"].includes(item.status) &&
+        (item.status === "blocked" ||
+          item.ownerId === workspace.user.id ||
+          item.createdBy === workspace.user.id ||
+          item.data._deputyId === workspace.user.id),
+    )
+    .sort(
+      (a, b) =>
+        Number(b.status === "blocked") - Number(a.status === "blocked") ||
+        String(a.dueAt || "9999").localeCompare(String(b.dueAt || "9999")) ||
+        b.updatedAt.localeCompare(a.updatedAt),
+    );
+  $: attentionTiles = attention.slice(0, 4).map((item) => ({
+    id: item.id,
+    title: item.title,
+    description: `${tradeStatus(item) || tradeChoiceLabel(item.status)}${
+      item.dueAt
+        ? " · fällig " + theaterLabel(item.dueAt, workspace.timezone || "Europe/Berlin")
+        : " · ohne Frist"
+    }`,
+    href:
+      "/?" +
+      new URLSearchParams({
+        module: "theater",
+        view: "trade",
+        itemId: item.id,
+        featureId: item.type,
+        tradeModule: item.moduleId,
+        ...(item.productionId ? { productionId: item.productionId } : {}),
+      }),
+  }));
   $: reviews = items
     .filter(
       (item) =>
@@ -66,38 +106,61 @@
   }
   onMount(async () => {
     try {
-      items = (await api<Planning>("/api/theater")).items;
+      const planning = await api<Planning>("/api/theater");
+      items = planning.items;
+      partial = !!planning.nextCursor;
     } catch (e) {
       error = (e as Error).message;
     }
   });
 </script>
 
-{#if reviews.length || team.length || error}<div class="daily-priorities">
+{#if attention.length || reviews.length || team.length || partial || error}<div
+    class="daily-priorities"
+  >
     <ErrorMessage message={error} />
+    {#if attention.length}<Section
+        title="Deine Facharbeit mit Handlungsbedarf"
+        meta={`${attention.length} im geladenen Bestand${partial ? " · weitere vorhanden" : ""}`}
+      >
+        <WorkTiles label="Arbeitsstände mit Handlungsbedarf" tiles={attentionTiles} />
+        {#if partial}<p class="small muted priority-note">
+            Die Kacheln zeigen die aktuell geladene Seite. Im Gewerk kannst du weitere Arbeitsstände
+            laden.
+          </p>{/if}
+      </Section>{/if}
+    {#if !attention.length && !reviews.length && partial}<Section
+        title="Weitere Facharbeit prüfen"
+        meta="Weitere Arbeitsstände sind vorhanden"
+      >
+        <div class="panel-content">
+          <p class="muted">
+            Auf der geladenen Seite liegt gerade nichts Eigenes oder Blockiertes. Im Gewerk kannst
+            du ältere Arbeitsstände nachladen und filtern.
+          </p>
+          <Button onClick={() => navigate("/?module=theater&view=trade")}
+            >Gewerk öffnen und weitere laden</Button
+          >
+        </div>
+      </Section>{/if}
     {#if reviews.length}<Section
         title="Abstimmungen, die Aufmerksamkeit brauchen"
-        meta="Aktuelle zugängliche Arbeitsstände"
+        meta={`Aktuell zugänglich${partial ? " · weitere Arbeitsstände vorhanden" : ""}`}
       >
-        <div class="list">
-          {#each reviews.slice(0, 4) as item (item.id)}<button
-              class="notification-row"
-              on:click={() =>
-                navigate(
-                  "/?module=theater&view=collaborations&requestId=" + encodeURIComponent(item.id),
-                )}
-            >
-              <div>
-                <strong>{item.title}</strong>
-                <p class="small muted">
-                  {item.data.dueDate
-                    ? "Frist " +
-                      theaterLabel(String(item.data.dueDate), workspace.timezone || "Europe/Berlin")
-                    : "Ohne Frist"} · Rückmeldung oder nächste Entscheidung prüfen
-                </p>
-              </div>
-            </button>{/each}
-        </div>
+        <WorkTiles
+          label="Abstimmungen mit Handlungsbedarf"
+          tiles={reviews.slice(0, 4).map((item) => ({
+            id: item.id,
+            title: item.title,
+            description: `${
+              item.data.dueDate
+                ? "Frist " +
+                  theaterLabel(String(item.data.dueDate), workspace.timezone || "Europe/Berlin")
+                : "Ohne Frist"
+            } · Rückmeldung oder Entscheidung prüfen`,
+            href: "/?module=theater&view=collaborations&requestId=" + encodeURIComponent(item.id),
+          }))}
+        />
       </Section>{/if}
     {#if team.length}<Section
         title="Teamaufgaben & kommende Dienste"
@@ -132,8 +195,7 @@
     gap: 20px;
     margin: 20px 0;
   }
-  .notification-row {
-    text-align: left;
-    width: 100%;
+  .priority-note {
+    margin: 16px 0 0;
   }
 </style>

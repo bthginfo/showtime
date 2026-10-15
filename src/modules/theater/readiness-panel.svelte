@@ -138,13 +138,25 @@
       Fachstand öffnen sie erneut. Eine Ausnahme wird zeitlich begrenzt dokumentiert und ersetzt
       keinen technischen Sicherheitsnachweis.
     </p>
+    {#if !performanceId && planning.modules.some((m) => m.config.departmentId === $store.workspace.department.id && m.manifest.features.some((f) => f.id === "readiness")) && hasPermission( subject, "readiness.manage", { productionId, departmentId: $store.workspace.department.id } )}<a
+        class="button primary"
+        href={"/?" +
+          new URLSearchParams({
+            module: "theater",
+            view: "trade",
+            featureId: "readiness",
+            productionId,
+            create: "1",
+          })}>Bereitschaft meines Gewerks prüfen</a
+      >{/if}
     {#if mayConfigure}<Button onClick={() => (editing = !editing)}
         >{editing ? "Vorgaben schließen" : "Anforderungen & Ausnahmen bearbeiten"}</Button
       >{/if}
     {#if editing}<form on:submit|preventDefault={() => void save()}>
         <fieldset class="form-multi">
           <legend>Erforderliche Gewerke für diesen Geltungsbereich</legend
-          >{#each planning.modules as m (m.moduleId)}<label class="check-label"
+          >{#each planning.modules.filter( (m) => m.manifest.features.some((f) => f.id === "readiness") ) as m (m.moduleId)}<label
+              class="check-label"
               ><input type="checkbox" bind:group={required} value={m.moduleId} />{m.manifest
                 .label}</label
             >{/each}
